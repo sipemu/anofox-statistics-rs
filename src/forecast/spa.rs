@@ -82,10 +82,7 @@ pub fn spa_test(
     }
 
     // Sample means of loss differentials
-    let d_bar: Vec<f64> = d
-        .iter()
-        .map(|di| di.iter().sum::<f64>() / t_f)
-        .collect();
+    let d_bar: Vec<f64> = d.iter().map(|di| di.iter().sum::<f64>() / t_f).collect();
 
     // Sample variances with HAC correction (simple version)
     let variances: Vec<f64> = d
@@ -251,10 +248,10 @@ mod tests {
 
         // Multiple models with varying performance
         let models = vec![
-            vec![4.0; 50],  // Slightly better
-            vec![2.0; 50],  // Much better
-            vec![6.0; 50],  // Worse
-            vec![4.5; 50],  // Slightly better
+            vec![4.0; 50], // Slightly better
+            vec![2.0; 50], // Much better
+            vec![6.0; 50], // Worse
+            vec![4.5; 50], // Slightly better
         ];
 
         let result = spa_test(&benchmark, &models, 499, 3.0, Some(42)).unwrap();

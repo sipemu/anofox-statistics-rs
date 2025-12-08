@@ -46,19 +46,13 @@ fn dot_product(a: &[f64], b: &[f64]) -> f64 {
 /// Compute the squared Euclidean distance between two vectors.
 #[inline]
 fn squared_distance(a: &[f64], b: &[f64]) -> f64 {
-    a.iter()
-        .zip(b.iter())
-        .map(|(x, y)| (x - y).powi(2))
-        .sum()
+    a.iter().zip(b.iter()).map(|(x, y)| (x - y).powi(2)).sum()
 }
 
 /// Compute the L1 distance between two vectors.
 #[inline]
 fn l1_distance(a: &[f64], b: &[f64]) -> f64 {
-    a.iter()
-        .zip(b.iter())
-        .map(|(x, y)| (x - y).abs())
-        .sum()
+    a.iter().zip(b.iter()).map(|(x, y)| (x - y).abs()).sum()
 }
 
 /// Evaluate the kernel function for two points.
@@ -294,7 +288,7 @@ fn median_heuristic_1d(data: &[f64]) -> f64 {
     // Find median
     distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let mid = distances.len() / 2;
-    if distances.len() % 2 == 0 {
+    if distances.len().is_multiple_of(2) {
         (distances[mid - 1] + distances[mid]) / 2.0
     } else {
         distances[mid]

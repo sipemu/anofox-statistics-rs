@@ -134,8 +134,7 @@ fn kurtosis_test(b2: f64, n: f64) -> Result<f64> {
     let e_b2 = 3.0 * (n - 1.0) / (n + 1.0);
 
     // Var[b2] = 24n(n-2)(n-3) / ((n+1)^2(n+3)(n+5))
-    let var_b2 = 24.0 * n * (n - 2.0) * (n - 3.0)
-        / ((n + 1.0).powi(2) * (n + 3.0) * (n + 5.0));
+    let var_b2 = 24.0 * n * (n - 2.0) * (n - 3.0) / ((n + 1.0).powi(2) * (n + 3.0) * (n + 5.0));
 
     // x = (b2 - E[b2]) / sqrt(Var[b2])
     let x = (b2 - e_b2) / var_b2.sqrt();
@@ -146,8 +145,7 @@ fn kurtosis_test(b2: f64, n: f64) -> Result<f64> {
 
     // A = 6 + 8/sqrtbeta1 * (2/sqrtbeta1 + sqrt(1 + 4/sqrtbeta1^2))
     let a = 6.0
-        + 8.0 / sqrt_beta1
-            * (2.0 / sqrt_beta1 + (1.0 + 4.0 / (sqrt_beta1 * sqrt_beta1)).sqrt());
+        + 8.0 / sqrt_beta1 * (2.0 / sqrt_beta1 + (1.0 + 4.0 / (sqrt_beta1 * sqrt_beta1)).sqrt());
 
     // Following R's anscombe.test formula:
     // z <- (1 - 2/(9*a) - ((1 - 2/a)/(1 + xx*sqrt(2/(a-4))))^(1/3)) / sqrt(2/(9*a))
@@ -197,8 +195,8 @@ mod tests {
     fn test_dagostino_non_normal_data() {
         // Highly skewed data should reject normality
         let data: Vec<f64> = vec![
-            1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.5, 3.0, 5.0, 10.0, 20.0,
-            50.0, 100.0, 200.0, 500.0,
+            1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.5, 3.0, 5.0, 10.0, 20.0, 50.0,
+            100.0, 200.0, 500.0,
         ];
         let result = dagostino_k_squared(&data).unwrap();
         // For highly skewed data, p-value should be small

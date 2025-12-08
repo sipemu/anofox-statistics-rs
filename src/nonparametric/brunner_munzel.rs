@@ -33,7 +33,11 @@ pub struct BrunnerMunzelResult {
 /// # References
 /// * Brunner, E. and Munzel, U. (2000). "The Nonparametric Behrens-Fisher Problem:
 ///   Asymptotic Theory and a Small Sample Approximation"
-pub fn brunner_munzel(x: &[f64], y: &[f64], alternative: Alternative) -> Result<BrunnerMunzelResult> {
+pub fn brunner_munzel(
+    x: &[f64],
+    y: &[f64],
+    alternative: Alternative,
+) -> Result<BrunnerMunzelResult> {
     let n1 = x.len();
     let n2 = y.len();
 
@@ -107,8 +111,8 @@ pub fn brunner_munzel(x: &[f64], y: &[f64], alternative: Alternative) -> Result<
     let statistic = n1_f * n2_f * (m2 - m1) / n_total / var_sum.sqrt();
 
     // Degrees of freedom (Welch-Satterthwaite approximation)
-    let df = var_sum.powi(2)
-        / ((n1_f * v1).powi(2) / (n1_f - 1.0) + (n2_f * v2).powi(2) / (n2_f - 1.0));
+    let df =
+        var_sum.powi(2) / ((n1_f * v1).powi(2) / (n1_f - 1.0) + (n2_f * v2).powi(2) / (n2_f - 1.0));
 
     // P-value from t-distribution
     let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
@@ -137,7 +141,9 @@ mod tests {
     #[test]
     fn test_brunner_munzel_basic() {
         // Test data from R: lawstat::brunner.munzel.test
-        let x = vec![1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 4.0, 1.0, 1.0];
+        let x = vec![
+            1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 4.0, 1.0, 1.0,
+        ];
         let y = vec![3.0, 3.0, 4.0, 3.0, 1.0, 2.0, 3.0, 1.0, 1.0, 5.0, 4.0];
 
         let result = brunner_munzel(&x, &y, Alternative::TwoSided).unwrap();

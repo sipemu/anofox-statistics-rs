@@ -55,7 +55,13 @@ impl PermutationEngine {
     ///
     /// # Returns
     /// * `PermutationResult` containing observed statistic and p-value
-    pub fn run<F>(&self, x: &[f64], y: &[f64], statistic_fn: F, alternative: Alternative) -> Result<PermutationResult>
+    pub fn run<F>(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        statistic_fn: F,
+        alternative: Alternative,
+    ) -> Result<PermutationResult>
     where
         F: Fn(&[f64], &[f64]) -> f64,
     {
@@ -195,7 +201,11 @@ mod tests {
         let result = permutation_t_test(&x, &y, Alternative::TwoSided, 999, Some(42)).unwrap();
 
         // Should have very low p-value for clearly different samples
-        assert!(result.p_value < 0.05, "p_value {} should be < 0.05", result.p_value);
+        assert!(
+            result.p_value < 0.05,
+            "p_value {} should be < 0.05",
+            result.p_value
+        );
     }
 
     #[test]
@@ -207,7 +217,11 @@ mod tests {
         let result = permutation_t_test(&x, &y, Alternative::TwoSided, 999, Some(42)).unwrap();
 
         // Should have high p-value for similar samples
-        assert!(result.p_value > 0.1, "p_value {} should be > 0.1", result.p_value);
+        assert!(
+            result.p_value > 0.1,
+            "p_value {} should be > 0.1",
+            result.p_value
+        );
     }
 
     #[test]
@@ -265,9 +279,15 @@ mod tests {
         };
 
         let engine = PermutationEngine::new(999).with_seed(42);
-        let result = engine.run(&x, &y, median_diff, Alternative::TwoSided).unwrap();
+        let result = engine
+            .run(&x, &y, median_diff, Alternative::TwoSided)
+            .unwrap();
 
         // Should detect significant difference with larger, clearly separated samples
-        assert!(result.p_value < 0.05, "p_value {} should be < 0.05", result.p_value);
+        assert!(
+            result.p_value < 0.05,
+            "p_value {} should be < 0.05",
+            result.p_value
+        );
     }
 }
