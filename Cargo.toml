@@ -1,0 +1,22 @@
+[package]
+name = "libanostat"
+version = "0.1.0"
+edition = "2021"
+authors = ["Simon Müller <code@santic.info>"]
+description = "A comprehensive statistical hypothesis testing library validated against R"
+license = "MIT"
+repository = "https://github.com/sipemu/libanostat"
+documentation = "https://docs.rs/libanostat"
+readme = "README.md"
+keywords = ["statistics", "hypothesis-testing", "t-test", "shapiro-wilk", "nonparametric"]
+categories = ["science", "mathematics"]
+
+[dependencies]
+statrs = "0.16"
+rand = "0.8"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+csv = "1.3"
+
+[dev-dependencies]
+approx = "0.5"
