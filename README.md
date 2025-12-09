@@ -45,7 +45,10 @@ This library provides a wide range of statistical tests commonly used in data an
 
 - **Forecast Evaluation**
   - Diebold-Mariano test for comparing predictive accuracy
+  - Clark-West test for nested model comparison
   - Superior Predictive Ability (SPA) test for multiple model comparison
+  - MSPE-Adjusted SPA test for multiple nested models (Clark-West + bootstrap)
+  - Model Confidence Set (Hansen, Lunde, & Nason, 2011)
 
 ## Installation
 
@@ -190,8 +193,8 @@ let result = mmd_test(&sample1, &sample2, Kernel::GaussianMedian, 1000, Some(42)
 ### Forecast Evaluation
 
 ```rust
-use anofox_statistics::{diebold_mariano, LossFunction};
-use anofox_statistics::forecast::spa_test;
+use anofox_statistics::{diebold_mariano, clark_west, spa_test, mspe_adjusted_spa,
+                        model_confidence_set, LossFunction, MCSStatistic};
 
 // Forecast errors from two competing models
 let errors_model1 = vec![0.1, -0.2, 0.3, -0.1, 0.2];
@@ -202,6 +205,13 @@ let result = diebold_mariano(&errors_model1, &errors_model2, LossFunction::Squar
 println!("DM statistic: {:.4}", result.statistic);
 println!("p-value: {:.4}", result.p_value);
 
+// Clark-West test for nested models (e.g., AR(1) vs AR(2))
+let restricted_errors = vec![0.3, -0.2, 0.4, -0.3, 0.2];   // Benchmark/restricted model
+let unrestricted_errors = vec![0.2, -0.1, 0.3, -0.2, 0.1]; // Alternative/unrestricted model
+let result = clark_west(&restricted_errors, &unrestricted_errors, 1)?;
+println!("CW statistic: {:.4}", result.statistic);
+println!("p-value (one-sided): {:.4}", result.p_value);
+
 // Superior Predictive Ability test (compare benchmark vs multiple models)
 let benchmark_losses = vec![0.5, 0.6, 0.4, 0.7, 0.5];
 let model_losses = vec![
@@ -210,7 +220,28 @@ let model_losses = vec![
 ];
 let result = spa_test(&benchmark_losses, &model_losses, 1000, 10.0, Some(42))?;
 println!("SPA statistic: {:.4}", result.statistic);
-println!("p-value: {:.4}", result.p_value);
+println!("p-value: {:.4}", result.p_value_consistent);
+
+// MSPE-Adjusted SPA for multiple nested models
+// Combines Clark-West adjustment with bootstrap for multiple testing
+let benchmark_errors = vec![0.5, 0.4, 0.6, 0.3, 0.5];
+let nested_model_errors = vec![
+    vec![0.4, 0.3, 0.5, 0.2, 0.4],  // Nested model 1
+    vec![0.3, 0.2, 0.4, 0.1, 0.3],  // Nested model 2
+];
+let result = mspe_adjusted_spa(&benchmark_errors, &nested_model_errors, 1000, 5.0, Some(42))?;
+println!("Best model: {:?}", result.best_model_idx);
+println!("p-value (adjusted): {:.4}", result.p_value_consistent);
+
+// Model Confidence Set - identify the set of best models
+let losses = vec![
+    vec![0.5, 0.6, 0.4, 0.7, 0.5],  // Model 0
+    vec![0.4, 0.5, 0.3, 0.6, 0.4],  // Model 1
+    vec![0.8, 0.9, 0.7, 1.0, 0.8],  // Model 2 (worst)
+];
+let result = model_confidence_set(&losses, 0.10, MCSStatistic::Range, 1000, 5.0, Some(42))?;
+println!("Models in MCS: {:?}", result.included_models);
+println!("Eliminated: {:?}", result.eliminated_models);
 ```
 
 ## API Reference
@@ -261,7 +292,10 @@ println!("p-value: {:.4}", result.p_value);
 | Function | Description |
 |----------|-------------|
 | `diebold_mariano(e1, e2, loss, h)` | Diebold-Mariano test for predictive accuracy |
+| `clark_west(e1, e2, h)` | Clark-West test for nested model comparison |
 | `spa_test(benchmark, models, n_bootstrap, block_length, seed)` | Superior Predictive Ability test |
+| `mspe_adjusted_spa(benchmark, models, n_bootstrap, block_length, seed)` | MSPE-Adjusted SPA for multiple nested models |
+| `model_confidence_set(losses, alpha, statistic, n_bootstrap, block_length, seed)` | Model Confidence Set (Hansen et al., 2011) |
 
 ### Math Primitives
 

@@ -9,7 +9,11 @@ pub mod utils;
 
 pub use distributional::{dagostino_k_squared, shapiro_wilk, DAgostinoResult, ShapiroWilkResult};
 pub use error::{Result, StatError};
-pub use forecast::{diebold_mariano, spa_test, DMResult, LossFunction, SPAResult};
+pub use forecast::{
+    clark_west, diebold_mariano, model_confidence_set, mspe_adjusted_spa, spa_test, CWResult,
+    DMResult, LossFunction, MCSEliminationStep, MCSResult, MCSStatistic, MSPEAdjustedResult,
+    SPAResult,
+};
 pub use modern::{
     energy_distance_test, energy_distance_test_1d, mmd_test, mmd_test_1d, EnergyDistanceResult,
     Kernel, MMDResult,
