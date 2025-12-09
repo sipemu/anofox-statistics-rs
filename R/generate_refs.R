@@ -550,5 +550,315 @@ save_ref("brunner_munzel.csv", list(
   estimate = bm_result$estimate
 ))
 
+# ============================================
+# PHASE 8: Clark-West Test
+# ============================================
+
+cat("\n=== Phase 8: Clark-West Test ===\n")
+
+# Clark-West test for nested model comparison
+# Uses the same forecast errors as Diebold-Mariano
+
+# Compute Clark-West adjusted statistic manually
+# d_t = e1_t^2 - e2_t^2 + (e1_t - e2_t)^2
+cw_d <- e1^2 - e2^2 + (e1 - e2)^2
+
+n <- length(cw_d)
+d_bar <- mean(cw_d)
+
+# HAC variance (h=1, so no autocorrelation adjustment)
+gamma_0 <- var(cw_d) * (n - 1) / n  # Population variance
+var_d_bar <- gamma_0 / n
+
+cw_stat <- d_bar / sqrt(var_d_bar)
+cw_p_one <- 1 - pnorm(cw_stat)  # One-sided
+cw_p_two <- 2 * (1 - pnorm(abs(cw_stat)))  # Two-sided
+
+# Also compute with h=3 (HAC adjustment)
+# Autocovariances for h=3 (lags 0, 1, 2)
+d_centered <- cw_d - mean(cw_d)
+gamma_0_h3 <- sum(d_centered^2) / n
+gamma_1 <- sum(d_centered[2:n] * d_centered[1:(n-1)]) / n
+gamma_2 <- sum(d_centered[3:n] * d_centered[1:(n-2)]) / n
+
+acov_sum_h3 <- gamma_0_h3 + 2 * gamma_1 + 2 * gamma_2
+var_d_bar_h3 <- acov_sum_h3 / n
+
+cw_stat_h3 <- d_bar / sqrt(var_d_bar_h3)
+cw_p_one_h3 <- 1 - pnorm(cw_stat_h3)
+cw_p_two_h3 <- 2 * (1 - pnorm(abs(cw_stat_h3)))
+
+save_ref("clark_west.csv", list(
+  # h=1
+  statistic_h1 = cw_stat,
+  p_value_one_h1 = cw_p_one,
+  p_value_two_h1 = cw_p_two,
+  # h=3
+  statistic_h3 = cw_stat_h3,
+  p_value_one_h3 = cw_p_one_h3,
+  p_value_two_h3 = cw_p_two_h3
+))
+
+# ============================================
+# PHASE 9: SPA Test (Superior Predictive Ability)
+# ============================================
+
+cat("\n=== Phase 9: SPA Test ===\n")
+
+# Generate benchmark and model losses for SPA test
+set.seed(456)
+spa_n <- 100
+
+# Benchmark: moderate losses
+spa_benchmark <- abs(rnorm(spa_n, 2, 0.5))
+save_vector("spa_benchmark.csv", spa_benchmark)
+
+# Model 1: Clearly better (lower losses)
+spa_model1 <- abs(rnorm(spa_n, 1, 0.3))
+save_vector("spa_model1.csv", spa_model1)
+
+# Model 2: Similar to benchmark
+spa_model2 <- abs(rnorm(spa_n, 2.1, 0.5))
+save_vector("spa_model2.csv", spa_model2)
+
+# Model 3: Worse than benchmark
+spa_model3 <- abs(rnorm(spa_n, 3, 0.6))
+save_vector("spa_model3.csv", spa_model3)
+
+# Compute SPA statistic manually (without bootstrap)
+# d_k = L_benchmark - L_model_k (positive = model better)
+d1 <- spa_benchmark - spa_model1
+d2 <- spa_benchmark - spa_model2
+d3 <- spa_benchmark - spa_model3
+
+# Sample means
+d1_bar <- mean(d1)
+d2_bar <- mean(d2)
+d3_bar <- mean(d3)
+
+# Sample variances of the mean
+var1 <- var(d1) / spa_n
+var2 <- var(d2) / spa_n
+var3 <- var(d3) / spa_n
+
+# Standardized statistics
+t1 <- d1_bar * sqrt(spa_n) / sqrt(var1)
+t2 <- d2_bar * sqrt(spa_n) / sqrt(var2)
+t3 <- d3_bar * sqrt(spa_n) / sqrt(var3)
+
+# SPA statistic = max of standardized stats
+spa_stat <- max(t1, t2, t3)
+best_idx <- which.max(c(t1, t2, t3)) - 1  # 0-indexed
+
+save_ref("spa.csv", list(
+  statistic = spa_stat,
+  t1 = t1,
+  t2 = t2,
+  t3 = t3,
+  best_idx = best_idx,
+  d1_bar = d1_bar,
+  d2_bar = d2_bar,
+  d3_bar = d3_bar
+))
+
+# ============================================
+# PHASE 10: Model Confidence Set (MCS)
+# ============================================
+
+cat("\n=== Phase 10: Model Confidence Set ===\n")
+
+# Generate loss series for MCS test
+set.seed(789)
+mcs_n <- 200
+
+# Model 0: Best (lowest losses)
+mcs_model0 <- abs(rnorm(mcs_n, 1.0, 0.3))
+save_vector("mcs_model0.csv", mcs_model0)
+
+# Model 1: Good (similar to model 0)
+mcs_model1 <- abs(rnorm(mcs_n, 1.1, 0.35))
+save_vector("mcs_model1.csv", mcs_model1)
+
+# Model 2: Medium (clearly worse than 0,1)
+mcs_model2 <- abs(rnorm(mcs_n, 2.0, 0.5))
+save_vector("mcs_model2.csv", mcs_model2)
+
+# Model 3: Worst (much worse)
+mcs_model3 <- abs(rnorm(mcs_n, 3.5, 0.8))
+save_vector("mcs_model3.csv", mcs_model3)
+
+# Compute pairwise loss differentials for MCS validation
+# d_ij = L_i - L_j (positive means model i has higher loss = worse)
+d_01 <- mcs_model0 - mcs_model1
+d_02 <- mcs_model0 - mcs_model2
+d_03 <- mcs_model0 - mcs_model3
+d_12 <- mcs_model1 - mcs_model2
+d_13 <- mcs_model1 - mcs_model3
+d_23 <- mcs_model2 - mcs_model3
+
+# Mean loss differentials
+mean_d_01 <- mean(d_01)
+mean_d_02 <- mean(d_02)
+mean_d_03 <- mean(d_03)
+mean_d_12 <- mean(d_12)
+mean_d_13 <- mean(d_13)
+mean_d_23 <- mean(d_23)
+
+# t-statistics for each pair (two-sample t-test on paired differences)
+t_01 <- mean(d_01) / sqrt(var(d_01) / mcs_n)
+t_02 <- mean(d_02) / sqrt(var(d_02) / mcs_n)
+t_03 <- mean(d_03) / sqrt(var(d_03) / mcs_n)
+t_12 <- mean(d_12) / sqrt(var(d_12) / mcs_n)
+t_13 <- mean(d_13) / sqrt(var(d_13) / mcs_n)
+t_23 <- mean(d_23) / sqrt(var(d_23) / mcs_n)
+
+# T_R statistic = max |t_ij|
+t_range <- max(abs(c(t_01, t_02, t_03, t_12, t_13, t_23)))
+
+save_ref("mcs.csv", list(
+  t_01 = t_01,
+  t_02 = t_02,
+  t_03 = t_03,
+  t_12 = t_12,
+  t_13 = t_13,
+  t_23 = t_23,
+  t_range = t_range,
+  mean_d_01 = mean_d_01,
+  mean_d_02 = mean_d_02,
+  mean_d_03 = mean_d_03
+))
+
+# ============================================
+# PHASE 11: Energy Distance Test
+# ============================================
+
+cat("\n=== Phase 11: Energy Distance Test ===\n")
+
+# Try to load energy package
+energy_available <- require(energy, quietly = TRUE)
+
+if (energy_available) {
+  set.seed(321)
+
+  # Generate two clearly different samples
+  ed_x <- rnorm(30, mean = 0, sd = 1)
+  ed_y <- rnorm(30, mean = 3, sd = 1)
+
+  save_vector("ed_x.csv", ed_x)
+  save_vector("ed_y.csv", ed_y)
+
+  # Energy distance test
+  # Note: eqdist.etest returns different things
+  # We'll compute the energy distance statistic manually
+
+  # Energy statistic (E = 2*E|X-Y| - E|X-X'| - E|Y-Y'|)
+  n_x <- length(ed_x)
+  n_y <- length(ed_y)
+
+  # Mean distance X-Y
+  mean_xy <- 0
+  for (i in 1:n_x) {
+    for (j in 1:n_y) {
+      mean_xy <- mean_xy + abs(ed_x[i] - ed_y[j])
+    }
+  }
+  mean_xy <- mean_xy / (n_x * n_y)
+
+  # Mean distance X-X'
+  mean_xx <- 0
+  for (i in 1:n_x) {
+    for (j in 1:n_x) {
+      if (i != j) {
+        mean_xx <- mean_xx + abs(ed_x[i] - ed_x[j])
+      }
+    }
+  }
+  mean_xx <- mean_xx / (n_x * (n_x - 1))
+
+  # Mean distance Y-Y'
+  mean_yy <- 0
+  for (i in 1:n_y) {
+    for (j in 1:n_y) {
+      if (i != j) {
+        mean_yy <- mean_yy + abs(ed_y[i] - ed_y[j])
+      }
+    }
+  }
+  mean_yy <- mean_yy / (n_y * (n_y - 1))
+
+  # Energy statistic
+  ed_stat <- 2 * mean_xy - mean_xx - mean_yy
+
+  save_ref("energy_distance.csv", list(
+    statistic = ed_stat,
+    mean_xy = mean_xy,
+    mean_xx = mean_xx,
+    mean_yy = mean_yy
+  ))
+
+  cat("Energy distance reference generated\n")
+} else {
+  cat("Note: 'energy' package not available, skipping energy distance reference\n")
+
+  # Generate basic reference without the package
+  set.seed(321)
+  ed_x <- rnorm(30, mean = 0, sd = 1)
+  ed_y <- rnorm(30, mean = 3, sd = 1)
+
+  save_vector("ed_x.csv", ed_x)
+  save_vector("ed_y.csv", ed_y)
+
+  # Manual energy statistic calculation
+  n_x <- length(ed_x)
+  n_y <- length(ed_y)
+
+  mean_xy <- mean(outer(ed_x, ed_y, function(a, b) abs(a - b)))
+  mean_xx <- mean(as.dist(outer(ed_x, ed_x, function(a, b) abs(a - b))))
+  mean_yy <- mean(as.dist(outer(ed_y, ed_y, function(a, b) abs(a - b))))
+
+  ed_stat <- 2 * mean_xy - mean_xx - mean_yy
+
+  save_ref("energy_distance.csv", list(
+    statistic = ed_stat,
+    mean_xy = mean_xy,
+    mean_xx = mean_xx,
+    mean_yy = mean_yy
+  ))
+}
+
+# ============================================
+# PHASE 12: Permutation T-Test
+# ============================================
+
+cat("\n=== Phase 12: Permutation T-Test ===\n")
+
+set.seed(555)
+
+# Generate two samples with different means
+perm_x <- rnorm(20, mean = 5, sd = 1)
+perm_y <- rnorm(25, mean = 7, sd = 1.2)
+
+save_vector("perm_x.csv", perm_x)
+save_vector("perm_y.csv", perm_y)
+
+# Compute t-statistic manually (for comparison)
+# t = (mean_x - mean_y) / sqrt(var_x/n_x + var_y/n_y)
+mean_x <- mean(perm_x)
+mean_y <- mean(perm_y)
+var_x <- var(perm_x)
+var_y <- var(perm_y)
+n_x <- length(perm_x)
+n_y <- length(perm_y)
+
+t_stat <- (mean_x - mean_y) / sqrt(var_x / n_x + var_y / n_y)
+
+save_ref("permutation_t.csv", list(
+  t_statistic = t_stat,
+  mean_x = mean_x,
+  mean_y = mean_y,
+  var_x = var_x,
+  var_y = var_y
+))
+
 cat("\n=== Reference generation complete ===\n")
 cat("Run 'cargo test' to verify Rust implementation against these references.\n")

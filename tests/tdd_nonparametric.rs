@@ -1,6 +1,8 @@
 mod common;
 
-use anofox_statistics::{kruskal_wallis, mann_whitney_u, rank, wilcoxon_signed_rank};
+use anofox_statistics::{
+    brunner_munzel, kruskal_wallis, mann_whitney_u, rank, wilcoxon_signed_rank, Alternative,
+};
 use approx::assert_relative_eq;
 
 const EPSILON: f64 = 1e-10;
@@ -140,4 +142,37 @@ fn test_kruskal_wallis_empty_group_returns_error() {
     let a = vec![1.0, 2.0, 3.0];
     let empty: Vec<f64> = vec![];
     assert!(kruskal_wallis(&[&a[..], &empty[..]]).is_err());
+}
+
+// ============================================
+// Brunner-Munzel Test
+// ============================================
+
+#[test]
+fn test_brunner_munzel() {
+    let refs = common::load_reference_scalars("brunner_munzel.csv");
+    let x = common::load_reference_vector("bm_x.csv");
+    let y = common::load_reference_vector("bm_y.csv");
+
+    let result =
+        brunner_munzel(&x, &y, Alternative::TwoSided).expect("brunner_munzel should succeed");
+
+    assert_relative_eq!(result.statistic, refs["statistic"], epsilon = 1e-6);
+    assert_relative_eq!(result.df, refs["df"], epsilon = 1e-6);
+    assert_relative_eq!(result.p_value, refs["p_value"], epsilon = 1e-6);
+    assert_relative_eq!(result.estimate, refs["estimate"], epsilon = 1e-6);
+}
+
+#[test]
+fn test_brunner_munzel_empty_x_returns_error() {
+    let empty: Vec<f64> = vec![];
+    let y = vec![1.0, 2.0, 3.0];
+    assert!(brunner_munzel(&empty, &y, Alternative::TwoSided).is_err());
+}
+
+#[test]
+fn test_brunner_munzel_empty_y_returns_error() {
+    let x = vec![1.0, 2.0, 3.0];
+    let empty: Vec<f64> = vec![];
+    assert!(brunner_munzel(&x, &empty, Alternative::TwoSided).is_err());
 }
