@@ -151,6 +151,28 @@ pub fn mmd_test(
     n_permutations: usize,
     seed: Option<u64>,
 ) -> Result<MMDResult> {
+    // Validate inputs
+    validate_mmd_inputs(x, y)?;
+
+    // Convert to slices
+    let x_slices: Vec<&[f64]> = x.iter().map(|v| v.as_slice()).collect();
+    let y_slices: Vec<&[f64]> = y.iter().map(|v| v.as_slice()).collect();
+
+    // Compute observed MMD^2
+    let observed = mmd_squared(&x_slices, &y_slices, kernel);
+
+    // Run permutation test
+    let p_value = run_mmd_permutation_test(x, y, kernel, observed, n_permutations, seed);
+
+    Ok(MMDResult {
+        statistic: observed,
+        p_value,
+        n_permutations,
+    })
+}
+
+/// Validate MMD test inputs.
+fn validate_mmd_inputs(x: &[Vec<f64>], y: &[Vec<f64>]) -> Result<()> {
     if x.is_empty() || y.is_empty() {
         return Err(StatError::EmptyData);
     }
@@ -169,7 +191,6 @@ pub fn mmd_test(
         });
     }
 
-    // Check dimensions match
     let dim = x[0].len();
     if dim == 0 {
         return Err(StatError::InvalidParameter(
@@ -177,34 +198,29 @@ pub fn mmd_test(
         ));
     }
 
-    for xi in x.iter() {
-        if xi.len() != dim {
-            return Err(StatError::InvalidParameter(
-                "All data points must have the same dimension".to_string(),
-            ));
-        }
+    // Check all points have consistent dimension
+    let all_same_dim = x.iter().chain(y.iter()).all(|v| v.len() == dim);
+    if !all_same_dim {
+        return Err(StatError::InvalidParameter(
+            "All data points must have the same dimension".to_string(),
+        ));
     }
 
-    for yi in y.iter() {
-        if yi.len() != dim {
-            return Err(StatError::InvalidParameter(
-                "All data points must have the same dimension".to_string(),
-            ));
-        }
-    }
+    Ok(())
+}
 
-    // Convert to slices
-    let x_slices: Vec<&[f64]> = x.iter().map(|v| v.as_slice()).collect();
-    let y_slices: Vec<&[f64]> = y.iter().map(|v| v.as_slice()).collect();
-
-    // Compute observed MMD^2
-    let observed = mmd_squared(&x_slices, &y_slices, kernel);
-
-    // Combine all observations for permutation testing
+/// Run the permutation test for MMD.
+fn run_mmd_permutation_test(
+    x: &[Vec<f64>],
+    y: &[Vec<f64>],
+    kernel: Kernel,
+    observed: f64,
+    n_permutations: usize,
+    seed: Option<u64>,
+) -> f64 {
     let combined: Vec<Vec<f64>> = x.iter().chain(y.iter()).cloned().collect();
     let n1 = x.len();
 
-    // Permutation test
     let mut rng = match seed {
         Some(s) => ChaCha8Rng::seed_from_u64(s),
         None => ChaCha8Rng::from_entropy(),
@@ -232,13 +248,7 @@ pub fn mmd_test(
         }
     }
 
-    let p_value = (count_extreme as f64 + 1.0) / (n_permutations as f64 + 1.0);
-
-    Ok(MMDResult {
-        statistic: observed,
-        p_value,
-        n_permutations,
-    })
+    (count_extreme as f64 + 1.0) / (n_permutations as f64 + 1.0)
 }
 
 /// Convenience function for univariate MMD test with Gaussian kernel.

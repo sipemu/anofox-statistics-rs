@@ -1,5 +1,8 @@
-use crate::error::{Result, StatError};
-use crate::resampling::bootstrap::StationaryBootstrap;
+use crate::error::Result;
+use crate::forecast::spa_common::{
+    compute_means, compute_spa_pvalues, compute_standardized, compute_variances, find_best_model,
+    validate_model_data,
+};
 
 /// Result of the Superior Predictive Ability (SPA) test
 #[derive(Debug, Clone)]
@@ -43,73 +46,18 @@ pub fn spa_test(
     seed: Option<u64>,
 ) -> Result<SPAResult> {
     let t = benchmark_losses.len();
-    let k = model_losses.len();
 
-    if t == 0 {
-        return Err(StatError::EmptyData);
-    }
-
-    if k == 0 {
-        return Err(StatError::InvalidParameter(
-            "At least one competing model required".to_string(),
-        ));
-    }
-
-    // Verify all model losses have the same length
-    for (i, losses) in model_losses.iter().enumerate() {
-        if losses.len() != t {
-            return Err(StatError::InvalidParameter(format!(
-                "Model {} has {} observations, expected {}",
-                i,
-                losses.len(),
-                t
-            )));
-        }
-    }
-
-    let t_f = t as f64;
+    // Validate inputs
+    validate_model_data(t, model_losses, "competing model")?;
 
     // Compute loss differentials: d_ki = L_benchmark - L_model_k
     // Positive values mean the model outperforms the benchmark
-    let mut d: Vec<Vec<f64>> = Vec::with_capacity(k);
-    for model_loss in model_losses {
-        let diff: Vec<f64> = benchmark_losses
-            .iter()
-            .zip(model_loss.iter())
-            .map(|(b, m)| b - m)
-            .collect();
-        d.push(diff);
-    }
+    let d: Vec<Vec<f64>> = compute_loss_differentials(benchmark_losses, model_losses);
 
-    // Sample means of loss differentials
-    let d_bar: Vec<f64> = d.iter().map(|di| di.iter().sum::<f64>() / t_f).collect();
-
-    // Sample variances with HAC correction (simple version)
-    let variances: Vec<f64> = d
-        .iter()
-        .zip(d_bar.iter())
-        .map(|(di, &mean)| {
-            let var: f64 = di.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (t_f - 1.0);
-            var / t_f // variance of the mean
-        })
-        .collect();
-
-    // Standardized statistics for each model
-    // When variance is very small, use the raw mean scaled by sqrt(T)
-    // This handles the case where all observations are identical
-    let standardized: Vec<f64> = d_bar
-        .iter()
-        .zip(variances.iter())
-        .map(|(&mean, &var)| {
-            if var > 1e-14 {
-                mean * t_f.sqrt() / var.sqrt()
-            } else {
-                // Zero variance: use scaled mean directly
-                // This preserves the ordering by mean magnitude
-                mean * t_f.sqrt() * 1e6
-            }
-        })
-        .collect();
+    // Compute statistics
+    let d_bar = compute_means(&d);
+    let variances = compute_variances(&d, &d_bar);
+    let standardized = compute_standardized(&d_bar, &variances, t);
 
     // Observed test statistic: max of standardized performance
     let observed = standardized
@@ -118,66 +66,11 @@ pub fn spa_test(
         .fold(f64::NEG_INFINITY, f64::max);
 
     // Find best model
-    let best_model_idx = standardized
-        .iter()
-        .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-        .map(|(i, _)| i);
+    let best_model_idx = find_best_model(&standardized);
 
     // Bootstrap p-values
-    let mut bootstrap = StationaryBootstrap::new(block_length, seed);
-    let mut count_consistent = 0usize;
-    let mut count_upper = 0usize;
-
-    for _ in 0..n_bootstrap {
-        let mut boot_max_consistent = f64::NEG_INFINITY;
-        let mut boot_max_upper = f64::NEG_INFINITY;
-
-        for (i, di) in d.iter().enumerate() {
-            // Bootstrap sample
-            let boot_sample = bootstrap.sample(di, t);
-
-            // Bootstrap mean
-            let boot_mean: f64 = boot_sample.iter().sum::<f64>() / t_f;
-
-            // Centered bootstrap statistic (for consistent p-value)
-            let centered_mean = boot_mean - d_bar[i];
-            let boot_var: f64 = boot_sample
-                .iter()
-                .map(|x| (x - boot_mean).powi(2))
-                .sum::<f64>()
-                / (t_f - 1.0)
-                / t_f;
-
-            let boot_stat_consistent = if boot_var > 1e-14 {
-                centered_mean * t_f.sqrt() / boot_var.sqrt()
-            } else {
-                centered_mean * t_f.sqrt() * 1e6
-            };
-
-            // For upper p-value, use g(d_bar) modification
-            let g_d_bar = d_bar[i].max(0.0);
-            let upper_centered = boot_mean - g_d_bar;
-            let boot_stat_upper = if boot_var > 1e-14 {
-                upper_centered * t_f.sqrt() / boot_var.sqrt()
-            } else {
-                upper_centered * t_f.sqrt() * 1e6
-            };
-
-            boot_max_consistent = boot_max_consistent.max(boot_stat_consistent);
-            boot_max_upper = boot_max_upper.max(boot_stat_upper);
-        }
-
-        if boot_max_consistent >= observed {
-            count_consistent += 1;
-        }
-        if boot_max_upper >= observed {
-            count_upper += 1;
-        }
-    }
-
-    let p_value_consistent = (count_consistent as f64 + 1.0) / (n_bootstrap as f64 + 1.0);
-    let p_value_upper = (count_upper as f64 + 1.0) / (n_bootstrap as f64 + 1.0);
+    let (p_value_consistent, p_value_upper) =
+        compute_spa_pvalues(&d, &d_bar, observed, n_bootstrap, block_length, seed);
 
     Ok(SPAResult {
         statistic: observed,
@@ -186,6 +79,20 @@ pub fn spa_test(
         n_bootstrap,
         best_model_idx,
     })
+}
+
+/// Compute loss differentials between benchmark and each model.
+fn compute_loss_differentials(benchmark: &[f64], models: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    models
+        .iter()
+        .map(|model_loss| {
+            benchmark
+                .iter()
+                .zip(model_loss.iter())
+                .map(|(b, m)| b - m)
+                .collect()
+        })
+        .collect()
 }
 
 #[cfg(test)]

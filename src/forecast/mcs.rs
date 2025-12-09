@@ -2,6 +2,9 @@ use crate::error::{Result, StatError};
 use crate::resampling::bootstrap::StationaryBootstrap;
 use std::collections::HashMap;
 
+/// Type alias for pairwise statistics maps.
+type PairwiseStats = HashMap<(usize, usize), f64>;
+
 /// Test statistic type for Model Confidence Set
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MCSStatistic {
@@ -68,10 +71,32 @@ pub fn model_confidence_set(
     block_length: f64,
     seed: Option<u64>,
 ) -> Result<MCSResult> {
+    // Validate inputs
+    validate_mcs_inputs(losses, alpha, n_bootstrap)?;
+
     let k = losses.len();
 
-    // Input validation - check parameters first
-    if k == 0 {
+    // Single model is trivially in the MCS
+    if k == 1 {
+        return Ok(MCSResult {
+            included_models: vec![0],
+            eliminated_models: vec![],
+            mcs_p_value: 1.0,
+            elimination_sequence: vec![],
+            n_bootstrap,
+            statistic_type: statistic,
+        });
+    }
+
+    let t = losses[0].len();
+
+    // Run sequential elimination
+    run_elimination_loop(losses, alpha, statistic, n_bootstrap, block_length, seed, t)
+}
+
+/// Validate MCS input parameters.
+fn validate_mcs_inputs(losses: &[Vec<f64>], alpha: f64, n_bootstrap: usize) -> Result<()> {
+    if losses.is_empty() {
         return Err(StatError::InvalidParameter(
             "At least one model required".to_string(),
         ));
@@ -89,24 +114,11 @@ pub fn model_confidence_set(
         ));
     }
 
-    // Single model is trivially in the MCS
-    if k == 1 {
-        return Ok(MCSResult {
-            included_models: vec![0],
-            eliminated_models: vec![],
-            mcs_p_value: 1.0,
-            elimination_sequence: vec![],
-            n_bootstrap,
-            statistic_type: statistic,
-        });
-    }
-
     let t = losses[0].len();
     if t == 0 {
         return Err(StatError::EmptyData);
     }
 
-    // Verify all models have same length
     for (i, model_losses) in losses.iter().enumerate() {
         if model_losses.len() != t {
             return Err(StatError::InvalidParameter(format!(
@@ -118,107 +130,54 @@ pub fn model_confidence_set(
         }
     }
 
-    // Initialize
+    Ok(())
+}
+
+/// Run the sequential elimination loop for MCS.
+fn run_elimination_loop(
+    losses: &[Vec<f64>],
+    alpha: f64,
+    statistic: MCSStatistic,
+    n_bootstrap: usize,
+    block_length: f64,
+    seed: Option<u64>,
+    t: usize,
+) -> Result<MCSResult> {
+    let k = losses.len();
     let mut remaining_models: Vec<usize> = (0..k).collect();
     let mut eliminated_models: Vec<usize> = vec![];
     let mut elimination_sequence: Vec<MCSEliminationStep> = vec![];
     let mut bootstrap = StationaryBootstrap::new(block_length, seed);
     let mut mcs_p_value = 1.0;
 
-    // Sequential elimination loop
     loop {
         if remaining_models.len() <= 1 {
-            break; // Cannot eliminate the last model
+            break;
         }
 
         let m = remaining_models.len();
 
-        // Compute pairwise loss differentials for remaining models
-        // d_{ij,t} = L_{i,t} - L_{j,t}
-        let mut d_ij: HashMap<(usize, usize), Vec<f64>> = HashMap::new();
+        // Compute pairwise statistics
+        let d_ij = compute_pairwise_differentials(losses, &remaining_models, t);
+        let (t_stats, d_bars) = compute_pairwise_tstats(&d_ij, t);
 
-        for i in 0..m {
-            for j in (i + 1)..m {
-                let model_i = remaining_models[i];
-                let model_j = remaining_models[j];
-                let d: Vec<f64> = losses[model_i]
-                    .iter()
-                    .zip(losses[model_j].iter())
-                    .map(|(li, lj)| li - lj)
-                    .collect();
-                d_ij.insert((i, j), d);
-            }
-        }
-
-        // Compute statistics for each pair
-        let t_f = t as f64;
-        let mut t_stats: HashMap<(usize, usize), f64> = HashMap::new();
-        let mut d_bars: HashMap<(usize, usize), f64> = HashMap::new();
-
-        for ((i, j), d) in &d_ij {
-            let d_bar: f64 = d.iter().sum::<f64>() / t_f;
-            d_bars.insert((*i, *j), d_bar);
-
-            // Variance of the mean (simple estimator)
-            let var_d: f64 = d.iter().map(|x| (x - d_bar).powi(2)).sum::<f64>() / (t_f - 1.0) / t_f;
-
-            let t_stat = if var_d > 1e-14 {
-                d_bar * t_f.sqrt() / var_d.sqrt()
-            } else {
-                d_bar * t_f.sqrt() * 1e6
-            };
-
-            t_stats.insert((*i, *j), t_stat);
-        }
-
-        // Compute observed test statistic
+        // Compute observed test statistic and identify worst model
         let observed_stat = compute_test_statistic(statistic, &t_stats, m);
-
-        // Identify worst model (highest average loss relative to others)
         let worst_idx = identify_worst_model(&t_stats, m);
 
-        // Bootstrap to get p-value
-        let mut count_exceeds = 0usize;
+        // Bootstrap p-value
+        let p_value = bootstrap_mcs_pvalue(
+            &d_ij,
+            &d_bars,
+            observed_stat,
+            statistic,
+            &mut bootstrap,
+            n_bootstrap,
+            t,
+            m,
+        );
 
-        for _ in 0..n_bootstrap {
-            let mut boot_t_stats: HashMap<(usize, usize), f64> = HashMap::new();
-
-            for ((i, j), d) in &d_ij {
-                // Bootstrap sample
-                let boot_sample = bootstrap.sample(d, t);
-
-                // Bootstrap mean
-                let boot_mean: f64 = boot_sample.iter().sum::<f64>() / t_f;
-                let original_mean = d_bars[&(*i, *j)];
-
-                // Centered bootstrap statistic
-                let centered = boot_mean - original_mean;
-                let boot_var: f64 = boot_sample
-                    .iter()
-                    .map(|x| (x - boot_mean).powi(2))
-                    .sum::<f64>()
-                    / (t_f - 1.0)
-                    / t_f;
-
-                let boot_t = if boot_var > 1e-14 {
-                    centered * t_f.sqrt() / boot_var.sqrt()
-                } else {
-                    centered * t_f.sqrt() * 1e6
-                };
-
-                boot_t_stats.insert((*i, *j), boot_t);
-            }
-
-            let boot_stat = compute_test_statistic(statistic, &boot_t_stats, m);
-
-            if boot_stat >= observed_stat {
-                count_exceeds += 1;
-            }
-        }
-
-        let p_value = (count_exceeds as f64 + 1.0) / (n_bootstrap as f64 + 1.0);
-
-        // Record step
+        // Record elimination step
         let step = MCSEliminationStep {
             model_idx: remaining_models[worst_idx],
             p_value,
@@ -227,17 +186,15 @@ pub fn model_confidence_set(
         elimination_sequence.push(step);
 
         if p_value < alpha {
-            // Eliminate worst model and continue
             eliminated_models.push(remaining_models[worst_idx]);
             remaining_models.remove(worst_idx);
         } else {
-            // Stop: all remaining models are "equivalent"
             mcs_p_value = p_value;
             break;
         }
     }
 
-    // If we eliminated all but one, the last p-value is the MCS p-value
+    // If we eliminated all but one, use the last p-value
     if remaining_models.len() == 1 && !elimination_sequence.is_empty() {
         mcs_p_value = elimination_sequence.last().unwrap().p_value;
     }
@@ -250,6 +207,117 @@ pub fn model_confidence_set(
         n_bootstrap,
         statistic_type: statistic,
     })
+}
+
+/// Compute pairwise loss differentials for remaining models.
+fn compute_pairwise_differentials(
+    losses: &[Vec<f64>],
+    remaining: &[usize],
+    t: usize,
+) -> HashMap<(usize, usize), Vec<f64>> {
+    let m = remaining.len();
+    let mut d_ij: HashMap<(usize, usize), Vec<f64>> = HashMap::with_capacity(m * (m - 1) / 2);
+
+    for i in 0..m {
+        for j in (i + 1)..m {
+            let model_i = remaining[i];
+            let model_j = remaining[j];
+            let d: Vec<f64> = (0..t)
+                .map(|idx| losses[model_i][idx] - losses[model_j][idx])
+                .collect();
+            d_ij.insert((i, j), d);
+        }
+    }
+
+    d_ij
+}
+
+/// Compute pairwise t-statistics and means.
+fn compute_pairwise_tstats(
+    d_ij: &HashMap<(usize, usize), Vec<f64>>,
+    t: usize,
+) -> (PairwiseStats, PairwiseStats) {
+    let t_f = t as f64;
+    let mut t_stats: HashMap<(usize, usize), f64> = HashMap::with_capacity(d_ij.len());
+    let mut d_bars: HashMap<(usize, usize), f64> = HashMap::with_capacity(d_ij.len());
+
+    for ((i, j), d) in d_ij {
+        let d_bar: f64 = d.iter().sum::<f64>() / t_f;
+        d_bars.insert((*i, *j), d_bar);
+
+        let var_d: f64 = d.iter().map(|x| (x - d_bar).powi(2)).sum::<f64>() / (t_f - 1.0) / t_f;
+        let t_stat = standardize_value(d_bar, var_d, t_f);
+        t_stats.insert((*i, *j), t_stat);
+    }
+
+    (t_stats, d_bars)
+}
+
+/// Bootstrap p-value for MCS elimination test.
+#[allow(clippy::too_many_arguments)]
+fn bootstrap_mcs_pvalue(
+    d_ij: &HashMap<(usize, usize), Vec<f64>>,
+    d_bars: &HashMap<(usize, usize), f64>,
+    observed_stat: f64,
+    statistic: MCSStatistic,
+    bootstrap: &mut StationaryBootstrap,
+    n_bootstrap: usize,
+    t: usize,
+    m: usize,
+) -> f64 {
+    let t_f = t as f64;
+    let mut count_exceeds = 0usize;
+
+    for _ in 0..n_bootstrap {
+        let boot_t_stats = compute_bootstrap_tstats(d_ij, d_bars, bootstrap, t, t_f);
+        let boot_stat = compute_test_statistic(statistic, &boot_t_stats, m);
+
+        if boot_stat >= observed_stat {
+            count_exceeds += 1;
+        }
+    }
+
+    (count_exceeds as f64 + 1.0) / (n_bootstrap as f64 + 1.0)
+}
+
+/// Compute bootstrap t-statistics for one bootstrap iteration.
+fn compute_bootstrap_tstats(
+    d_ij: &HashMap<(usize, usize), Vec<f64>>,
+    d_bars: &HashMap<(usize, usize), f64>,
+    bootstrap: &mut StationaryBootstrap,
+    t: usize,
+    t_f: f64,
+) -> HashMap<(usize, usize), f64> {
+    let mut boot_t_stats: HashMap<(usize, usize), f64> = HashMap::with_capacity(d_ij.len());
+
+    for ((i, j), d) in d_ij {
+        let boot_sample = bootstrap.sample(d, t);
+        let boot_mean: f64 = boot_sample.iter().sum::<f64>() / t_f;
+        let original_mean = d_bars[&(*i, *j)];
+        let centered = boot_mean - original_mean;
+
+        let boot_var: f64 = boot_sample
+            .iter()
+            .map(|x| (x - boot_mean).powi(2))
+            .sum::<f64>()
+            / (t_f - 1.0)
+            / t_f;
+
+        let boot_t = standardize_value(centered, boot_var, t_f);
+        boot_t_stats.insert((*i, *j), boot_t);
+    }
+
+    boot_t_stats
+}
+
+/// Standardize a value, handling near-zero variance.
+#[inline]
+fn standardize_value(mean: f64, var: f64, t_f: f64) -> f64 {
+    if var > 1e-14 {
+        mean * t_f.sqrt() / var.sqrt()
+    } else {
+        mean * t_f.sqrt() * 1e6
+    }
 }
 
 /// Compute the test statistic based on pairwise t-statistics

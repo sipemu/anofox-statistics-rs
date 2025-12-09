@@ -3,6 +3,7 @@ mod diebold_mariano;
 mod mcs;
 mod mspe_adjusted;
 mod spa;
+mod spa_common;
 
 pub use clark_west::{clark_west, CWResult};
 pub use diebold_mariano::{diebold_mariano, DMResult, LossFunction};

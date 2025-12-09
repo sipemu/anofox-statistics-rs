@@ -1,5 +1,8 @@
-use crate::error::{Result, StatError};
-use crate::resampling::bootstrap::StationaryBootstrap;
+use crate::error::Result;
+use crate::forecast::spa_common::{
+    compute_means, compute_spa_pvalues, compute_standardized, compute_variances, find_best_model,
+    validate_model_data,
+};
 
 /// Result of the MSPE-Adjusted SPA test
 #[derive(Debug, Clone)]
@@ -54,75 +57,17 @@ pub fn mspe_adjusted_spa(
     seed: Option<u64>,
 ) -> Result<MSPEAdjustedResult> {
     let t = benchmark_errors.len();
-    let k = model_errors.len();
 
-    if t == 0 {
-        return Err(StatError::EmptyData);
-    }
+    // Validate inputs
+    validate_model_data(t, model_errors, "alternative model")?;
 
-    if k == 0 {
-        return Err(StatError::InvalidParameter(
-            "At least one alternative model required".to_string(),
-        ));
-    }
+    // Compute Clark-West adjusted differentials
+    let f = compute_clark_west_differentials(benchmark_errors, model_errors);
 
-    // Verify all model errors have the same length
-    for (i, errors) in model_errors.iter().enumerate() {
-        if errors.len() != t {
-            return Err(StatError::InvalidParameter(format!(
-                "Model {} has {} observations, expected {}",
-                i,
-                errors.len(),
-                t
-            )));
-        }
-    }
-
-    let t_f = t as f64;
-
-    // Compute Clark-West adjusted differentials for each model:
-    // f_{t,k} = (e_benchmark,t² - e_k,t²) + (e_benchmark,t - e_k,t)²
-    // Positive values mean the alternative model outperforms the benchmark
-    let mut f: Vec<Vec<f64>> = Vec::with_capacity(k);
-    for model_err in model_errors {
-        let diff: Vec<f64> = benchmark_errors
-            .iter()
-            .zip(model_err.iter())
-            .map(|(e_b, e_k)| {
-                let squared_diff = e_b.powi(2) - e_k.powi(2);
-                let adjustment = (e_b - e_k).powi(2);
-                squared_diff + adjustment
-            })
-            .collect();
-        f.push(diff);
-    }
-
-    // Sample means of adjusted differentials
-    let f_bar: Vec<f64> = f.iter().map(|fi| fi.iter().sum::<f64>() / t_f).collect();
-
-    // Sample variances with simple estimator (could use HAC for better properties)
-    let variances: Vec<f64> = f
-        .iter()
-        .zip(f_bar.iter())
-        .map(|(fi, &mean)| {
-            let var: f64 = fi.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (t_f - 1.0);
-            var / t_f // variance of the mean
-        })
-        .collect();
-
-    // Standardized statistics for each model
-    let standardized: Vec<f64> = f_bar
-        .iter()
-        .zip(variances.iter())
-        .map(|(&mean, &var)| {
-            if var > 1e-14 {
-                mean * t_f.sqrt() / var.sqrt()
-            } else {
-                // Zero variance: use scaled mean directly
-                mean * t_f.sqrt() * 1e6
-            }
-        })
-        .collect();
+    // Compute statistics
+    let f_bar = compute_means(&f);
+    let variances = compute_variances(&f, &f_bar);
+    let standardized = compute_standardized(&f_bar, &variances, t);
 
     // Observed test statistic: max of standardized performance
     let observed = standardized
@@ -131,66 +76,11 @@ pub fn mspe_adjusted_spa(
         .fold(f64::NEG_INFINITY, f64::max);
 
     // Find best model
-    let best_model_idx = standardized
-        .iter()
-        .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-        .map(|(i, _)| i);
+    let best_model_idx = find_best_model(&standardized);
 
     // Bootstrap p-values
-    let mut bootstrap = StationaryBootstrap::new(block_length, seed);
-    let mut count_consistent = 0usize;
-    let mut count_upper = 0usize;
-
-    for _ in 0..n_bootstrap {
-        let mut boot_max_consistent = f64::NEG_INFINITY;
-        let mut boot_max_upper = f64::NEG_INFINITY;
-
-        for (i, fi) in f.iter().enumerate() {
-            // Bootstrap sample of the adjusted differentials
-            let boot_sample = bootstrap.sample(fi, t);
-
-            // Bootstrap mean
-            let boot_mean: f64 = boot_sample.iter().sum::<f64>() / t_f;
-
-            // Centered bootstrap statistic (for consistent p-value)
-            let centered_mean = boot_mean - f_bar[i];
-            let boot_var: f64 = boot_sample
-                .iter()
-                .map(|x| (x - boot_mean).powi(2))
-                .sum::<f64>()
-                / (t_f - 1.0)
-                / t_f;
-
-            let boot_stat_consistent = if boot_var > 1e-14 {
-                centered_mean * t_f.sqrt() / boot_var.sqrt()
-            } else {
-                centered_mean * t_f.sqrt() * 1e6
-            };
-
-            // For upper p-value, use g(f_bar) modification
-            let g_f_bar = f_bar[i].max(0.0);
-            let upper_centered = boot_mean - g_f_bar;
-            let boot_stat_upper = if boot_var > 1e-14 {
-                upper_centered * t_f.sqrt() / boot_var.sqrt()
-            } else {
-                upper_centered * t_f.sqrt() * 1e6
-            };
-
-            boot_max_consistent = boot_max_consistent.max(boot_stat_consistent);
-            boot_max_upper = boot_max_upper.max(boot_stat_upper);
-        }
-
-        if boot_max_consistent >= observed {
-            count_consistent += 1;
-        }
-        if boot_max_upper >= observed {
-            count_upper += 1;
-        }
-    }
-
-    let p_value_consistent = (count_consistent as f64 + 1.0) / (n_bootstrap as f64 + 1.0);
-    let p_value_upper = (count_upper as f64 + 1.0) / (n_bootstrap as f64 + 1.0);
+    let (p_value_consistent, p_value_upper) =
+        compute_spa_pvalues(&f, &f_bar, observed, n_bootstrap, block_length, seed);
 
     Ok(MSPEAdjustedResult {
         statistic: observed,
@@ -199,6 +89,26 @@ pub fn mspe_adjusted_spa(
         n_bootstrap,
         best_model_idx,
     })
+}
+
+/// Compute Clark-West adjusted differentials for nested model comparison.
+///
+/// For each model k: f_{t,k} = (e_b² - e_k²) + (e_b - e_k)²
+fn compute_clark_west_differentials(benchmark: &[f64], models: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    models
+        .iter()
+        .map(|model_err| {
+            benchmark
+                .iter()
+                .zip(model_err.iter())
+                .map(|(e_b, e_k)| {
+                    let squared_diff = e_b.powi(2) - e_k.powi(2);
+                    let adjustment = (e_b - e_k).powi(2);
+                    squared_diff + adjustment
+                })
+                .collect()
+        })
+        .collect()
 }
 
 #[cfg(test)]

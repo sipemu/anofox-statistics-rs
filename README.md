@@ -5,6 +5,7 @@
 [![Documentation](https://docs.rs/anofox-statistics/badge.svg)](https://docs.rs/anofox-statistics)
 [![codecov](https://codecov.io/gh/sipemu/anofox-statistics-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/sipemu/anofox-statistics-rs)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Code Health](https://img.shields.io/badge/code%20health-85%25-brightgreen)](.)
 
 A comprehensive statistical hypothesis testing library for Rust, validated against R.
 
