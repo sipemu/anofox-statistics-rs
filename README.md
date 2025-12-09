@@ -3,7 +3,7 @@
 [![CI](https://github.com/sipemu/anofox-statistics-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/sipemu/anofox-statistics-rs/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/anofox-statistics.svg)](https://crates.io/crates/anofox-statistics)
 [![Documentation](https://docs.rs/anofox-statistics/badge.svg)](https://docs.rs/anofox-statistics)
-[![codecov](https://codecov.io/gh/sipemu/anofox-statistics-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/sipemu/anofox-statistics-rs)
+[![codecov](https://codecov.io/gh/sipemu/anofox-statistics-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/sipemu/stattests-rs)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Code Health](https://img.shields.io/badge/code%20health-85%25-brightgreen)](.)
 
