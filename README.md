@@ -56,7 +56,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anofox-statistics = "0.1"
+anofox-statistics = "0.2"
 ```
 
 ## Quick Start
