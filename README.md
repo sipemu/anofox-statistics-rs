@@ -60,6 +60,20 @@ Add to your `Cargo.toml`:
 anofox-statistics = "0.2"
 ```
 
+## Examples
+
+The library includes runnable examples demonstrating each major feature:
+
+```bash
+cargo run --example quickstart      # Overview: t-test, Mann-Whitney, Shapiro-Wilk, permutation test
+cargo run --example parametric      # T-tests, Yuen's robust test, Brown-Forsythe
+cargo run --example nonparametric   # Ranking, Mann-Whitney, Wilcoxon, Kruskal-Wallis, Brunner-Munzel
+cargo run --example normality       # Shapiro-Wilk, D'Agostino's K-squared
+cargo run --example resampling      # Permutation tests, bootstrap methods
+cargo run --example modern          # Energy distance, MMD with different kernels
+cargo run --example forecast        # Diebold-Mariano, Clark-West, SPA, MCS
+```
+
 ## Quick Start
 
 ### T-Tests
