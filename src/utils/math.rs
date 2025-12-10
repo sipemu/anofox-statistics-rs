@@ -10,6 +10,19 @@ pub fn mean(data: &[f64]) -> Result<f64> {
     Ok(sum / data.len() as f64)
 }
 
+/// Calculate the arithmetic mean of a slice using.
+/// Returns `StatError::EmptyData` if the slice is empty.
+pub fn stable_mean(data: &[f64]) -> Result<f64> {
+    if data.is_empty() {
+        return Err(StatError::EmptyData);
+    }
+    // Use a less naive version to compute the mean
+    let sum: f64 = data.iter().enumerate().fold(0_f64, |mean_km1, (k, xk)| {
+        mean_km1 + (xk - mean_km1) / (k + 1) as f64
+    });
+    Ok(sum)
+}
+
 /// Calculate the sample variance (using n-1 denominator, matching R's `var()`).
 /// Returns `StatError::InsufficientData` if fewer than 2 elements.
 pub fn variance(data: &[f64]) -> Result<f64> {
@@ -23,6 +36,27 @@ pub fn variance(data: &[f64]) -> Result<f64> {
     Ok(sum_sq / (n - 1) as f64)
 }
 
+/// Calculate the sample variance (using n-1 denominator, matching R's `var()`).
+/// Returns `StatError::InsufficientData` if fewer than 2 elements.
+pub fn stable_variance(data: &[f64]) -> Result<f64> {
+    let n = data.len();
+    if n < 2 {
+        return Err(StatError::InsufficientData { needed: 2, got: n });
+    }
+
+    // Use Welford's algorithm for stable computation of the variance.
+    let (_mean, snd_moment): (f64, f64) =
+        data.iter()
+            .enumerate()
+            .fold((0_f64, 0_f64), |(mean, snd_moment), (count, xk)| {
+                let delta = xk - mean;
+                let mean = mean + delta / (count + 1) as f64;
+                let delta2 = xk - mean;
+                let snd_moment = snd_moment + delta * delta2;
+                (mean, snd_moment)
+            });
+    Ok(snd_moment / (n as f64 - 1.0_f64))
+}
 /// Calculate the median of a slice.
 /// Returns `StatError::EmptyData` if the slice is empty.
 pub fn median(data: &[f64]) -> Result<f64> {

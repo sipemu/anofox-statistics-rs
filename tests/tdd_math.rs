@@ -42,6 +42,39 @@ fn test_mean_empty_returns_error() {
     assert!(math::mean(&empty).is_err());
 }
 
+#[test]
+fn test_stable_mean_short_vector() {
+    let refs = common::load_reference_scalars("math_basic.csv");
+    let x_short = vec![1.2, 2.3, 3.4, 4.5, 5.6];
+
+    let result = math::stable_mean(&x_short).expect("mean should succeed");
+    assert_relative_eq!(result, refs["mean_short"], epsilon = EPSILON);
+}
+
+#[test]
+fn test_stable_mean_long_vector() {
+    let refs = common::load_reference_scalars("math_basic.csv");
+    let x_long = common::load_reference_vector("vec_long.csv");
+
+    let result = math::stable_mean(&x_long).expect("mean should succeed");
+    assert_relative_eq!(result, refs["mean_long"], epsilon = EPSILON);
+}
+
+#[test]
+fn test_stable_mean_single_element() {
+    let refs = common::load_reference_scalars("math_basic.csv");
+    let x_single = vec![42.0];
+
+    let result = math::stable_mean(&x_single).expect("mean should succeed");
+    assert_relative_eq!(result, refs["mean_single"], epsilon = EPSILON);
+}
+
+#[test]
+fn test_stable_mean_empty_returns_error() {
+    let empty: Vec<f64> = vec![];
+    assert!(math::stable_mean(&empty).is_err());
+}
+
 // ============================================
 // Variance Tests
 // ============================================
@@ -84,6 +117,46 @@ fn test_variance_single_element_returns_error() {
 fn test_variance_empty_returns_error() {
     let empty: Vec<f64> = vec![];
     assert!(math::variance(&empty).is_err());
+}
+
+#[test]
+fn test_stable_variance_short_vector() {
+    let refs = common::load_reference_scalars("math_basic.csv");
+    let x_short = vec![1.2, 2.3, 3.4, 4.5, 5.6];
+
+    let result = math::stable_variance(&x_short).expect("variance should succeed");
+    assert_relative_eq!(result, refs["var_short"], epsilon = EPSILON);
+}
+
+#[test]
+fn test_stable_variance_long_vector() {
+    let refs = common::load_reference_scalars("math_basic.csv");
+    let x_long = common::load_reference_vector("vec_long.csv");
+
+    let result = math::stable_variance(&x_long).expect("variance should succeed");
+    assert_relative_eq!(result, refs["var_long"], epsilon = EPSILON);
+}
+
+#[test]
+fn test_stable_variance_outlier_vector() {
+    let refs = common::load_reference_scalars("math_basic.csv");
+    let x_outlier = vec![1.0, 1.0, 1.0, 1.0, 100.0];
+
+    let result = math::stable_variance(&x_outlier).expect("variance should succeed");
+    assert_relative_eq!(result, refs["var_outlier"], epsilon = EPSILON);
+}
+
+#[test]
+fn test_stable_variance_single_element_returns_error() {
+    let x_single = vec![42.0];
+    // R's var() returns NA for single element; we return error
+    assert!(math::stable_variance(&x_single).is_err());
+}
+
+#[test]
+fn test_stable_variance_empty_returns_error() {
+    let empty: Vec<f64> = vec![];
+    assert!(math::stable_variance(&empty).is_err());
 }
 
 // ============================================
