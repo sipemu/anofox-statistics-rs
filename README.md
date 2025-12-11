@@ -328,18 +328,26 @@ println!("Eliminated: {:?}", result.eliminated_models);
 
 This library is developed using Test-Driven Development (TDD) with R as the oracle (ground truth). All implementations are validated against R's statistical functions:
 
-- `t.test()` for t-tests
-- `WRS2::yuen()` for Yuen's test
-- `car::leveneTest()` for Brown-Forsythe
-- `wilcox.test()` for Mann-Whitney and Wilcoxon tests
-- `kruskal.test()` for Kruskal-Wallis
-- `lawstat::brunner.munzel.test()` for Brunner-Munzel
-- `shapiro.test()` for Shapiro-Wilk
-- `moments::agostino.test()` and `moments::anscombe.test()` for D'Agostino
-- `e1071::skewness()` and `e1071::kurtosis()` for skewness/kurtosis
-- `forecast::dm.test()` for Diebold-Mariano
+| Rust Function | R Equivalent | Package |
+|---------------|--------------|---------|
+| `t_test()` | `t.test()` | stats |
+| `yuen_test()` | `yuen()` | WRS2 |
+| `brown_forsythe()` | `leveneTest(center=median)` | car |
+| `mann_whitney_u()`, `wilcoxon_signed_rank()` | `wilcox.test()` | stats |
+| `kruskal_wallis()` | `kruskal.test()` | stats |
+| `brunner_munzel()` | `brunner.munzel.test()` | lawstat |
+| `shapiro_wilk()` | `shapiro.test()` | stats |
+| `dagostino_k_squared()` | `agostino.test()`, `anscombe.test()` | moments |
+| `skewness()`, `kurtosis()` | `skewness()`, `kurtosis()` | e1071 |
+| `diebold_mariano()` | `dm.test()` | forecast |
 
-All tests ensure numerical agreement with R within appropriate tolerances.
+All 134 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
+
+**For complete transparency on the validation process, see [`R/VALIDATION.md`](R/VALIDATION.md)**, which documents:
+- All 76 reference data files and their R generation code
+- Tolerance rationale for each test category
+- Step-by-step reproduction instructions
+- R package dependencies
 
 ## Dependencies
 
