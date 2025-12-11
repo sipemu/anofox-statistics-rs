@@ -129,7 +129,7 @@ Tests load the CSV files and compare Rust results against R references.
 | `shapiro_wilk_edge.csv` | Shapiro-Wilk edge | `shapiro.test()` | W, p_value for n=3,4,5,10 |
 | `dagostino.csv` | D'Agostino | `moments::agostino.test()`, `moments::anscombe.test()` | Z_skew, Z_kurt, p_values |
 | `brunner_munzel.csv` | Brunner-Munzel | `lawstat::brunner.munzel.test()` | statistic, df, p_value, estimate, p_value_less, p_value_greater, conf.int at 95/90/99% |
-| `diebold_mariano.csv` | Diebold-Mariano | `forecast::dm.test()` | statistic, p_value for SE/AE loss, h=1/h=3, alternative=less/greater |
+| `diebold_mariano.csv` | Diebold-Mariano | `forecast::dm.test()` | statistic, p_value for SE/AE loss, h=1/h=3, alternative=less/greater, varestimator=acf/bartlett |
 | `ttest_welch.csv` | Welch t-test with mu | `t.test(var.equal=FALSE, mu=0.5)` | statistic_mu, p_value_mu |
 | `clark_west.csv` | Clark-West | Manual HAC computation | statistic, p_value for h=1 and h=3 |
 | `spa.csv` | SPA test | Manual computation | t-statistics, means for all models |
@@ -197,7 +197,7 @@ Tests load the CSV files and compare Rust results against R references.
 
 | Function | R Equivalent | Tolerance | Test Cases |
 |----------|-------------|-----------|------------|
-| `diebold_mariano()` | `forecast::dm.test()` | 1e-6 | SE/AE loss, h=1/h=3, alternative=two-sided/less/greater |
+| `diebold_mariano()` | `forecast::dm.test()` | 1e-6 | SE/AE loss, h=1/h=3, alternative=two-sided/less/greater, varestimator=acf/bartlett |
 | `clark_west()` | Manual HAC computation | 1e-6 | h=1, h=3 |
 | `spa_test()` | Manual computation | 1e-6 | 3 competing models |
 | `model_confidence_set()` | Manual computation | 1e-6 | 4 models |
@@ -283,14 +283,14 @@ install.packages(c("WRS2", "car", "lawstat", "e1071", "moments", "forecast"))
 
 | Category | Tests | Test Cases | Reference Files |
 |----------|-------|------------|-----------------|
-| Math Primitives | 7 | 41 | 8 |
-| Parametric | 5 | 25 | 13 |
+| Math Primitives | 7 | 59 | 8 |
+| Parametric | 5 | 27 | 13 |
 | Nonparametric | 5 | 42 | 14 |
 | Distributional | 2 | 17 | 12 |
 | Resampling | 3 | 13 | 4 |
 | Modern | 2 | 8 | 3 |
-| Forecast | 5 | 21 | 22 |
-| **Total** | **29** | **167** | **76** |
+| Forecast | 5 | 25 | 22 |
+| **Total** | **29** | **191** | **76** |
 
 ## Reproducibility
 
@@ -314,5 +314,5 @@ Rscript R/generate_refs.R
 # 3. Run validation tests
 cargo test
 
-# All 227 tests should pass (60 unit + 167 TDD integration)
+# All 251 tests should pass (60 unit + 191 TDD integration)
 ```
