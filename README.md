@@ -15,6 +15,7 @@ This library provides a wide range of statistical tests commonly used in data an
 
 - **Math Primitives**
   - Mean, variance, standard deviation, median
+  - Numerically stable mean and variance (Welford's algorithm)
   - Trimmed mean (robust to outliers)
   - Skewness and kurtosis (Fisher's definition, matching R's e1071)
 
@@ -288,75 +289,6 @@ let result = model_confidence_set(&losses, 0.10, MCSStatistic::Range, 1000, 5.0,
 println!("Models in MCS: {:?}", result.included_models);
 println!("Eliminated: {:?}", result.eliminated_models);
 ```
-
-## API Reference
-
-### Parametric Tests
-
-| Function | Description |
-|----------|-------------|
-| `t_test(x, y, kind, alternative, mu, conf_level)` | T-test (Welch, Student, or Paired) with null hypothesis mu and optional confidence interval |
-| `yuen_test(x, y, trim)` | Yuen's trimmed mean t-test |
-| `brown_forsythe(groups)` | Brown-Forsythe test for homogeneity of variances |
-
-### Nonparametric Tests
-
-| Function | Description |
-|----------|-------------|
-| `rank(data)` | Compute ranks with average tie handling |
-| `mann_whitney_u(x, y, alternative, correct, exact, conf_level, mu)` | Mann-Whitney U test with exact p-values, confidence intervals, and location shift hypothesis |
-| `wilcoxon_signed_rank(x, y, alternative, correct, exact, conf_level, mu)` | Wilcoxon signed-rank test with exact p-values, confidence intervals, and median difference hypothesis |
-| `kruskal_wallis(groups)` | Kruskal-Wallis H test for k independent samples |
-| `brunner_munzel(x, y, alternative, alpha)` | Brunner-Munzel test for stochastic equality with optional confidence interval |
-
-### Distributional Tests
-
-| Function | Description |
-|----------|-------------|
-| `shapiro_wilk(data)` | Shapiro-Wilk test for normality |
-| `dagostino_k_squared(data)` | D'Agostino's K-squared omnibus normality test |
-
-### Resampling Methods
-
-| Function | Description |
-|----------|-------------|
-| `permutation_t_test(x, y, n_permutations, seed)` | Permutation-based t-test |
-| `PermutationEngine::new(x, y, seed)` | Generic permutation testing engine |
-| `StationaryBootstrap::new(data, expected_length, seed)` | Stationary bootstrap for dependent data |
-| `CircularBlockBootstrap::new(data, block_length, seed)` | Circular block bootstrap |
-
-### Modern Distribution Tests
-
-| Function | Description |
-|----------|-------------|
-| `energy_distance_test(x, y, n_permutations, seed)` | Energy distance two-sample test |
-| `mmd_test(x, y, kernel, n_permutations, seed)` | Maximum Mean Discrepancy test |
-
-### Forecast Evaluation
-
-| Function | Description |
-|----------|-------------|
-| `diebold_mariano(e1, e2, loss, h, alternative)` | Diebold-Mariano test for predictive accuracy |
-| `clark_west(e1, e2, h)` | Clark-West test for nested model comparison |
-| `spa_test(benchmark, models, n_bootstrap, block_length, seed)` | Superior Predictive Ability test |
-| `mspe_adjusted_spa(benchmark, models, n_bootstrap, block_length, seed)` | MSPE-Adjusted SPA for multiple nested models |
-| `model_confidence_set(losses, alpha, statistic, n_bootstrap, block_length, seed)` | Model Confidence Set (Hansen et al., 2011) |
-
-### Math Primitives
-
-| Function | Description |
-|----------|-------------|
-| `mean(data)` | Arithmetic mean |
-| `stable_mean(data)` | Arithmetic mean using Welford's algorithm (numerically stable) |
-| `variance(data)` | Sample variance |
-| `stable_variance(data)` | Sample variance using Welford's algorithm (numerically stable) |
-| `std_dev(data)` | Sample standard deviation |
-| `median(data)` | Median |
-| `trimmed_mean(data, trim)` | Trimmed mean |
-| `skewness(data)` | Sample skewness (Fisher's, type 2) |
-| `kurtosis(data)` | Sample excess kurtosis (Fisher's, type 2) |
-
-The `stable_mean` and `stable_variance` functions implement Welford's online algorithm (B.P. Welford, "Note on a Method for Calculating Corrected Sums of Squares and Products", Technometrics, 1962). This algorithm computes running statistics in a single pass with O(1) memory, avoiding catastrophic cancellation that occurs with naive summation when variance is small relative to mean magnitude. Recommended for data with large offsets (e.g., timestamps, financial prices) or streaming applications.
 
 ## Validation
 
