@@ -4,7 +4,7 @@
 
 use anofox_statistics::{
     clark_west, diebold_mariano, model_confidence_set, mspe_adjusted_spa, spa_test, Alternative,
-    LossFunction, MCSStatistic,
+    LossFunction, MCSStatistic, VarEstimator,
 };
 
 fn main() {
@@ -44,6 +44,7 @@ fn main() {
         LossFunction::SquaredError,
         1,
         Alternative::TwoSided,
+        VarEstimator::Acf,
     )
     .unwrap();
     println!("   DM statistic: {:.4}", dm1.statistic);
@@ -66,6 +67,7 @@ fn main() {
         LossFunction::AbsoluteError,
         1,
         Alternative::TwoSided,
+        VarEstimator::Acf,
     )
     .unwrap();
     println!("   DM statistic: {:.4}", dm2.statistic);
@@ -80,6 +82,7 @@ fn main() {
         LossFunction::SquaredError,
         3,
         Alternative::TwoSided,
+        VarEstimator::Acf,
     )
     .unwrap();
     println!("   DM statistic: {:.4}", dm3.statistic);

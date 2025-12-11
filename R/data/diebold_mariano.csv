@@ -1,2 +1,2 @@
-"statistic_se_h1","p_value_se_h1","statistic_ae_h1","p_value_ae_h1","statistic_se_h3","p_value_se_h3","p_value_less_se_h1","p_value_greater_se_h1"
--5.19425848151562,1.10163618973918e-06,-5.68608096176618,1.3175500842911e-07,-5.47560424036964,3.30643651414324e-07,5.50818094869588e-07,0.999999449181905
+"statistic_se_h1","p_value_se_h1","statistic_ae_h1","p_value_ae_h1","statistic_se_h3","p_value_se_h3","p_value_less_se_h1","p_value_greater_se_h1","statistic_se_h1_bartlett","p_value_se_h1_bartlett","statistic_se_h3_bartlett","p_value_se_h3_bartlett","p_value_less_bartlett","p_value_greater_bartlett"
+-5.19425848151562,1.10163618973918e-06,-5.68608096176618,1.3175500842911e-07,-5.47560424036964,3.30643651414324e-07,5.50818094869588e-07,0.999999449181905,-5.19425848151562,1.10163618973918e-06,-5.26421843810818,8.1912407581098e-07,5.50818094869588e-07,0.999999449181905

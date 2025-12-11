@@ -45,6 +45,7 @@ Complete API documentation for anofox-statistics. This document serves as the si
   - [Alternative](#alternative)
   - [TTestKind](#ttestkind)
   - [LossFunction](#lossfunction)
+  - [VarEstimator](#varestimator)
   - [MCSStatistic](#mcsstatistic)
   - [Kernel](#kernel)
 
@@ -635,6 +636,7 @@ pub fn diebold_mariano(
     loss: LossFunction,
     h: usize,
     alternative: Alternative,
+    varestimator: VarEstimator,
 ) -> Result<DMResult>
 ```
 
@@ -647,6 +649,7 @@ pub fn diebold_mariano(
 | `loss` | `LossFunction` | Loss function: `SquaredError` or `AbsoluteError` |
 | `h` | `usize` | Forecast horizon (for variance adjustment) |
 | `alternative` | `Alternative` | Alternative hypothesis |
+| `varestimator` | `VarEstimator` | Variance estimator: `Acf` or `Bartlett` |
 
 **Returns:** `DMResult`
 
@@ -983,6 +986,21 @@ Loss function for forecast comparison tests.
 pub enum LossFunction {
     SquaredError,   // (e)²
     AbsoluteError,  // |e|
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### VarEstimator
+
+Variance estimator for Diebold-Mariano test.
+
+```rust
+pub enum VarEstimator {
+    Acf,      // ACF-based estimator (default) - uses unweighted autocovariances
+    Bartlett, // Bartlett kernel estimator - uses Bartlett weights for positive variance
 }
 ```
 

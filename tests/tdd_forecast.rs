@@ -2,7 +2,7 @@ mod common;
 
 use anofox_statistics::{
     clark_west, diebold_mariano, model_confidence_set, spa_test, Alternative, LossFunction,
-    MCSStatistic,
+    MCSStatistic, VarEstimator,
 };
 use approx::assert_relative_eq;
 
@@ -24,6 +24,7 @@ fn test_dm_squared_error_h1() {
         LossFunction::SquaredError,
         1,
         Alternative::TwoSided,
+        VarEstimator::Acf,
     )
     .expect("diebold_mariano should succeed");
 
@@ -43,6 +44,7 @@ fn test_dm_absolute_error_h1() {
         LossFunction::AbsoluteError,
         1,
         Alternative::TwoSided,
+        VarEstimator::Acf,
     )
     .expect("diebold_mariano should succeed");
 
@@ -62,6 +64,7 @@ fn test_dm_squared_error_h3() {
         LossFunction::SquaredError,
         3,
         Alternative::TwoSided,
+        VarEstimator::Acf,
     )
     .expect("diebold_mariano should succeed");
 
@@ -75,8 +78,15 @@ fn test_dm_less() {
     let e1 = common::load_reference_vector("dm_e1.csv");
     let e2 = common::load_reference_vector("dm_e2.csv");
 
-    let result = diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1, Alternative::Less)
-        .expect("diebold_mariano should succeed");
+    let result = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::Less,
+        VarEstimator::Acf,
+    )
+    .expect("diebold_mariano should succeed");
 
     assert_relative_eq!(
         result.p_value,
@@ -97,12 +107,115 @@ fn test_dm_greater() {
         LossFunction::SquaredError,
         1,
         Alternative::Greater,
+        VarEstimator::Acf,
     )
     .expect("diebold_mariano should succeed");
 
     assert_relative_eq!(
         result.p_value,
         refs["p_value_greater_se_h1"],
+        epsilon = EPSILON
+    );
+}
+
+#[test]
+fn test_dm_bartlett_h1() {
+    let refs = common::load_reference_scalars("diebold_mariano.csv");
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::TwoSided,
+        VarEstimator::Bartlett,
+    )
+    .expect("diebold_mariano should succeed");
+
+    assert_relative_eq!(
+        result.statistic,
+        refs["statistic_se_h1_bartlett"],
+        epsilon = EPSILON
+    );
+    assert_relative_eq!(
+        result.p_value,
+        refs["p_value_se_h1_bartlett"],
+        epsilon = EPSILON
+    );
+}
+
+#[test]
+fn test_dm_bartlett_h3() {
+    let refs = common::load_reference_scalars("diebold_mariano.csv");
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        3,
+        Alternative::TwoSided,
+        VarEstimator::Bartlett,
+    )
+    .expect("diebold_mariano should succeed");
+
+    assert_relative_eq!(
+        result.statistic,
+        refs["statistic_se_h3_bartlett"],
+        epsilon = EPSILON
+    );
+    assert_relative_eq!(
+        result.p_value,
+        refs["p_value_se_h3_bartlett"],
+        epsilon = EPSILON
+    );
+}
+
+#[test]
+fn test_dm_bartlett_less() {
+    let refs = common::load_reference_scalars("diebold_mariano.csv");
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::Less,
+        VarEstimator::Bartlett,
+    )
+    .expect("diebold_mariano should succeed");
+
+    assert_relative_eq!(
+        result.p_value,
+        refs["p_value_less_bartlett"],
+        epsilon = EPSILON
+    );
+}
+
+#[test]
+fn test_dm_bartlett_greater() {
+    let refs = common::load_reference_scalars("diebold_mariano.csv");
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::Greater,
+        VarEstimator::Bartlett,
+    )
+    .expect("diebold_mariano should succeed");
+
+    assert_relative_eq!(
+        result.p_value,
+        refs["p_value_greater_bartlett"],
         epsilon = EPSILON
     );
 }
@@ -116,7 +229,8 @@ fn test_dm_empty_returns_error() {
         &e2,
         LossFunction::SquaredError,
         1,
-        Alternative::TwoSided
+        Alternative::TwoSided,
+        VarEstimator::Acf,
     )
     .is_err());
 }
@@ -130,7 +244,8 @@ fn test_dm_unequal_length_returns_error() {
         &e2,
         LossFunction::SquaredError,
         1,
-        Alternative::TwoSided
+        Alternative::TwoSided,
+        VarEstimator::Acf,
     )
     .is_err());
 }
@@ -144,7 +259,8 @@ fn test_dm_insufficient_data_returns_error() {
         &e2,
         LossFunction::SquaredError,
         1,
-        Alternative::TwoSided
+        Alternative::TwoSided,
+        VarEstimator::Acf,
     )
     .is_err());
 }

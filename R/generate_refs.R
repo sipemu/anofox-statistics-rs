@@ -527,19 +527,32 @@ dm_se_h3 <- dm.test(e1, e2, alternative = "two.sided", h = 3, power = 2)
 dm_less <- dm.test(e1, e2, alternative = "less", h = 1, power = 2)
 dm_greater <- dm.test(e1, e2, alternative = "greater", h = 1, power = 2)
 
+# Diebold-Mariano test with Bartlett variance estimator
+dm_se_h1_bartlett <- dm.test(e1, e2, alternative = "two.sided", h = 1, power = 2, varestimator = "bartlett")
+dm_se_h3_bartlett <- dm.test(e1, e2, alternative = "two.sided", h = 3, power = 2, varestimator = "bartlett")
+dm_less_bartlett <- dm.test(e1, e2, alternative = "less", h = 1, power = 2, varestimator = "bartlett")
+dm_greater_bartlett <- dm.test(e1, e2, alternative = "greater", h = 1, power = 2, varestimator = "bartlett")
+
 save_ref("diebold_mariano.csv", list(
-  # Squared error, h=1
+  # Squared error, h=1, ACF (default)
   statistic_se_h1 = dm_se_h1$statistic,
   p_value_se_h1 = dm_se_h1$p.value,
-  # Absolute error, h=1
+  # Absolute error, h=1, ACF
   statistic_ae_h1 = dm_ae_h1$statistic,
   p_value_ae_h1 = dm_ae_h1$p.value,
-  # Squared error, h=3
+  # Squared error, h=3, ACF
   statistic_se_h3 = dm_se_h3$statistic,
   p_value_se_h3 = dm_se_h3$p.value,
-  # Alternative hypotheses
+  # Alternative hypotheses (ACF)
   p_value_less_se_h1 = dm_less$p.value,
-  p_value_greater_se_h1 = dm_greater$p.value
+  p_value_greater_se_h1 = dm_greater$p.value,
+  # Bartlett variance estimator
+  statistic_se_h1_bartlett = dm_se_h1_bartlett$statistic,
+  p_value_se_h1_bartlett = dm_se_h1_bartlett$p.value,
+  statistic_se_h3_bartlett = dm_se_h3_bartlett$statistic,
+  p_value_se_h3_bartlett = dm_se_h3_bartlett$p.value,
+  p_value_less_bartlett = dm_less_bartlett$p.value,
+  p_value_greater_bartlett = dm_greater_bartlett$p.value
 ))
 
 # ============================================
