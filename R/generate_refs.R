@@ -217,7 +217,10 @@ save_ref("yuen.csv", list(
   diff_10 = yuen_10$diff,
   # alternatives (20% trim) - computed from t-distribution
   p_value_less = p_less,
-  p_value_greater = p_greater
+  p_value_greater = p_greater,
+  # 95% confidence interval for difference (20% trim)
+  conf_low_95 = yuen_20$conf.int[1],
+  conf_high_95 = yuen_20$conf.int[2]
 ))
 
 # Brown-Forsythe test (Levene's test with median)

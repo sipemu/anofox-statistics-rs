@@ -46,6 +46,8 @@ pub struct MannWhitneyResult {
     pub estimate: Option<f64>,
     /// Confidence interval for the location shift
     pub conf_int: Option<ConfidenceInterval>,
+    /// Null hypothesis value (location shift under H0)
+    pub null_value: f64,
 }
 
 /// Result of Wilcoxon Signed-Rank test
@@ -59,6 +61,8 @@ pub struct WilcoxonResult {
     pub estimate: Option<f64>,
     /// Confidence interval for the pseudo-median
     pub conf_int: Option<ConfidenceInterval>,
+    /// Null hypothesis value (median difference under H0)
+    pub null_value: f64,
 }
 
 /// Perform Mann-Whitney U test (Wilcoxon rank-sum test) for two independent samples.
@@ -165,6 +169,7 @@ pub fn mann_whitney_u(
         p_value,
         estimate,
         conf_int,
+        null_value: mu_shift,
     })
 }
 
@@ -224,6 +229,7 @@ pub fn wilcoxon_signed_rank(
             p_value: 1.0,
             estimate: None,
             conf_int: None,
+            null_value: mu_shift,
         });
     }
 
@@ -290,6 +296,7 @@ pub fn wilcoxon_signed_rank(
         p_value,
         estimate,
         conf_int,
+        null_value: mu_shift,
     })
 }
 

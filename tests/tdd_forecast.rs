@@ -266,6 +266,143 @@ fn test_dm_insufficient_data_returns_error() {
 }
 
 // ============================================
+// Diebold-Mariano Result Fields
+// ============================================
+
+#[test]
+fn test_dm_result_contains_horizon() {
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result_h1 = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::TwoSided,
+        VarEstimator::Acf,
+    )
+    .expect("diebold_mariano should succeed");
+
+    let result_h3 = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        3,
+        Alternative::TwoSided,
+        VarEstimator::Acf,
+    )
+    .expect("diebold_mariano should succeed");
+
+    assert_eq!(result_h1.horizon, 1);
+    assert_eq!(result_h3.horizon, 3);
+}
+
+#[test]
+fn test_dm_result_contains_loss_function() {
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result_se = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::TwoSided,
+        VarEstimator::Acf,
+    )
+    .expect("diebold_mariano should succeed");
+
+    let result_ae = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::AbsoluteError,
+        1,
+        Alternative::TwoSided,
+        VarEstimator::Acf,
+    )
+    .expect("diebold_mariano should succeed");
+
+    assert!(matches!(
+        result_se.loss_function,
+        LossFunction::SquaredError
+    ));
+    assert!(matches!(
+        result_ae.loss_function,
+        LossFunction::AbsoluteError
+    ));
+}
+
+#[test]
+fn test_dm_result_contains_varestimator() {
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result_acf = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::TwoSided,
+        VarEstimator::Acf,
+    )
+    .expect("diebold_mariano should succeed");
+
+    let result_bart = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::TwoSided,
+        VarEstimator::Bartlett,
+    )
+    .expect("diebold_mariano should succeed");
+
+    assert!(matches!(result_acf.varestimator, VarEstimator::Acf));
+    assert!(matches!(result_bart.varestimator, VarEstimator::Bartlett));
+}
+
+#[test]
+fn test_dm_result_contains_alternative() {
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result_two = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::TwoSided,
+        VarEstimator::Acf,
+    )
+    .expect("diebold_mariano should succeed");
+
+    let result_less = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::Less,
+        VarEstimator::Acf,
+    )
+    .expect("diebold_mariano should succeed");
+
+    let result_greater = diebold_mariano(
+        &e1,
+        &e2,
+        LossFunction::SquaredError,
+        1,
+        Alternative::Greater,
+        VarEstimator::Acf,
+    )
+    .expect("diebold_mariano should succeed");
+
+    assert!(matches!(result_two.alternative, Alternative::TwoSided));
+    assert!(matches!(result_less.alternative, Alternative::Less));
+    assert!(matches!(result_greater.alternative, Alternative::Greater));
+}
+
+// ============================================
 // Clark-West Test
 // ============================================
 

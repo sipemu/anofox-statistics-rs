@@ -168,7 +168,7 @@ fn main() {
     println!();
 
     // Yuen's test (robust)
-    let yuen = yuen_test(&clean, &with_outlier, 0.2, Alternative::TwoSided).unwrap();
+    let yuen = yuen_test(&clean, &with_outlier, 0.2, Alternative::TwoSided, None).unwrap();
 
     println!("Yuen's test (20% trimmed means - robust):");
     println!("  t-statistic: {:.4}", yuen.statistic);

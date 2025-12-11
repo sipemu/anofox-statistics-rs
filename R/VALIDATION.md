@@ -159,10 +159,10 @@ Tests load the CSV files and compare Rust results against R references.
 
 | Function | R Equivalent | Tolerance | Test Cases |
 |----------|-------------|-----------|------------|
-| `t_test(..., Welch)` | `t.test(var.equal=FALSE)` | 1e-10 | two-sided, less, greater, mu=0.5, conf.level=0.95/0.90/0.99 |
+| `t_test(..., Welch)` | `t.test(var.equal=FALSE)` | 1e-10 | two-sided, less, greater, mu=0.5, conf.level=0.95/0.90/0.99, null_value |
 | `t_test(..., Student)` | `t.test(var.equal=TRUE)` | 1e-10 | two-sided, less, greater |
 | `t_test(..., Paired)` | `t.test(paired=TRUE)` | 1e-10 | two-sided, less, greater |
-| `yuen_test()` | `WRS2::yuen()` | 1e-10 | 20% trim, 10% trim |
+| `yuen_test()` | `WRS2::yuen()` | 1e-10 | 20% trim, 10% trim, less, greater, conf.level=0.95 |
 | `brown_forsythe()` | `car::leveneTest(center=median)` | 1e-10 | 2 groups, 3 groups |
 
 ### 3. Nonparametric Tests
@@ -172,8 +172,8 @@ Tests load the CSV files and compare Rust results against R references.
 | Function | R Equivalent | Tolerance | Test Cases |
 |----------|-------------|-----------|------------|
 | `rank()` | `base::rank(ties.method="average")` | 1e-10 | simple, with ties |
-| `mann_whitney_u()` | `wilcox.test(exact=FALSE/TRUE)` | 1e-6 | two-sided, less, greater, continuity correction, exact p-value, mu=0.5, conf.level=0.95/0.90 |
-| `wilcoxon_signed_rank()` | `wilcox.test(paired=TRUE, exact=FALSE/TRUE)` | 1e-6 | two-sided, less, greater, continuity correction, exact p-value, mu=0.3, conf.level=0.95/0.90 |
+| `mann_whitney_u()` | `wilcox.test(exact=FALSE/TRUE)` | 1e-6 | two-sided, less, greater, continuity correction, exact p-value, mu=0.5, conf.level=0.95/0.90, null_value |
+| `wilcoxon_signed_rank()` | `wilcox.test(paired=TRUE, exact=FALSE/TRUE)` | 1e-6 | two-sided, less, greater, continuity correction, exact p-value, mu=0.3, conf.level=0.95/0.90, null_value |
 | `kruskal_wallis()` | `kruskal.test()` | 1e-10 | 3 groups |
 | `brunner_munzel()` | `lawstat::brunner.munzel.test()` | 1e-6 | two-sided, less, greater, alpha=0.05/0.10/0.01 (conf.int) |
 
@@ -197,7 +197,7 @@ Tests load the CSV files and compare Rust results against R references.
 
 | Function | R Equivalent | Tolerance | Test Cases |
 |----------|-------------|-----------|------------|
-| `diebold_mariano()` | `forecast::dm.test()` | 1e-6 | SE/AE loss, h=1/h=3, alternative=two-sided/less/greater, varestimator=acf/bartlett |
+| `diebold_mariano()` | `forecast::dm.test()` | 1e-6 | SE/AE loss, h=1/h=3, alternative=two-sided/less/greater, varestimator=acf/bartlett, horizon, loss_function, varestimator (output fields) |
 | `clark_west()` | Manual HAC computation | 1e-6 | h=1, h=3 |
 | `spa_test()` | Manual computation | 1e-6 | 3 competing models |
 | `model_confidence_set()` | Manual computation | 1e-6 | 4 models |

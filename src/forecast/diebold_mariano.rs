@@ -28,8 +28,16 @@ pub enum VarEstimator {
 pub struct DMResult {
     /// The DM test statistic
     pub statistic: f64,
-    /// The p-value (two-sided)
+    /// The p-value
     pub p_value: f64,
+    /// Forecast horizon used
+    pub horizon: usize,
+    /// Loss function used
+    pub loss_function: LossFunction,
+    /// Variance estimator used
+    pub varestimator: VarEstimator,
+    /// Alternative hypothesis tested
+    pub alternative: Alternative,
 }
 
 /// Perform the Diebold-Mariano test for comparing forecast accuracy.
@@ -122,6 +130,10 @@ pub fn diebold_mariano(
     Ok(DMResult {
         statistic: dm_stat,
         p_value,
+        horizon: h,
+        loss_function: loss,
+        varestimator,
+        alternative,
     })
 }
 

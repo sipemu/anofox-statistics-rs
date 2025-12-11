@@ -4,4 +4,4 @@ pub mod yuen;
 
 pub use levene::{brown_forsythe, LeveneResult};
 pub use ttest::{t_test, Alternative, TTestKind, TTestResult};
-pub use yuen::{yuen_test, YuenResult};
+pub use yuen::{yuen_test, YuenConfInt, YuenResult};

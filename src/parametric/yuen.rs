@@ -2,6 +2,17 @@ use crate::error::{Result, StatError};
 use crate::Alternative;
 use statrs::distribution::{ContinuousCDF, StudentsT};
 
+/// Confidence interval for Yuen's test
+#[derive(Debug, Clone)]
+pub struct YuenConfInt {
+    /// Lower bound of the confidence interval
+    pub lower: f64,
+    /// Upper bound of the confidence interval
+    pub upper: f64,
+    /// Confidence level (e.g., 0.95 for 95%)
+    pub conf_level: f64,
+}
+
 /// Result of Yuen's test
 #[derive(Debug, Clone)]
 pub struct YuenResult {
@@ -17,6 +28,8 @@ pub struct YuenResult {
     pub trimmed_mean_x: f64,
     /// Trimmed mean of second sample
     pub trimmed_mean_y: f64,
+    /// Confidence interval for the difference in trimmed means
+    pub conf_int: Option<YuenConfInt>,
 }
 
 /// Perform Yuen's test for comparing trimmed means of two independent samples.
@@ -29,10 +42,17 @@ pub struct YuenResult {
 /// * `y` - Second sample
 /// * `trim` - Proportion to trim from each tail (default 0.2)
 /// * `alternative` - Alternative hypothesis (TwoSided, Less, Greater)
+/// * `conf_level` - If Some, compute confidence interval at this level (e.g., 0.95)
 ///
 /// # Returns
-/// * `YuenResult` containing statistic, df, p-value, and trimmed means
-pub fn yuen_test(x: &[f64], y: &[f64], trim: f64, alternative: Alternative) -> Result<YuenResult> {
+/// * `YuenResult` containing statistic, df, p-value, trimmed means, and optionally CI
+pub fn yuen_test(
+    x: &[f64],
+    y: &[f64],
+    trim: f64,
+    alternative: Alternative,
+    conf_level: Option<f64>,
+) -> Result<YuenResult> {
     // Validate trim parameter
     if !(0.0..0.5).contains(&trim) {
         return Err(StatError::InvalidParameter(format!(
@@ -100,6 +120,25 @@ pub fn yuen_test(x: &[f64], y: &[f64], trim: f64, alternative: Alternative) -> R
         Alternative::Greater => 1.0 - t_dist.cdf(t_stat),
     };
 
+    // Compute confidence interval if requested
+    let conf_int = if let Some(level) = conf_level {
+        if !(0.0 < level && level < 1.0) {
+            return Err(StatError::InvalidParameter(
+                "conf_level must be between 0 and 1".to_string(),
+            ));
+        }
+        let alpha = 1.0 - level;
+        let t_crit = t_dist.inverse_cdf(1.0 - alpha / 2.0);
+        let margin = t_crit * se;
+        Some(YuenConfInt {
+            lower: diff - margin,
+            upper: diff + margin,
+            conf_level: level,
+        })
+    } else {
+        None
+    };
+
     Ok(YuenResult {
         statistic: t_stat,
         df,
@@ -107,6 +146,7 @@ pub fn yuen_test(x: &[f64], y: &[f64], trim: f64, alternative: Alternative) -> R
         diff,
         trimmed_mean_x,
         trimmed_mean_y,
+        conf_int,
     })
 }
 

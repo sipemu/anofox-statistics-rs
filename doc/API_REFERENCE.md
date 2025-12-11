@@ -91,6 +91,7 @@ pub fn t_test(
 | `mean_x` | `f64` | Mean of first sample (or mean difference for paired) |
 | `mean_y` | `Option<f64>` | Mean of second sample (`None` for paired) |
 | `conf_int` | `Option<TTestConfInt>` | Confidence interval (if `conf_level` specified) |
+| `null_value` | `f64` | Null hypothesis value (the `mu` parameter) |
 
 **R equivalent:** `t.test()` (stats)
 
@@ -112,6 +113,7 @@ pub fn yuen_test(
     y: &[f64],
     trim: f64,
     alternative: Alternative,
+    conf_level: Option<f64>,
 ) -> Result<YuenResult>
 ```
 
@@ -123,6 +125,7 @@ pub fn yuen_test(
 | `y` | `&[f64]` | Second sample |
 | `trim` | `f64` | Proportion to trim from each tail, must be in `[0, 0.5)` |
 | `alternative` | `Alternative` | Alternative hypothesis: `TwoSided`, `Less`, or `Greater` |
+| `conf_level` | `Option<f64>` | Confidence level for CI (e.g., `Some(0.95)` for 95% CI) |
 
 **Returns:** `YuenResult`
 
@@ -134,6 +137,7 @@ pub fn yuen_test(
 | `diff` | `f64` | Difference between trimmed means |
 | `trimmed_mean_x` | `f64` | Trimmed mean of first sample |
 | `trimmed_mean_y` | `f64` | Trimmed mean of second sample |
+| `conf_int` | `Option<YuenConfInt>` | Confidence interval (if `conf_level` specified) |
 
 **R equivalent:** `yuen()` (WRS2)
 
@@ -234,6 +238,7 @@ pub fn mann_whitney_u(
 | `p_value` | `f64` | The p-value |
 | `estimate` | `Option<f64>` | Hodges-Lehmann estimate of location shift |
 | `conf_int` | `Option<ConfidenceInterval>` | Confidence interval for location shift |
+| `null_value` | `f64` | Null hypothesis value (location shift under H0) |
 
 **R equivalent:** `wilcox.test(paired=FALSE)` (stats)
 
@@ -281,6 +286,7 @@ pub fn wilcoxon_signed_rank(
 | `p_value` | `f64` | The p-value |
 | `estimate` | `Option<f64>` | Hodges-Lehmann pseudo-median of differences |
 | `conf_int` | `Option<ConfidenceInterval>` | Confidence interval for pseudo-median |
+| `null_value` | `f64` | Null hypothesis value (median difference under H0) |
 
 **R equivalent:** `wilcox.test(paired=TRUE)` (stats)
 
@@ -659,6 +665,10 @@ pub fn diebold_mariano(
 |-------|------|-------------|
 | `statistic` | `f64` | The DM test statistic |
 | `p_value` | `f64` | The p-value |
+| `horizon` | `usize` | Forecast horizon used |
+| `loss_function` | `LossFunction` | Loss function used |
+| `varestimator` | `VarEstimator` | Variance estimator used |
+| `alternative` | `Alternative` | Alternative hypothesis tested |
 
 **R equivalent:** `dm.test()` (forecast)
 

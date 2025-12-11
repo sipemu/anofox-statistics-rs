@@ -24,7 +24,7 @@ pub use nonparametric::{
 };
 pub use parametric::{
     brown_forsythe, t_test, yuen_test, Alternative, LeveneResult, TTestKind, TTestResult,
-    YuenResult,
+    YuenConfInt, YuenResult,
 };
 pub use resampling::{
     permutation_t_test, CircularBlockBootstrap, PermutationEngine, PermutationResult,

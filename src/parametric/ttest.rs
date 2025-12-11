@@ -50,6 +50,8 @@ pub struct TTestResult {
     pub mean_y: Option<f64>,
     /// Confidence interval for the mean difference (if conf_level was specified)
     pub conf_int: Option<TTestConfInt>,
+    /// Null hypothesis value (mu parameter)
+    pub null_value: f64,
 }
 
 /// Perform a t-test comparing two samples.
@@ -130,6 +132,7 @@ fn welch_t_test(
         mean_x,
         mean_y: Some(mean_y),
         conf_int,
+        null_value: mu,
     })
 }
 
@@ -183,6 +186,7 @@ fn student_t_test(
         mean_x,
         mean_y: Some(mean_y),
         conf_int,
+        null_value: mu,
     })
 }
 
@@ -237,6 +241,7 @@ fn paired_t_test(
         mean_x: mean_diff,
         mean_y: None,
         conf_int,
+        null_value: mu,
     })
 }
 

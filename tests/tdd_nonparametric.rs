@@ -552,3 +552,42 @@ fn test_wilcoxon_signed_rank_confidence_interval_90() {
     assert_relative_eq!(ci.upper, refs["conf_high_90"], epsilon = 1e-6);
     assert_relative_eq!(ci.conf_level, 0.90, epsilon = EPSILON);
 }
+
+// ============================================
+// Mann-Whitney U Result Fields
+// ============================================
+
+#[test]
+fn test_mann_whitney_u_result_contains_null_value() {
+    let x = common::load_reference_vector("mw_x.csv");
+    let y = common::load_reference_vector("mw_y.csv");
+
+    let result_mu0 = mann_whitney_u(&x, &y, Alternative::TwoSided, false, false, None, None)
+        .expect("mann_whitney_u should succeed");
+
+    let result_mu05 = mann_whitney_u(&x, &y, Alternative::TwoSided, false, false, None, Some(0.5))
+        .expect("mann_whitney_u should succeed");
+
+    assert_relative_eq!(result_mu0.null_value, 0.0, epsilon = EPSILON);
+    assert_relative_eq!(result_mu05.null_value, 0.5, epsilon = EPSILON);
+}
+
+// ============================================
+// Wilcoxon Signed-Rank Result Fields
+// ============================================
+
+#[test]
+fn test_wilcoxon_signed_rank_result_contains_null_value() {
+    let x = common::load_reference_vector("wsr_x.csv");
+    let y = common::load_reference_vector("wsr_y.csv");
+
+    let result_mu0 = wilcoxon_signed_rank(&x, &y, Alternative::TwoSided, false, false, None, None)
+        .expect("wilcoxon_signed_rank should succeed");
+
+    let result_mu03 =
+        wilcoxon_signed_rank(&x, &y, Alternative::TwoSided, false, false, None, Some(0.3))
+            .expect("wilcoxon_signed_rank should succeed");
+
+    assert_relative_eq!(result_mu0.null_value, 0.0, epsilon = EPSILON);
+    assert_relative_eq!(result_mu03.null_value, 0.3, epsilon = EPSILON);
+}
