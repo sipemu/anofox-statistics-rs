@@ -91,6 +91,10 @@ pub fn t_test(
 
 **R equivalent:** `t.test()` (stats)
 
+**References:**
+- Student (1908). "The Probable Error of a Mean." *Biometrika*, 6(1), 1–25. [DOI: 10.2307/2331554](https://doi.org/10.2307/2331554)
+- Welch, B. L. (1947). "The Generalization of 'Student's' Problem when Several Different Population Variances are Involved." *Biometrika*, 34(1–2), 28–35. [DOI: 10.2307/2332510](https://doi.org/10.2307/2332510)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -124,6 +128,8 @@ pub fn yuen_test(x: &[f64], y: &[f64], trim: f64) -> Result<YuenResult>
 
 **R equivalent:** `yuen()` (WRS2)
 
+**Reference:** Yuen, K. K. (1974). "The Two-Sample Trimmed t for Unequal Population Variances." *Biometrika*, 61(1), 165–170. [DOI: 10.2307/2334299](https://doi.org/10.2307/2334299)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -152,6 +158,8 @@ pub fn brown_forsythe(groups: &[&[f64]]) -> Result<LeveneResult>
 | `p_value` | `f64` | The p-value |
 
 **R equivalent:** `leveneTest(center=median)` (car)
+
+**Reference:** Brown, M. B., & Forsythe, A. B. (1974). "Robust Tests for the Equality of Variances." *Journal of the American Statistical Association*, 69(346), 364–367. [DOI: 10.2307/2285659](https://doi.org/10.2307/2285659)
 
 [Back to top](#table-of-contents)
 
@@ -220,6 +228,10 @@ pub fn mann_whitney_u(
 
 **R equivalent:** `wilcox.test(paired=FALSE)` (stats)
 
+**References:**
+- Wilcoxon, F. (1945). "Individual Comparisons by Ranking Methods." *Biometrics Bulletin*, 1(6), 80–83. [DOI: 10.2307/3001968](https://doi.org/10.2307/3001968)
+- Mann, H. B., & Whitney, D. R. (1947). "On a Test of Whether One of Two Random Variables is Stochastically Larger than the Other." *Annals of Mathematical Statistics*, 18(1), 50–60. [DOI: 10.1214/aoms/1177730491](https://doi.org/10.1214/aoms/1177730491)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -263,6 +275,8 @@ pub fn wilcoxon_signed_rank(
 
 **R equivalent:** `wilcox.test(paired=TRUE)` (stats)
 
+**Reference:** Wilcoxon, F. (1945). "Individual Comparisons by Ranking Methods." *Biometrics Bulletin*, 1(6), 80–83. [DOI: 10.2307/3001968](https://doi.org/10.2307/3001968)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -290,6 +304,8 @@ pub fn kruskal_wallis(groups: &[&[f64]]) -> Result<KruskalResult>
 | `p_value` | `f64` | The p-value |
 
 **R equivalent:** `kruskal.test()` (stats)
+
+**Reference:** Kruskal, W. H., & Wallis, W. A. (1952). "Use of Ranks in One-Criterion Variance Analysis." *Journal of the American Statistical Association*, 47(260), 583–621. [DOI: 10.2307/2280779](https://doi.org/10.2307/2280779)
 
 [Back to top](#table-of-contents)
 
@@ -329,6 +345,10 @@ pub fn brunner_munzel(
 
 **R equivalent:** `brunner.munzel.test()` (lawstat)
 
+**References:**
+- Brunner, E., & Munzel, U. (2000). "The Nonparametric Behrens-Fisher Problem: Asymptotic Theory and a Small-Sample Approximation." *Biometrical Journal*, 42(1), 17–25. [DOI: 10.1002/(SICI)1521-4036(200001)42:1<17::AID-BIMJ17>3.0.CO;2-U](https://doi.org/10.1002/(SICI)1521-4036(200001)42:1<17::AID-BIMJ17>3.0.CO;2-U)
+- Neubert, K., & Brunner, E. (2007). "A Studentized Permutation Test for the Non-parametric Behrens-Fisher Problem." *Computational Statistics & Data Analysis*, 51(10), 5192–5204. [DOI: 10.1016/j.csda.2006.05.024](https://doi.org/10.1016/j.csda.2006.05.024)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -358,6 +378,10 @@ pub fn shapiro_wilk(data: &[f64]) -> Result<ShapiroWilkResult>
 
 **R equivalent:** `shapiro.test()` (stats)
 
+**References:**
+- Shapiro, S. S., & Wilk, M. B. (1965). "An Analysis of Variance Test for Normality (Complete Samples)." *Biometrika*, 52(3–4), 591–611. [DOI: 10.1093/biomet/52.3-4.591](https://doi.org/10.1093/biomet/52.3-4.591)
+- Royston, J. P. (1995). "Remark AS R94: A Remark on Algorithm AS 181: The W-test for Normality." *Journal of the Royal Statistical Society. Series C (Applied Statistics)*, 44(4), 547–551. [DOI: 10.2307/2986146](https://doi.org/10.2307/2986146)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -386,6 +410,11 @@ pub fn dagostino_k_squared(data: &[f64]) -> Result<DAgostinoResult>
 | `z_kurtosis` | `f64` | Z-score for kurtosis |
 
 **R equivalent:** `agostino.test()`, `anscombe.test()` (moments)
+
+**References:**
+- D'Agostino, R. B. (1971). "An Omnibus Test of Normality for Moderate and Large Sample Size." *Biometrika*, 58(2), 341–348. [DOI: 10.2307/2334522](https://doi.org/10.2307/2334522)
+- D'Agostino, R. B., & Pearson, E. S. (1973). "Tests for Departure from Normality." *Biometrika*, 60(3), 613–622. [DOI: 10.2307/2335012](https://doi.org/10.2307/2335012)
+- D'Agostino, R. B., Belanger, A., & D'Agostino, R. B. Jr. (1990). "A Suggestion for Using Powerful and Informative Tests of Normality." *The American Statistician*, 44(4), 316–321. [DOI: 10.2307/2684359](https://doi.org/10.2307/2684359)
 
 [Back to top](#table-of-contents)
 
@@ -424,6 +453,10 @@ pub fn permutation_t_test(
 | `statistic` | `f64` | The observed test statistic |
 | `p_value` | `f64` | The p-value from permutation distribution |
 | `n_permutations` | `usize` | Number of permutations used |
+
+**References:**
+- Fisher, R. A. (1935). *The Design of Experiments.* Oliver and Boyd.
+- Pitman, E. J. G. (1937). "Significance Tests Which May be Applied to Samples from Any Populations." *Supplement to the Journal of the Royal Statistical Society*, 4(1), 119–130. [DOI: 10.2307/2984124](https://doi.org/10.2307/2984124)
 
 [Back to top](#table-of-contents)
 
@@ -472,6 +505,8 @@ impl StationaryBootstrap {
 | `expected_block_length` | `f64` | Expected block length (determines block switching probability) |
 | `seed` | `Option<u64>` | Random seed for reproducibility |
 
+**Reference:** Politis, D. N., & Romano, J. P. (1994). "The Stationary Bootstrap." *Journal of the American Statistical Association*, 89(428), 1303–1313. [DOI: 10.1080/01621459.1994.10476870](https://doi.org/10.1080/01621459.1994.10476870)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -494,6 +529,10 @@ impl CircularBlockBootstrap {
 |-----------|------|-------------|
 | `block_length` | `usize` | Fixed block length |
 | `seed` | `Option<u64>` | Random seed for reproducibility |
+
+**References:**
+- Künsch, H. R. (1989). "The Jackknife and the Bootstrap for General Stationary Observations." *Annals of Statistics*, 17(3), 1217–1241. [DOI: 10.1214/aos/1176347265](https://doi.org/10.1214/aos/1176347265)
+- Politis, D. N., & Romano, J. P. (1992). "A Circular Block-Resampling Procedure for Stationary Data." In R. LePage & L. Billard (Eds.), *Exploring the Limits of Bootstrap* (pp. 263–270). Wiley.
 
 [Back to top](#table-of-contents)
 
@@ -531,6 +570,10 @@ pub fn energy_distance_test(
 | `p_value` | `f64` | The p-value from permutation test |
 | `n_permutations` | `usize` | Number of permutations used |
 
+**References:**
+- Székely, G. J., & Rizzo, M. L. (2004). "Testing for Equal Distributions in High Dimension." *InterStat*, November (5).
+- Székely, G. J., & Rizzo, M. L. (2013). "Energy Statistics: A Class of Statistics Based on Distances." *Journal of Statistical Planning and Inference*, 143(8), 1249–1272. [DOI: 10.1016/j.jspi.2013.03.018](https://doi.org/10.1016/j.jspi.2013.03.018)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -566,6 +609,8 @@ pub fn mmd_test(
 | `statistic` | `f64` | The MMD² test statistic (unbiased estimator) |
 | `p_value` | `f64` | The p-value from permutation test |
 | `n_permutations` | `usize` | Number of permutations used |
+
+**Reference:** Gretton, A., Borgwardt, K. M., Rasch, M. J., Schölkopf, B., & Smola, A. (2012). "A Kernel Two-Sample Test." *Journal of Machine Learning Research*, 13, 723–773. [PDF](https://www.jmlr.org/papers/volume13/gretton12a/gretton12a.pdf)
 
 [Back to top](#table-of-contents)
 
@@ -606,6 +651,8 @@ pub fn diebold_mariano(
 
 **R equivalent:** `dm.test()` (forecast)
 
+**Reference:** Diebold, F. X., & Mariano, R. S. (1995). "Comparing Predictive Accuracy." *Journal of Business & Economic Statistics*, 13(3), 253–263. [DOI: 10.1080/07350015.1995.10524599](https://doi.org/10.1080/07350015.1995.10524599)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -633,6 +680,10 @@ pub fn clark_west(e1: &[f64], e2: &[f64], h: usize) -> Result<CWResult>
 | `statistic` | `f64` | The Clark-West adjusted test statistic |
 | `p_value` | `f64` | One-sided p-value (H₁: unrestricted is better) |
 | `p_value_two_sided` | `f64` | Two-sided p-value |
+
+**References:**
+- Clark, T. E., & West, K. D. (2006). "Using Out-of-Sample Mean Squared Prediction Errors to Test the Martingale Difference Hypothesis." *Journal of Econometrics*, 135(1–2), 155–186. [DOI: 10.1016/j.jeconom.2005.07.014](https://doi.org/10.1016/j.jeconom.2005.07.014)
+- Clark, T. E., & West, K. D. (2007). "Approximately Normal Tests for Equal Predictive Accuracy in Nested Models." *Journal of Econometrics*, 138(1), 291–311. [DOI: 10.1016/j.jeconom.2006.05.023](https://doi.org/10.1016/j.jeconom.2006.05.023)
 
 [Back to top](#table-of-contents)
 
@@ -671,6 +722,8 @@ pub fn spa_test(
 | `p_value_upper` | `f64` | Upper p-value (more conservative) |
 | `n_bootstrap` | `usize` | Number of bootstrap samples used |
 | `best_model_idx` | `Option<usize>` | Index of best performing model |
+
+**Reference:** Hansen, P. R. (2005). "A Test for Superior Predictive Ability." *Journal of Business & Economic Statistics*, 23(4), 365–380. [DOI: 10.1198/073500105000000063](https://doi.org/10.1198/073500105000000063)
 
 [Back to top](#table-of-contents)
 
@@ -751,6 +804,8 @@ pub fn model_confidence_set(
 | `n_bootstrap` | `usize` | Number of bootstrap samples used |
 | `statistic_type` | `MCSStatistic` | Statistic type used |
 
+**Reference:** Hansen, P. R., Lunde, A., & Nason, J. M. (2011). "The Model Confidence Set." *Econometrica*, 79(2), 453–497. [DOI: 10.3982/ECTA5771](https://doi.org/10.3982/ECTA5771)
+
 [Back to top](#table-of-contents)
 
 ---
@@ -771,11 +826,13 @@ pub fn mean(data: &[f64]) -> Result<f64>
 
 ### stable_mean
 
-Computes arithmetic mean using Welford's online algorithm (Welford, 1962). Numerically stable for data with large magnitude or many observations.
+Computes arithmetic mean using Welford's online algorithm. Numerically stable for data with large magnitude or many observations.
 
 ```rust
 pub fn stable_mean(data: &[f64]) -> Result<f64>
 ```
+
+**Reference:** Welford, B. P. (1962). "Note on a Method for Calculating Corrected Sums of Squares and Products." *Technometrics*, 4(3), 419–420. [DOI: 10.2307/1266577](https://doi.org/10.2307/1266577)
 
 [Back to top](#table-of-contents)
 
@@ -795,11 +852,13 @@ pub fn variance(data: &[f64]) -> Result<f64>
 
 ### stable_variance
 
-Computes sample variance using Welford's online algorithm (Welford, 1962). Numerically stable for data with large magnitude or small variance relative to mean.
+Computes sample variance using Welford's online algorithm. Numerically stable for data with large magnitude or small variance relative to mean.
 
 ```rust
 pub fn stable_variance(data: &[f64]) -> Result<f64>
 ```
+
+**Reference:** Welford, B. P. (1962). "Note on a Method for Calculating Corrected Sums of Squares and Products." *Technometrics*, 4(3), 419–420. [DOI: 10.2307/1266577](https://doi.org/10.2307/1266577)
 
 [Back to top](#table-of-contents)
 
