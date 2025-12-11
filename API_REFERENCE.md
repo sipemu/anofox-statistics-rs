@@ -1,0 +1,956 @@
+# API Reference
+
+Complete API documentation for anofox-statistics. This document serves as the single source of truth for all function signatures, parameters, and return types.
+
+## Table of Contents
+
+- [Parametric Tests](#parametric-tests)
+  - [t_test](#t_test)
+  - [yuen_test](#yuen_test)
+  - [brown_forsythe](#brown_forsythe)
+- [Nonparametric Tests](#nonparametric-tests)
+  - [rank](#rank)
+  - [mann_whitney_u](#mann_whitney_u)
+  - [wilcoxon_signed_rank](#wilcoxon_signed_rank)
+  - [kruskal_wallis](#kruskal_wallis)
+  - [brunner_munzel](#brunner_munzel)
+- [Distributional Tests](#distributional-tests)
+  - [shapiro_wilk](#shapiro_wilk)
+  - [dagostino_k_squared](#dagostino_k_squared)
+- [Resampling Methods](#resampling-methods)
+  - [permutation_t_test](#permutation_t_test)
+  - [PermutationEngine](#permutationengine)
+  - [StationaryBootstrap](#stationarybootstrap)
+  - [CircularBlockBootstrap](#circularblockbootstrap)
+- [Modern Distribution Tests](#modern-distribution-tests)
+  - [energy_distance_test](#energy_distance_test)
+  - [mmd_test](#mmd_test)
+- [Forecast Evaluation](#forecast-evaluation)
+  - [diebold_mariano](#diebold_mariano)
+  - [clark_west](#clark_west)
+  - [spa_test](#spa_test)
+  - [mspe_adjusted_spa](#mspe_adjusted_spa)
+  - [model_confidence_set](#model_confidence_set)
+- [Math Primitives](#math-primitives)
+  - [mean](#mean)
+  - [stable_mean](#stable_mean)
+  - [variance](#variance)
+  - [stable_variance](#stable_variance)
+  - [std_dev](#std_dev)
+  - [median](#median)
+  - [trimmed_mean](#trimmed_mean)
+  - [skewness](#skewness)
+  - [kurtosis](#kurtosis)
+- [Enums](#enums)
+  - [Alternative](#alternative)
+  - [TTestKind](#ttestkind)
+  - [LossFunction](#lossfunction)
+  - [MCSStatistic](#mcsstatistic)
+  - [Kernel](#kernel)
+
+---
+
+## Parametric Tests
+
+### t_test
+
+Performs t-test comparing two samples.
+
+```rust
+pub fn t_test(
+    x: &[f64],
+    y: &[f64],
+    kind: TTestKind,
+    alternative: Alternative,
+    mu: f64,
+    conf_level: Option<f64>,
+) -> Result<TTestResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample |
+| `kind` | `TTestKind` | Type of t-test: `Welch`, `Student`, or `Paired` |
+| `alternative` | `Alternative` | Alternative hypothesis: `TwoSided`, `Less`, or `Greater` |
+| `mu` | `f64` | Null hypothesis value for the true difference in means |
+| `conf_level` | `Option<f64>` | Confidence level for CI (e.g., `Some(0.95)` for 95% CI) |
+
+**Returns:** `TTestResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The t-statistic |
+| `df` | `f64` | Degrees of freedom |
+| `p_value` | `f64` | The p-value |
+| `mean_x` | `f64` | Mean of first sample (or mean difference for paired) |
+| `mean_y` | `Option<f64>` | Mean of second sample (`None` for paired) |
+| `conf_int` | `Option<TTestConfInt>` | Confidence interval (if `conf_level` specified) |
+
+**R equivalent:** `t.test()` (stats)
+
+[Back to top](#table-of-contents)
+
+---
+
+### yuen_test
+
+Performs Yuen's test for comparing trimmed means of two independent samples. Robust alternative to t-test using trimmed means and winsorized variances.
+
+```rust
+pub fn yuen_test(x: &[f64], y: &[f64], trim: f64) -> Result<YuenResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample |
+| `trim` | `f64` | Proportion to trim from each tail, must be in `[0, 0.5)` |
+
+**Returns:** `YuenResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The t-statistic |
+| `df` | `f64` | Degrees of freedom (Welch-Satterthwaite) |
+| `p_value` | `f64` | The p-value (two-sided) |
+| `diff` | `f64` | Difference between trimmed means |
+| `trimmed_mean_x` | `f64` | Trimmed mean of first sample |
+| `trimmed_mean_y` | `f64` | Trimmed mean of second sample |
+
+**R equivalent:** `yuen()` (WRS2)
+
+[Back to top](#table-of-contents)
+
+---
+
+### brown_forsythe
+
+Performs Brown-Forsythe test for homogeneity of variances. This is Levene's test using the median instead of the mean.
+
+```rust
+pub fn brown_forsythe(groups: &[&[f64]]) -> Result<LeveneResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `groups` | `&[&[f64]]` | Slice of slices, each containing one group's data (minimum 2 groups) |
+
+**Returns:** `LeveneResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The F-statistic |
+| `df1` | `f64` | Numerator degrees of freedom (k-1) |
+| `df2` | `f64` | Denominator degrees of freedom (N-k) |
+| `p_value` | `f64` | The p-value |
+
+**R equivalent:** `leveneTest(center=median)` (car)
+
+[Back to top](#table-of-contents)
+
+---
+
+## Nonparametric Tests
+
+### rank
+
+Computes ranks with average tie handling.
+
+```rust
+pub fn rank(data: &[f64]) -> Result<Vec<f64>>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `data` | `&[f64]` | Input data |
+
+**Returns:** `Vec<f64>` - Ranks (1-indexed, ties receive average rank)
+
+**R equivalent:** `rank(ties.method="average")` (stats)
+
+[Back to top](#table-of-contents)
+
+---
+
+### mann_whitney_u
+
+Performs Mann-Whitney U test (Wilcoxon rank-sum test) for two independent samples.
+
+```rust
+pub fn mann_whitney_u(
+    x: &[f64],
+    y: &[f64],
+    alternative: Alternative,
+    continuity_correction: bool,
+    exact: bool,
+    conf_level: Option<f64>,
+    mu: Option<f64>,
+) -> Result<MannWhitneyResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample |
+| `alternative` | `Alternative` | Alternative hypothesis |
+| `continuity_correction` | `bool` | Apply continuity correction (normal approximation only) |
+| `exact` | `bool` | Compute exact p-value (recommended for small samples without ties) |
+| `conf_level` | `Option<f64>` | Confidence level for Hodges-Lehmann CI |
+| `mu` | `Option<f64>` | Null hypothesis location shift (default: 0) |
+
+**Returns:** `MannWhitneyResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The U statistic |
+| `p_value` | `f64` | The p-value |
+| `estimate` | `Option<f64>` | Hodges-Lehmann estimate of location shift |
+| `conf_int` | `Option<ConfidenceInterval>` | Confidence interval for location shift |
+
+**R equivalent:** `wilcox.test(paired=FALSE)` (stats)
+
+[Back to top](#table-of-contents)
+
+---
+
+### wilcoxon_signed_rank
+
+Performs Wilcoxon signed-rank test for paired samples.
+
+```rust
+pub fn wilcoxon_signed_rank(
+    x: &[f64],
+    y: &[f64],
+    alternative: Alternative,
+    continuity_correction: bool,
+    exact: bool,
+    conf_level: Option<f64>,
+    mu: Option<f64>,
+) -> Result<WilcoxonResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample (paired with x) |
+| `alternative` | `Alternative` | Alternative hypothesis |
+| `continuity_correction` | `bool` | Apply continuity correction |
+| `exact` | `bool` | Compute exact p-value |
+| `conf_level` | `Option<f64>` | Confidence level for pseudo-median CI |
+| `mu` | `Option<f64>` | Null hypothesis median difference (default: 0) |
+
+**Returns:** `WilcoxonResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The V statistic (sum of positive ranks) |
+| `p_value` | `f64` | The p-value |
+| `estimate` | `Option<f64>` | Hodges-Lehmann pseudo-median of differences |
+| `conf_int` | `Option<ConfidenceInterval>` | Confidence interval for pseudo-median |
+
+**R equivalent:** `wilcox.test(paired=TRUE)` (stats)
+
+[Back to top](#table-of-contents)
+
+---
+
+### kruskal_wallis
+
+Performs Kruskal-Wallis H test for comparing multiple independent groups. Nonparametric equivalent of one-way ANOVA.
+
+```rust
+pub fn kruskal_wallis(groups: &[&[f64]]) -> Result<KruskalResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `groups` | `&[&[f64]]` | Slice of slices, each containing one group's data |
+
+**Returns:** `KruskalResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The H statistic (chi-squared approximation) |
+| `df` | `f64` | Degrees of freedom (k-1) |
+| `p_value` | `f64` | The p-value |
+
+**R equivalent:** `kruskal.test()` (stats)
+
+[Back to top](#table-of-contents)
+
+---
+
+### brunner_munzel
+
+Performs Brunner-Munzel test for stochastic equality. Robust alternative to Mann-Whitney U that handles unequal variances.
+
+```rust
+pub fn brunner_munzel(
+    x: &[f64],
+    y: &[f64],
+    alternative: Alternative,
+    alpha: Option<f64>,
+) -> Result<BrunnerMunzelResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample (minimum 2 observations) |
+| `y` | `&[f64]` | Second sample (minimum 2 observations) |
+| `alternative` | `Alternative` | Alternative hypothesis |
+| `alpha` | `Option<f64>` | Significance level for CI (e.g., `Some(0.05)` for 95% CI) |
+
+**Returns:** `BrunnerMunzelResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The test statistic |
+| `df` | `f64` | Degrees of freedom (Welch-Satterthwaite) |
+| `p_value` | `f64` | The p-value |
+| `estimate` | `f64` | Estimated P(X < Y) + 0.5 * P(X = Y) |
+| `conf_int` | `Option<BrunnerMunzelConfInt>` | Confidence interval for the estimate |
+
+**R equivalent:** `brunner.munzel.test()` (lawstat)
+
+[Back to top](#table-of-contents)
+
+---
+
+## Distributional Tests
+
+### shapiro_wilk
+
+Performs Shapiro-Wilk test for normality. Implementation follows Algorithm AS R94 (Royston, 1995).
+
+```rust
+pub fn shapiro_wilk(data: &[f64]) -> Result<ShapiroWilkResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `data` | `&[f64]` | Sample data (3 ≤ n ≤ 5000) |
+
+**Returns:** `ShapiroWilkResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The W statistic |
+| `p_value` | `f64` | The p-value |
+
+**R equivalent:** `shapiro.test()` (stats)
+
+[Back to top](#table-of-contents)
+
+---
+
+### dagostino_k_squared
+
+Performs D'Agostino's K-squared test for normality. Omnibus test combining tests for skewness and kurtosis.
+
+```rust
+pub fn dagostino_k_squared(data: &[f64]) -> Result<DAgostinoResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `data` | `&[f64]` | Sample data (n ≥ 8, recommended n ≥ 20) |
+
+**Returns:** `DAgostinoResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The K² test statistic |
+| `p_value` | `f64` | The p-value |
+| `z_skewness` | `f64` | Z-score for skewness |
+| `z_kurtosis` | `f64` | Z-score for kurtosis |
+
+**R equivalent:** `agostino.test()`, `anscombe.test()` (moments)
+
+[Back to top](#table-of-contents)
+
+---
+
+## Resampling Methods
+
+### permutation_t_test
+
+Performs permutation-based t-test.
+
+```rust
+pub fn permutation_t_test(
+    x: &[f64],
+    y: &[f64],
+    alternative: Alternative,
+    n_permutations: usize,
+    seed: Option<u64>,
+) -> Result<PermutationResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample |
+| `alternative` | `Alternative` | Alternative hypothesis |
+| `n_permutations` | `usize` | Number of permutations |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+**Returns:** `PermutationResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The observed test statistic |
+| `p_value` | `f64` | The p-value from permutation distribution |
+| `n_permutations` | `usize` | Number of permutations used |
+
+[Back to top](#table-of-contents)
+
+---
+
+### PermutationEngine
+
+Generic permutation engine for custom test statistics.
+
+```rust
+impl PermutationEngine {
+    pub fn new(n_permutations: usize, seed: Option<u64>) -> Self;
+
+    pub fn test<F>(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        statistic_fn: F,
+        alternative: Alternative,
+    ) -> Result<PermutationResult>
+    where
+        F: Fn(&[f64], &[f64]) -> f64;
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### StationaryBootstrap
+
+Stationary bootstrap for dependent data (Politis & Romano, 1994).
+
+```rust
+impl StationaryBootstrap {
+    pub fn new(expected_block_length: f64, seed: Option<u64>) -> Self;
+
+    pub fn resample(&mut self, data: &[f64]) -> Vec<f64>;
+}
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `expected_block_length` | `f64` | Expected block length (determines block switching probability) |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+[Back to top](#table-of-contents)
+
+---
+
+### CircularBlockBootstrap
+
+Circular block bootstrap for dependent data.
+
+```rust
+impl CircularBlockBootstrap {
+    pub fn new(block_length: usize, seed: Option<u64>) -> Self;
+
+    pub fn resample(&mut self, data: &[f64]) -> Vec<f64>;
+}
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `block_length` | `usize` | Fixed block length |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+[Back to top](#table-of-contents)
+
+---
+
+## Modern Distribution Tests
+
+### energy_distance_test
+
+Performs energy distance two-sample test for multivariate data.
+
+```rust
+pub fn energy_distance_test(
+    x: &[Vec<f64>],
+    y: &[Vec<f64>],
+    n_permutations: usize,
+    seed: Option<u64>,
+) -> Result<EnergyDistanceResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[Vec<f64>]` | First sample (n₁ observations, each d-dimensional) |
+| `y` | `&[Vec<f64>]` | Second sample (n₂ observations, each d-dimensional) |
+| `n_permutations` | `usize` | Number of permutations |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+**Returns:** `EnergyDistanceResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The energy distance statistic |
+| `p_value` | `f64` | The p-value from permutation test |
+| `n_permutations` | `usize` | Number of permutations used |
+
+[Back to top](#table-of-contents)
+
+---
+
+### mmd_test
+
+Performs Maximum Mean Discrepancy two-sample test.
+
+```rust
+pub fn mmd_test(
+    x: &[Vec<f64>],
+    y: &[Vec<f64>],
+    kernel: Kernel,
+    n_permutations: usize,
+    seed: Option<u64>,
+) -> Result<MMDResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[Vec<f64>]` | First sample |
+| `y` | `&[Vec<f64>]` | Second sample |
+| `kernel` | `Kernel` | Kernel function to use |
+| `n_permutations` | `usize` | Number of permutations |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+**Returns:** `MMDResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The MMD² test statistic (unbiased estimator) |
+| `p_value` | `f64` | The p-value from permutation test |
+| `n_permutations` | `usize` | Number of permutations used |
+
+[Back to top](#table-of-contents)
+
+---
+
+## Forecast Evaluation
+
+### diebold_mariano
+
+Performs Diebold-Mariano test for comparing forecast accuracy.
+
+```rust
+pub fn diebold_mariano(
+    e1: &[f64],
+    e2: &[f64],
+    loss: LossFunction,
+    h: usize,
+    alternative: Alternative,
+) -> Result<DMResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `e1` | `&[f64]` | Forecast errors from model 1 |
+| `e2` | `&[f64]` | Forecast errors from model 2 |
+| `loss` | `LossFunction` | Loss function: `SquaredError` or `AbsoluteError` |
+| `h` | `usize` | Forecast horizon (for variance adjustment) |
+| `alternative` | `Alternative` | Alternative hypothesis |
+
+**Returns:** `DMResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The DM test statistic |
+| `p_value` | `f64` | The p-value |
+
+**R equivalent:** `dm.test()` (forecast)
+
+[Back to top](#table-of-contents)
+
+---
+
+### clark_west
+
+Performs Clark-West test for comparing forecasts from nested models.
+
+```rust
+pub fn clark_west(e1: &[f64], e2: &[f64], h: usize) -> Result<CWResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `e1` | `&[f64]` | Forecast errors from restricted (null) model |
+| `e2` | `&[f64]` | Forecast errors from unrestricted (alternative) model |
+| `h` | `usize` | Forecast horizon (for HAC variance adjustment) |
+
+**Returns:** `CWResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The Clark-West adjusted test statistic |
+| `p_value` | `f64` | One-sided p-value (H₁: unrestricted is better) |
+| `p_value_two_sided` | `f64` | Two-sided p-value |
+
+[Back to top](#table-of-contents)
+
+---
+
+### spa_test
+
+Performs Superior Predictive Ability test for multiple model comparison.
+
+```rust
+pub fn spa_test(
+    benchmark_losses: &[f64],
+    model_losses: &[Vec<f64>],
+    n_bootstrap: usize,
+    block_length: f64,
+    seed: Option<u64>,
+) -> Result<SPAResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `benchmark_losses` | `&[f64]` | Loss values from benchmark model (length T) |
+| `model_losses` | `&[Vec<f64>]` | Loss values from K competing models (K × T) |
+| `n_bootstrap` | `usize` | Number of bootstrap samples |
+| `block_length` | `f64` | Expected block length for stationary bootstrap |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+**Returns:** `SPAResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | Maximum standardized performance |
+| `p_value_consistent` | `f64` | Consistent p-value (Hansen, 2005) |
+| `p_value_upper` | `f64` | Upper p-value (more conservative) |
+| `n_bootstrap` | `usize` | Number of bootstrap samples used |
+| `best_model_idx` | `Option<usize>` | Index of best performing model |
+
+[Back to top](#table-of-contents)
+
+---
+
+### mspe_adjusted_spa
+
+Performs MSPE-Adjusted SPA test combining Clark-West adjustment with bootstrap for nested models.
+
+```rust
+pub fn mspe_adjusted_spa(
+    benchmark_errors: &[f64],
+    model_errors: &[Vec<f64>],
+    n_bootstrap: usize,
+    block_length: f64,
+    seed: Option<u64>,
+) -> Result<MSPEAdjustedResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `benchmark_errors` | `&[f64]` | Forecast errors from benchmark (restricted) model |
+| `model_errors` | `&[Vec<f64>]` | Forecast errors from K alternative models |
+| `n_bootstrap` | `usize` | Number of bootstrap samples |
+| `block_length` | `f64` | Expected block length for stationary bootstrap |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+**Returns:** `MSPEAdjustedResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | Maximum standardized Clark-West adjusted performance |
+| `p_value_consistent` | `f64` | Consistent p-value |
+| `p_value_upper` | `f64` | Upper p-value (conservative) |
+| `n_bootstrap` | `usize` | Number of bootstrap samples used |
+| `best_model_idx` | `Option<usize>` | Index of best performing model |
+
+[Back to top](#table-of-contents)
+
+---
+
+### model_confidence_set
+
+Performs Model Confidence Set procedure to identify the set of best models.
+
+```rust
+pub fn model_confidence_set(
+    losses: &[Vec<f64>],
+    alpha: f64,
+    statistic: MCSStatistic,
+    n_bootstrap: usize,
+    block_length: f64,
+    seed: Option<u64>,
+) -> Result<MCSResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `losses` | `&[Vec<f64>]` | Loss values for K models (K × T) |
+| `alpha` | `f64` | Significance level for elimination (e.g., 0.10) |
+| `statistic` | `MCSStatistic` | Test statistic type: `Range` or `Max` |
+| `n_bootstrap` | `usize` | Number of bootstrap samples |
+| `block_length` | `f64` | Expected block length for stationary bootstrap |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+**Returns:** `MCSResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `included_models` | `Vec<usize>` | Model indices in the confidence set |
+| `eliminated_models` | `Vec<usize>` | Model indices eliminated from the set |
+| `mcs_p_value` | `f64` | P-value when elimination stopped |
+| `elimination_sequence` | `Vec<MCSEliminationStep>` | Full elimination history |
+| `n_bootstrap` | `usize` | Number of bootstrap samples used |
+| `statistic_type` | `MCSStatistic` | Statistic type used |
+
+[Back to top](#table-of-contents)
+
+---
+
+## Math Primitives
+
+### mean
+
+Computes arithmetic mean.
+
+```rust
+pub fn mean(data: &[f64]) -> Result<f64>
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### stable_mean
+
+Computes arithmetic mean using Welford's online algorithm (Welford, 1962). Numerically stable for data with large magnitude or many observations.
+
+```rust
+pub fn stable_mean(data: &[f64]) -> Result<f64>
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### variance
+
+Computes sample variance (n-1 denominator).
+
+```rust
+pub fn variance(data: &[f64]) -> Result<f64>
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### stable_variance
+
+Computes sample variance using Welford's online algorithm (Welford, 1962). Numerically stable for data with large magnitude or small variance relative to mean.
+
+```rust
+pub fn stable_variance(data: &[f64]) -> Result<f64>
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### std_dev
+
+Computes sample standard deviation (n-1 denominator).
+
+```rust
+pub fn std_dev(data: &[f64]) -> Result<f64>
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### median
+
+Computes median.
+
+```rust
+pub fn median(data: &[f64]) -> Result<f64>
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### trimmed_mean
+
+Computes trimmed mean.
+
+```rust
+pub fn trimmed_mean(data: &[f64], trim: f64) -> Result<f64>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `data` | `&[f64]` | Input data |
+| `trim` | `f64` | Proportion to trim from each tail, must be in `[0, 0.5)` |
+
+[Back to top](#table-of-contents)
+
+---
+
+### skewness
+
+Computes sample skewness (Fisher's definition, type 2, matching R's e1071).
+
+```rust
+pub fn skewness(data: &[f64]) -> Result<f64>
+```
+
+**R equivalent:** `skewness(type=2)` (e1071)
+
+[Back to top](#table-of-contents)
+
+---
+
+### kurtosis
+
+Computes sample excess kurtosis (Fisher's definition, type 2, matching R's e1071).
+
+```rust
+pub fn kurtosis(data: &[f64]) -> Result<f64>
+```
+
+**R equivalent:** `kurtosis(type=2)` (e1071)
+
+[Back to top](#table-of-contents)
+
+---
+
+## Enums
+
+### Alternative
+
+Alternative hypothesis direction for hypothesis tests.
+
+```rust
+pub enum Alternative {
+    TwoSided,  // x ≠ y
+    Less,      // x < y
+    Greater,   // x > y
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### TTestKind
+
+Type of t-test to perform.
+
+```rust
+pub enum TTestKind {
+    Welch,    // Independent samples, unequal variances
+    Student,  // Independent samples, equal variances assumed
+    Paired,   // Paired samples
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### LossFunction
+
+Loss function for forecast comparison tests.
+
+```rust
+pub enum LossFunction {
+    SquaredError,   // (e)²
+    AbsoluteError,  // |e|
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### MCSStatistic
+
+Test statistic type for Model Confidence Set.
+
+```rust
+pub enum MCSStatistic {
+    Range,  // T_R: max_{i,j} |t_{ij}| - best against one clearly inferior model
+    Max,    // T_max: max_i of average t-statistics - balanced for multiple inferior models
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### Kernel
+
+Kernel types for MMD test.
+
+```rust
+pub enum Kernel {
+    Gaussian { bandwidth: f64 },                           // RBF: exp(-||x-y||²/(2σ²))
+    Linear,                                                 // x·y
+    Polynomial { degree: u32, scale: f64, offset: f64 },   // (scale·x·y + offset)^degree
+    Laplacian { bandwidth: f64 },                          // exp(-||x-y||/σ)
+}
+```
+
+[Back to top](#table-of-contents)
