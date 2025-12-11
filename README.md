@@ -347,12 +347,16 @@ println!("Eliminated: {:?}", result.eliminated_models);
 | Function | Description |
 |----------|-------------|
 | `mean(data)` | Arithmetic mean |
+| `stable_mean(data)` | Arithmetic mean using Welford's algorithm (numerically stable) |
 | `variance(data)` | Sample variance |
+| `stable_variance(data)` | Sample variance using Welford's algorithm (numerically stable) |
 | `std_dev(data)` | Sample standard deviation |
 | `median(data)` | Median |
 | `trimmed_mean(data, trim)` | Trimmed mean |
 | `skewness(data)` | Sample skewness (Fisher's, type 2) |
 | `kurtosis(data)` | Sample excess kurtosis (Fisher's, type 2) |
+
+The `stable_mean` and `stable_variance` functions implement Welford's online algorithm (B.P. Welford, "Note on a Method for Calculating Corrected Sums of Squares and Products", Technometrics, 1962). This algorithm computes running statistics in a single pass with O(1) memory, avoiding catastrophic cancellation that occurs with naive summation when variance is small relative to mean magnitude. Recommended for data with large offsets (e.g., timestamps, financial prices) or streaming applications.
 
 ## Validation
 
@@ -371,7 +375,7 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `skewness()`, `kurtosis()` | `skewness()`, `kurtosis()` | e1071 |
 | `diebold_mariano()` | `dm.test()` | forecast |
 
-All 227 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
+All 245 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
 
 **For complete transparency on the validation process, see [`R/VALIDATION.md`](R/VALIDATION.md)**, which documents:
 - All 76 reference data files and their R generation code

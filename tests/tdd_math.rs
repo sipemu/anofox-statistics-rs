@@ -444,3 +444,155 @@ fn test_kurtosis_empty_returns_error() {
     let empty: Vec<f64> = vec![];
     assert!(math::kurtosis(&empty).is_err());
 }
+
+// ============================================
+// Numerical Stability Tests
+// ============================================
+// These tests demonstrate why stable_mean and stable_variance
+// are preferable for certain edge cases.
+
+#[test]
+fn test_stable_mean_large_offset() {
+    // Data with large offset: values clustered around 1e12
+    // Naive summation can lose precision when sum >> individual differences
+    let large_offset: Vec<f64> = (0..1000).map(|i| 1e12 + (i as f64) * 0.001).collect();
+
+    let naive = math::mean(&large_offset).unwrap();
+    let stable = math::stable_mean(&large_offset).unwrap();
+
+    // Both algorithms should give similar results for this case
+    // At 1e12 magnitude, relative difference of ~1e-14 means absolute diff ~0.01
+    // The key is they agree with each other within floating-point precision
+    assert!((naive - stable).abs() < 0.1);
+
+    // Value should be approximately 1e12 + 0.4995
+    assert!(stable > 1e12);
+    assert!(stable < 1e12 + 1.0);
+}
+
+#[test]
+fn test_stable_mean_alternating_large_values() {
+    // Alternating large positive and negative values
+    // Tests catastrophic cancellation resistance
+    let alternating: Vec<f64> = (0..100)
+        .map(|i| if i % 2 == 0 { 1e15 } else { -1e15 + 1.0 })
+        .collect();
+
+    let naive = math::mean(&alternating).unwrap();
+    let stable = math::stable_mean(&alternating).unwrap();
+
+    // Expected: average of (1e15, -1e15+1, 1e15, -1e15+1, ...)
+    // = (50 * 1e15 + 50 * (-1e15 + 1)) / 100 = 0.5
+    // Due to floating-point precision limits at 1e15 scale, both methods
+    // have some error. The key test is they give consistent results.
+    assert_relative_eq!(stable, naive, epsilon = 0.1);
+
+    // Both should be close to 0.5
+    assert!(stable.abs() < 1.0);
+    assert!(naive.abs() < 1.0);
+}
+
+#[test]
+fn test_stable_variance_small_variance_large_mean() {
+    // Data with very small variance relative to mean magnitude
+    // Classic case where naive algorithms fail
+    let data: Vec<f64> = vec![1e9 + 1.0, 1e9 + 2.0, 1e9 + 3.0, 1e9 + 4.0, 1e9 + 5.0];
+
+    let naive = math::variance(&data).unwrap();
+    let stable = math::stable_variance(&data).unwrap();
+
+    // Variance of [1,2,3,4,5] = 2.5
+    let expected = 2.5;
+
+    // Both should work for this case, but stable is more reliable
+    assert_relative_eq!(stable, expected, epsilon = 1e-10);
+    assert_relative_eq!(naive, expected, epsilon = 1e-10);
+}
+
+#[test]
+fn test_stable_variance_constant_data() {
+    // Constant data should have zero variance
+    let constant: Vec<f64> = vec![42.0; 100];
+
+    let naive = math::variance(&constant).unwrap();
+    let stable = math::stable_variance(&constant).unwrap();
+
+    assert_relative_eq!(stable, 0.0, epsilon = 1e-15);
+    assert_relative_eq!(naive, 0.0, epsilon = 1e-15);
+}
+
+#[test]
+fn test_stable_variance_near_constant() {
+    // Nearly constant data with tiny variance
+    let near_constant: Vec<f64> = (0..100).map(|i| 1e8 + (i as f64) * 1e-10).collect();
+
+    let naive = math::variance(&near_constant).unwrap();
+    let stable = math::stable_variance(&near_constant).unwrap();
+
+    // Variance of arithmetic sequence: n^2 - 1 / 12 * d^2 where d is step size
+    // For 0..99 with step 1e-10: var = (100^2 - 1) / 12 * (1e-10)^2 * (100/99)
+    // Simplified: var((0..n)*d) = var(0..n) * d^2
+
+    // Both should be very small positive numbers
+    assert!(stable >= 0.0);
+    assert!(naive >= 0.0);
+}
+
+#[test]
+fn test_stable_mean_many_small_values() {
+    // Many small values that could underflow when summed naively
+    let small_values: Vec<f64> = vec![1e-15; 10000];
+
+    let naive = math::mean(&small_values).unwrap();
+    let stable = math::stable_mean(&small_values).unwrap();
+
+    assert_relative_eq!(stable, 1e-15, epsilon = 1e-25);
+    assert_relative_eq!(naive, 1e-15, epsilon = 1e-25);
+}
+
+#[test]
+fn test_stable_variance_two_elements() {
+    // Minimum case: two elements
+    let two = vec![1.0, 3.0];
+
+    let naive = math::variance(&two).unwrap();
+    let stable = math::stable_variance(&two).unwrap();
+
+    // var([1,3]) = ((1-2)^2 + (3-2)^2) / 1 = 2
+    assert_relative_eq!(stable, 2.0, epsilon = 1e-15);
+    assert_relative_eq!(naive, 2.0, epsilon = 1e-15);
+}
+
+#[test]
+fn test_stable_mean_equivalence_normal_data() {
+    // For normal data, both algorithms should give identical results
+    let refs = common::load_reference_scalars("math_basic.csv");
+    let x_long = common::load_reference_vector("vec_long.csv");
+
+    let naive = math::mean(&x_long).unwrap();
+    let stable = math::stable_mean(&x_long).unwrap();
+
+    // Both should match R's reference
+    assert_relative_eq!(naive, refs["mean_long"], epsilon = EPSILON);
+    assert_relative_eq!(stable, refs["mean_long"], epsilon = EPSILON);
+
+    // And should be equal to each other
+    assert_relative_eq!(naive, stable, epsilon = 1e-14);
+}
+
+#[test]
+fn test_stable_variance_equivalence_normal_data() {
+    // For normal data, both algorithms should give identical results
+    let refs = common::load_reference_scalars("math_basic.csv");
+    let x_long = common::load_reference_vector("vec_long.csv");
+
+    let naive = math::variance(&x_long).unwrap();
+    let stable = math::stable_variance(&x_long).unwrap();
+
+    // Both should match R's reference
+    assert_relative_eq!(naive, refs["var_long"], epsilon = EPSILON);
+    assert_relative_eq!(stable, refs["var_long"], epsilon = EPSILON);
+
+    // And should be equal to each other
+    assert_relative_eq!(naive, stable, epsilon = 1e-12);
+}

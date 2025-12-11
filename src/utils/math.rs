@@ -10,13 +10,22 @@ pub fn mean(data: &[f64]) -> Result<f64> {
     Ok(sum / data.len() as f64)
 }
 
-/// Calculate the arithmetic mean of a slice using.
+/// Calculate the arithmetic mean using Welford's online algorithm.
+///
+/// This implementation uses B.P. Welford's numerically stable algorithm
+/// (Technometrics, 1962) which incrementally updates the mean to avoid
+/// precision loss when summing large values or many small values.
+///
+/// Prefer this over `mean()` when:
+/// - Data values have large magnitude with small relative differences
+/// - Processing streaming/online data
+/// - Numerical stability is critical
+///
 /// Returns `StatError::EmptyData` if the slice is empty.
 pub fn stable_mean(data: &[f64]) -> Result<f64> {
     if data.is_empty() {
         return Err(StatError::EmptyData);
     }
-    // Use a less naive version to compute the mean
     let sum: f64 = data.iter().enumerate().fold(0_f64, |mean_km1, (k, xk)| {
         mean_km1 + (xk - mean_km1) / (k + 1) as f64
     });
@@ -36,7 +45,21 @@ pub fn variance(data: &[f64]) -> Result<f64> {
     Ok(sum_sq / (n - 1) as f64)
 }
 
-/// Calculate the sample variance (using n-1 denominator, matching R's `var()`).
+/// Calculate the sample variance using Welford's online algorithm.
+///
+/// This implementation uses B.P. Welford's numerically stable algorithm
+/// (Technometrics, 1962) which computes mean and variance in a single pass
+/// while avoiding catastrophic cancellation.
+///
+/// The algorithm maintains a running mean and sum of squared deviations,
+/// updating both incrementally. This is more stable than the two-pass
+/// algorithm when variance is small relative to the mean magnitude.
+///
+/// Prefer this over `variance()` when:
+/// - Data values have large magnitude with small variance
+/// - Processing streaming/online data
+/// - Numerical stability is critical
+///
 /// Returns `StatError::InsufficientData` if fewer than 2 elements.
 pub fn stable_variance(data: &[f64]) -> Result<f64> {
     let n = data.len();
@@ -44,7 +67,6 @@ pub fn stable_variance(data: &[f64]) -> Result<f64> {
         return Err(StatError::InsufficientData { needed: 2, got: n });
     }
 
-    // Use Welford's algorithm for stable computation of the variance.
     let (_mean, snd_moment): (f64, f64) =
         data.iter()
             .enumerate()
