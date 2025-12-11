@@ -2,6 +2,8 @@
 
 Complete API documentation for anofox-statistics. This document serves as the single source of truth for all function signatures, parameters, and return types.
 
+For runnable code examples demonstrating each test category, see the [examples/](../examples/) directory.
+
 ## Table of Contents
 
 - [Parametric Tests](#parametric-tests)
