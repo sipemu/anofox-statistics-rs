@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-12
+
+### Added
+
+- **Full R Output Parity**: All statistical test result structs now include all fields returned by R's `htest` objects (except `method` and `data.name`)
+  - `DMResult`: Added `horizon`, `loss_function`, `varestimator`, `alternative` fields
+  - `TTestResult`: Added `null_value` field
+  - `MannWhitneyResult`: Added `null_value` field
+  - `WilcoxonResult`: Added `null_value` field
+  - `YuenResult`: Added `conf_int` field with `YuenConfInt` struct
+
+- **Full R Input Parameter Parity**: All statistical tests now support the same parameters as their R equivalents
+  - `mann_whitney_u()`: Added `alternative`, `continuity_correction`, `exact`, `conf_level`, `mu` parameters
+  - `wilcoxon_signed_rank()`: Added `alternative`, `continuity_correction`, `exact`, `conf_level`, `mu` parameters
+  - `diebold_mariano()`: Added `alternative`, `varestimator` parameters
+  - `yuen_test()`: Added `alternative`, `conf_level` parameters
+  - `t_test()`: Added `mu`, `conf_level` parameters
+  - `brunner_munzel()`: Added `alternative`, `alpha` parameters
+
+- **Exact P-Values**: Mann-Whitney U and Wilcoxon signed-rank tests now support exact p-value computation for small samples without ties
+
+- **Confidence Intervals**: Added Hodges-Lehmann confidence intervals for Mann-Whitney U and Wilcoxon signed-rank tests
+
+- **Numerically Stable Algorithms**: Added `stable_mean()` and `stable_variance()` using Welford's online algorithm
+
+- **CI/CD**: Added automatic cargo publish to crates.io on GitHub release
+
+- **Documentation**:
+  - Comprehensive API reference in `doc/API_REFERENCE.md`
+  - Scientific references for all statistical tests
+  - Runnable examples for all test categories
+  - R validation documentation in `R/VALIDATION.md`
+
+### Changed
+
+- Refactored complex modules to improve code maintainability
+- Consolidated documentation structure
+
 ## [0.2.0] - 2025-12-09
 
 ### Added
