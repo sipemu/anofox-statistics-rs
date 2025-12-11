@@ -197,6 +197,12 @@ yuen_data <- data.frame(
 yuen_20 <- yuen(value ~ group, data = yuen_data, tr = 0.2)
 # Yuen's test with 10% trimming
 yuen_10 <- yuen(value ~ group, data = yuen_data, tr = 0.1)
+# Yuen's test alternatives computed manually from t-distribution
+# (WRS2::yuen doesn't correctly implement alternatives)
+t_stat <- yuen_20$test
+df <- yuen_20$df
+p_less <- pt(t_stat, df)
+p_greater <- pt(t_stat, df, lower.tail = FALSE)
 
 save_ref("yuen.csv", list(
   # 20% trim (default)
@@ -208,7 +214,10 @@ save_ref("yuen.csv", list(
   statistic_10 = yuen_10$test,
   df_10 = yuen_10$df,
   p_value_10 = yuen_10$p.value,
-  diff_10 = yuen_10$diff
+  diff_10 = yuen_10$diff,
+  # alternatives (20% trim) - computed from t-distribution
+  p_value_less = p_less,
+  p_value_greater = p_greater
 ))
 
 # Brown-Forsythe test (Levene's test with median)

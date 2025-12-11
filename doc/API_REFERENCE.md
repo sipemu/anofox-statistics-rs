@@ -104,7 +104,12 @@ pub fn t_test(
 Performs Yuen's test for comparing trimmed means of two independent samples. Robust alternative to t-test using trimmed means and winsorized variances.
 
 ```rust
-pub fn yuen_test(x: &[f64], y: &[f64], trim: f64) -> Result<YuenResult>
+pub fn yuen_test(
+    x: &[f64],
+    y: &[f64],
+    trim: f64,
+    alternative: Alternative,
+) -> Result<YuenResult>
 ```
 
 **Parameters:**
@@ -114,6 +119,7 @@ pub fn yuen_test(x: &[f64], y: &[f64], trim: f64) -> Result<YuenResult>
 | `x` | `&[f64]` | First sample |
 | `y` | `&[f64]` | Second sample |
 | `trim` | `f64` | Proportion to trim from each tail, must be in `[0, 0.5)` |
+| `alternative` | `Alternative` | Alternative hypothesis: `TwoSided`, `Less`, or `Greater` |
 
 **Returns:** `YuenResult`
 
@@ -121,7 +127,7 @@ pub fn yuen_test(x: &[f64], y: &[f64], trim: f64) -> Result<YuenResult>
 |-------|------|-------------|
 | `statistic` | `f64` | The t-statistic |
 | `df` | `f64` | Degrees of freedom (Welch-Satterthwaite) |
-| `p_value` | `f64` | The p-value (two-sided) |
+| `p_value` | `f64` | The p-value |
 | `diff` | `f64` | Difference between trimmed means |
 | `trimmed_mean_x` | `f64` | Trimmed mean of first sample |
 | `trimmed_mean_y` | `f64` | Trimmed mean of second sample |

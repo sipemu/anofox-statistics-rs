@@ -1,4 +1,5 @@
 use crate::error::{Result, StatError};
+use crate::Alternative;
 use statrs::distribution::{ContinuousCDF, StudentsT};
 
 /// Result of Yuen's test
@@ -27,10 +28,11 @@ pub struct YuenResult {
 /// * `x` - First sample
 /// * `y` - Second sample
 /// * `trim` - Proportion to trim from each tail (default 0.2)
+/// * `alternative` - Alternative hypothesis (TwoSided, Less, Greater)
 ///
 /// # Returns
 /// * `YuenResult` containing statistic, df, p-value, and trimmed means
-pub fn yuen_test(x: &[f64], y: &[f64], trim: f64) -> Result<YuenResult> {
+pub fn yuen_test(x: &[f64], y: &[f64], trim: f64, alternative: Alternative) -> Result<YuenResult> {
     // Validate trim parameter
     if !(0.0..0.5).contains(&trim) {
         return Err(StatError::InvalidParameter(format!(
@@ -90,9 +92,13 @@ pub fn yuen_test(x: &[f64], y: &[f64], trim: f64) -> Result<YuenResult> {
     // Welch-Satterthwaite degrees of freedom
     let df = (dx + dy).powi(2) / (dx.powi(2) / (hx_f - 1.0) + dy.powi(2) / (hy_f - 1.0));
 
-    // Two-sided p-value
+    // Compute p-value based on alternative hypothesis
     let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-    let p_value = 2.0 * (1.0 - t_dist.cdf(t_stat.abs()));
+    let p_value = match alternative {
+        Alternative::TwoSided => 2.0 * (1.0 - t_dist.cdf(t_stat.abs())),
+        Alternative::Less => t_dist.cdf(t_stat),
+        Alternative::Greater => 1.0 - t_dist.cdf(t_stat),
+    };
 
     Ok(YuenResult {
         statistic: t_stat,

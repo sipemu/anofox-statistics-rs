@@ -329,7 +329,7 @@ fn test_yuen_20_percent_trim() {
     let g1 = common::load_reference_vector("yuen_g1.csv");
     let g2 = common::load_reference_vector("yuen_g2.csv");
 
-    let result = yuen_test(&g1, &g2, 0.2).expect("yuen_test should succeed");
+    let result = yuen_test(&g1, &g2, 0.2, Alternative::TwoSided).expect("yuen_test should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_20"], epsilon = EPSILON);
     assert_relative_eq!(result.df, refs["df_20"], epsilon = EPSILON);
@@ -343,7 +343,7 @@ fn test_yuen_10_percent_trim() {
     let g1 = common::load_reference_vector("yuen_g1.csv");
     let g2 = common::load_reference_vector("yuen_g2.csv");
 
-    let result = yuen_test(&g1, &g2, 0.1).expect("yuen_test should succeed");
+    let result = yuen_test(&g1, &g2, 0.1, Alternative::TwoSided).expect("yuen_test should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_10"], epsilon = EPSILON);
     assert_relative_eq!(result.df, refs["df_10"], epsilon = EPSILON);
@@ -355,15 +355,41 @@ fn test_yuen_10_percent_trim() {
 fn test_yuen_invalid_trim_returns_error() {
     let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
     let y = vec![2.0, 3.0, 4.0, 5.0, 6.0];
-    assert!(yuen_test(&x, &y, 0.5).is_err());
-    assert!(yuen_test(&x, &y, -0.1).is_err());
+    assert!(yuen_test(&x, &y, 0.5, Alternative::TwoSided).is_err());
+    assert!(yuen_test(&x, &y, -0.1, Alternative::TwoSided).is_err());
 }
 
 #[test]
 fn test_yuen_empty_returns_error() {
     let empty: Vec<f64> = vec![];
     let y = vec![1.0, 2.0, 3.0];
-    assert!(yuen_test(&empty, &y, 0.2).is_err());
+    assert!(yuen_test(&empty, &y, 0.2, Alternative::TwoSided).is_err());
+}
+
+#[test]
+fn test_yuen_less() {
+    let refs = common::load_reference_scalars("yuen.csv");
+    let g1 = common::load_reference_vector("yuen_g1.csv");
+    let g2 = common::load_reference_vector("yuen_g2.csv");
+
+    let result = yuen_test(&g1, &g2, 0.2, Alternative::Less).expect("yuen_test should succeed");
+
+    assert_relative_eq!(result.statistic, refs["statistic_20"], epsilon = EPSILON);
+    assert_relative_eq!(result.df, refs["df_20"], epsilon = EPSILON);
+    assert_relative_eq!(result.p_value, refs["p_value_less"], epsilon = EPSILON);
+}
+
+#[test]
+fn test_yuen_greater() {
+    let refs = common::load_reference_scalars("yuen.csv");
+    let g1 = common::load_reference_vector("yuen_g1.csv");
+    let g2 = common::load_reference_vector("yuen_g2.csv");
+
+    let result = yuen_test(&g1, &g2, 0.2, Alternative::Greater).expect("yuen_test should succeed");
+
+    assert_relative_eq!(result.statistic, refs["statistic_20"], epsilon = EPSILON);
+    assert_relative_eq!(result.df, refs["df_20"], epsilon = EPSILON);
+    assert_relative_eq!(result.p_value, refs["p_value_greater"], epsilon = EPSILON);
 }
 
 // ============================================

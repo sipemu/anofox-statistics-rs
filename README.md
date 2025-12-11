@@ -112,10 +112,10 @@ if let Some(ci) = result.conf_int {
 ### Yuen's Robust T-Test
 
 ```rust
-use anofox_statistics::yuen_test;
+use anofox_statistics::{yuen_test, Alternative};
 
 // 20% trimmed means (robust to outliers)
-let result = yuen_test(&group1, &group2, 0.2)?;
+let result = yuen_test(&group1, &group2, 0.2, Alternative::TwoSided)?;
 
 println!("Test statistic: {:.4}", result.statistic);
 println!("p-value: {:.4}", result.p_value);
