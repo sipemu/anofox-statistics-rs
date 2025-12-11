@@ -1,4 +1,5 @@
 use crate::error::{Result, StatError};
+use crate::parametric::Alternative;
 use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Loss function for Diebold-Mariano test
@@ -29,13 +30,20 @@ pub struct DMResult {
 /// * `e2` - Forecast errors from model 2
 /// * `loss` - Loss function to use (SquaredError or AbsoluteError)
 /// * `h` - Forecast horizon (for variance adjustment, h=1 for 1-step ahead)
+/// * `alternative` - Alternative hypothesis (TwoSided, Less, Greater)
 ///
 /// # Returns
 /// * `DMResult` containing test statistic and p-value
 ///
 /// # References
 /// * Diebold, F.X. and Mariano, R.S. (1995) "Comparing Predictive Accuracy"
-pub fn diebold_mariano(e1: &[f64], e2: &[f64], loss: LossFunction, h: usize) -> Result<DMResult> {
+pub fn diebold_mariano(
+    e1: &[f64],
+    e2: &[f64],
+    loss: LossFunction,
+    h: usize,
+    alternative: Alternative,
+) -> Result<DMResult> {
     let n = e1.len();
 
     if n == 0 {
@@ -86,9 +94,13 @@ pub fn diebold_mariano(e1: &[f64], e2: &[f64], loss: LossFunction, h: usize) -> 
     let correction = ((n_f + 1.0 - 2.0 * h_f + h_f * (h_f - 1.0) / n_f) / n_f).sqrt();
     let dm_stat = dm_raw * correction;
 
-    // Two-sided p-value from standard normal
+    // Compute p-value based on alternative hypothesis
     let normal = Normal::new(0.0, 1.0).unwrap();
-    let p_value = 2.0 * (1.0 - normal.cdf(dm_stat.abs()));
+    let p_value = match alternative {
+        Alternative::TwoSided => 2.0 * (1.0 - normal.cdf(dm_stat.abs())),
+        Alternative::Less => normal.cdf(dm_stat),
+        Alternative::Greater => 1.0 - normal.cdf(dm_stat),
+    };
 
     Ok(DMResult {
         statistic: dm_stat,

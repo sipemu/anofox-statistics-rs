@@ -16,7 +16,7 @@ fn test_welch_two_sided() {
     let g2 = common::load_reference_vector("ttest_g2.csv");
 
     let result =
-        t_test(&g1, &g2, TTestKind::Welch, Alternative::TwoSided).expect("t_test should succeed");
+        t_test(&g1, &g2, TTestKind::Welch, Alternative::TwoSided, 0.0).expect("t_test should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_two"], epsilon = EPSILON);
     assert_relative_eq!(result.df, refs["df_two"], epsilon = EPSILON);
@@ -36,7 +36,7 @@ fn test_welch_less() {
     let g2 = common::load_reference_vector("ttest_g2.csv");
 
     let result =
-        t_test(&g1, &g2, TTestKind::Welch, Alternative::Less).expect("t_test should succeed");
+        t_test(&g1, &g2, TTestKind::Welch, Alternative::Less, 0.0).expect("t_test should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_less"], epsilon = EPSILON);
     assert_relative_eq!(result.df, refs["df_less"], epsilon = EPSILON);
@@ -50,7 +50,7 @@ fn test_welch_greater() {
     let g2 = common::load_reference_vector("ttest_g2.csv");
 
     let result =
-        t_test(&g1, &g2, TTestKind::Welch, Alternative::Greater).expect("t_test should succeed");
+        t_test(&g1, &g2, TTestKind::Welch, Alternative::Greater, 0.0).expect("t_test should succeed");
 
     assert_relative_eq!(
         result.statistic,
@@ -59,6 +59,19 @@ fn test_welch_greater() {
     );
     assert_relative_eq!(result.df, refs["df_greater"], epsilon = EPSILON);
     assert_relative_eq!(result.p_value, refs["p_value_greater"], epsilon = EPSILON);
+}
+
+#[test]
+fn test_welch_with_mu() {
+    let refs = common::load_reference_scalars("ttest_welch.csv");
+    let g1 = common::load_reference_vector("ttest_g1.csv");
+    let g2 = common::load_reference_vector("ttest_g2.csv");
+
+    let result =
+        t_test(&g1, &g2, TTestKind::Welch, Alternative::TwoSided, 0.5).expect("t_test should succeed");
+
+    assert_relative_eq!(result.statistic, refs["statistic_mu"], epsilon = EPSILON);
+    assert_relative_eq!(result.p_value, refs["p_value_mu"], epsilon = EPSILON);
 }
 
 // ============================================
@@ -72,7 +85,7 @@ fn test_student_two_sided() {
     let g2 = common::load_reference_vector("ttest_g2.csv");
 
     let result =
-        t_test(&g1, &g2, TTestKind::Student, Alternative::TwoSided).expect("t_test should succeed");
+        t_test(&g1, &g2, TTestKind::Student, Alternative::TwoSided, 0.0).expect("t_test should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_two"], epsilon = EPSILON);
     assert_relative_eq!(result.df, refs["df_two"], epsilon = EPSILON);
@@ -92,7 +105,7 @@ fn test_student_less() {
     let g2 = common::load_reference_vector("ttest_g2.csv");
 
     let result =
-        t_test(&g1, &g2, TTestKind::Student, Alternative::Less).expect("t_test should succeed");
+        t_test(&g1, &g2, TTestKind::Student, Alternative::Less, 0.0).expect("t_test should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_less"], epsilon = EPSILON);
     assert_relative_eq!(result.df, refs["df_less"], epsilon = EPSILON);
@@ -106,7 +119,7 @@ fn test_student_greater() {
     let g2 = common::load_reference_vector("ttest_g2.csv");
 
     let result =
-        t_test(&g1, &g2, TTestKind::Student, Alternative::Greater).expect("t_test should succeed");
+        t_test(&g1, &g2, TTestKind::Student, Alternative::Greater, 0.0).expect("t_test should succeed");
 
     assert_relative_eq!(
         result.statistic,
@@ -128,7 +141,7 @@ fn test_paired_two_sided() {
     let g2 = common::load_reference_vector("ttest_g2_paired.csv");
 
     let result =
-        t_test(&g1, &g2, TTestKind::Paired, Alternative::TwoSided).expect("t_test should succeed");
+        t_test(&g1, &g2, TTestKind::Paired, Alternative::TwoSided, 0.0).expect("t_test should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_two"], epsilon = EPSILON);
     assert_relative_eq!(result.df, refs["df_two"], epsilon = EPSILON);
@@ -143,7 +156,7 @@ fn test_paired_less() {
     let g2 = common::load_reference_vector("ttest_g2_paired.csv");
 
     let result =
-        t_test(&g1, &g2, TTestKind::Paired, Alternative::Less).expect("t_test should succeed");
+        t_test(&g1, &g2, TTestKind::Paired, Alternative::Less, 0.0).expect("t_test should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_less"], epsilon = EPSILON);
     assert_relative_eq!(result.df, refs["df_less"], epsilon = EPSILON);
@@ -157,7 +170,7 @@ fn test_paired_greater() {
     let g2 = common::load_reference_vector("ttest_g2_paired.csv");
 
     let result =
-        t_test(&g1, &g2, TTestKind::Paired, Alternative::Greater).expect("t_test should succeed");
+        t_test(&g1, &g2, TTestKind::Paired, Alternative::Greater, 0.0).expect("t_test should succeed");
 
     assert_relative_eq!(
         result.statistic,
@@ -176,28 +189,28 @@ fn test_paired_greater() {
 fn test_ttest_empty_x_returns_error() {
     let empty: Vec<f64> = vec![];
     let y = vec![1.0, 2.0, 3.0];
-    assert!(t_test(&empty, &y, TTestKind::Welch, Alternative::TwoSided).is_err());
+    assert!(t_test(&empty, &y, TTestKind::Welch, Alternative::TwoSided, 0.0).is_err());
 }
 
 #[test]
 fn test_ttest_empty_y_returns_error() {
     let x = vec![1.0, 2.0, 3.0];
     let empty: Vec<f64> = vec![];
-    assert!(t_test(&x, &empty, TTestKind::Welch, Alternative::TwoSided).is_err());
+    assert!(t_test(&x, &empty, TTestKind::Welch, Alternative::TwoSided, 0.0).is_err());
 }
 
 #[test]
 fn test_paired_unequal_length_returns_error() {
     let x = vec![1.0, 2.0, 3.0];
     let y = vec![1.0, 2.0];
-    assert!(t_test(&x, &y, TTestKind::Paired, Alternative::TwoSided).is_err());
+    assert!(t_test(&x, &y, TTestKind::Paired, Alternative::TwoSided, 0.0).is_err());
 }
 
 #[test]
 fn test_ttest_insufficient_data_returns_error() {
     let x = vec![1.0];
     let y = vec![2.0];
-    assert!(t_test(&x, &y, TTestKind::Welch, Alternative::TwoSided).is_err());
+    assert!(t_test(&x, &y, TTestKind::Welch, Alternative::TwoSided, 0.0).is_err());
 }
 
 // ============================================

@@ -98,6 +98,8 @@ save_vector("ttest_g2_paired.csv", g2_paired)
 welch_two <- t.test(g1, g2, var.equal = FALSE, alternative = "two.sided")
 welch_less <- t.test(g1, g2, var.equal = FALSE, alternative = "less")
 welch_greater <- t.test(g1, g2, var.equal = FALSE, alternative = "greater")
+# t-test with mu parameter (testing against non-zero null hypothesis)
+welch_mu <- t.test(g1, g2, var.equal = FALSE, alternative = "two.sided", mu = 0.5)
 
 save_ref("ttest_welch.csv", list(
   # Two-sided
@@ -113,7 +115,10 @@ save_ref("ttest_welch.csv", list(
   # Greater (g1 > g2)
   statistic_greater = welch_greater$statistic,
   df_greater = welch_greater$parameter,
-  p_value_greater = welch_greater$p.value
+  p_value_greater = welch_greater$p.value,
+  # With mu parameter
+  statistic_mu = welch_mu$statistic,
+  p_value_mu = welch_mu$p.value
 ))
 
 # Student t-test (equal variances assumed)
@@ -271,10 +276,48 @@ save_vector("mw_y.csv", mw_y)
 
 # exact=FALSE forces normal approximation
 mw_result <- wilcox.test(mw_x, mw_y, exact = FALSE, correct = FALSE)
+mw_less <- wilcox.test(mw_x, mw_y, alternative = "less", exact = FALSE, correct = FALSE)
+mw_greater <- wilcox.test(mw_x, mw_y, alternative = "greater", exact = FALSE, correct = FALSE)
+mw_corrected <- wilcox.test(mw_x, mw_y, exact = FALSE, correct = TRUE)
+
+# Confidence interval (requires conf.int=TRUE)
+mw_ci <- wilcox.test(mw_x, mw_y, exact = FALSE, correct = FALSE, conf.int = TRUE, conf.level = 0.95)
 
 save_ref("mann_whitney.csv", list(
   statistic = mw_result$statistic,
-  p_value = mw_result$p.value
+  p_value = mw_result$p.value,
+  p_value_less = mw_less$p.value,
+  p_value_greater = mw_greater$p.value,
+  p_value_corrected = mw_corrected$p.value,
+  estimate = mw_ci$estimate,
+  conf_low = mw_ci$conf.int[1],
+  conf_high = mw_ci$conf.int[2]
+))
+
+# Mann-Whitney with exact p-value (smaller samples, no ties)
+# Use integer data to avoid ties
+mw_x_exact <- c(1.1, 2.3, 3.5, 4.7, 5.9, 6.2, 7.4, 8.6)
+mw_y_exact <- c(2.2, 3.4, 4.6, 5.8, 7.0, 8.2, 9.4, 10.6, 11.8)
+
+save_vector("mw_x_exact.csv", mw_x_exact)
+save_vector("mw_y_exact.csv", mw_y_exact)
+
+mw_exact_two <- wilcox.test(mw_x_exact, mw_y_exact, exact = TRUE)
+mw_exact_less <- wilcox.test(mw_x_exact, mw_y_exact, exact = TRUE, alternative = "less")
+mw_exact_greater <- wilcox.test(mw_x_exact, mw_y_exact, exact = TRUE, alternative = "greater")
+mw_exact_ci <- wilcox.test(mw_x_exact, mw_y_exact, exact = TRUE, conf.int = TRUE, conf.level = 0.95)
+mw_exact_ci90 <- wilcox.test(mw_x_exact, mw_y_exact, exact = TRUE, conf.int = TRUE, conf.level = 0.90)
+
+save_ref("mann_whitney_exact.csv", list(
+  statistic = mw_exact_two$statistic,
+  p_value = mw_exact_two$p.value,
+  p_value_less = mw_exact_less$p.value,
+  p_value_greater = mw_exact_greater$p.value,
+  estimate = mw_exact_ci$estimate,
+  conf_low_95 = mw_exact_ci$conf.int[1],
+  conf_high_95 = mw_exact_ci$conf.int[2],
+  conf_low_90 = mw_exact_ci90$conf.int[1],
+  conf_high_90 = mw_exact_ci90$conf.int[2]
 ))
 
 # Wilcoxon Signed-Rank test (paired)
@@ -285,10 +328,49 @@ save_vector("wsr_x.csv", wsr_x)
 save_vector("wsr_y.csv", wsr_y)
 
 wsr_result <- wilcox.test(wsr_x, wsr_y, paired = TRUE, exact = FALSE, correct = FALSE)
+wsr_less <- wilcox.test(wsr_x, wsr_y, paired = TRUE, alternative = "less", exact = FALSE, correct = FALSE)
+wsr_greater <- wilcox.test(wsr_x, wsr_y, paired = TRUE, alternative = "greater", exact = FALSE, correct = FALSE)
+wsr_corrected <- wilcox.test(wsr_x, wsr_y, paired = TRUE, exact = FALSE, correct = TRUE)
+
+# Confidence interval
+wsr_ci <- wilcox.test(wsr_x, wsr_y, paired = TRUE, exact = FALSE, correct = FALSE, conf.int = TRUE, conf.level = 0.95)
 
 save_ref("wilcoxon_signed_rank.csv", list(
   statistic = wsr_result$statistic,
-  p_value = wsr_result$p.value
+  p_value = wsr_result$p.value,
+  p_value_less = wsr_less$p.value,
+  p_value_greater = wsr_greater$p.value,
+  p_value_corrected = wsr_corrected$p.value,
+  estimate = wsr_ci$estimate,
+  conf_low = wsr_ci$conf.int[1],
+  conf_high = wsr_ci$conf.int[2]
+))
+
+# Wilcoxon Signed-Rank with exact p-value (smaller samples, no ties)
+# Differences should have no ties and no zeros
+# Creating data with unique differences: 0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.1
+wsr_x_exact <- seq(10, 20, length.out = 10)
+wsr_y_exact <- wsr_x_exact - c(0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.1)
+
+save_vector("wsr_x_exact.csv", wsr_x_exact)
+save_vector("wsr_y_exact.csv", wsr_y_exact)
+
+wsr_exact_two <- wilcox.test(wsr_x_exact, wsr_y_exact, paired = TRUE, exact = TRUE)
+wsr_exact_less <- wilcox.test(wsr_x_exact, wsr_y_exact, paired = TRUE, exact = TRUE, alternative = "less")
+wsr_exact_greater <- wilcox.test(wsr_x_exact, wsr_y_exact, paired = TRUE, exact = TRUE, alternative = "greater")
+wsr_exact_ci <- wilcox.test(wsr_x_exact, wsr_y_exact, paired = TRUE, exact = TRUE, conf.int = TRUE, conf.level = 0.95)
+wsr_exact_ci90 <- wilcox.test(wsr_x_exact, wsr_y_exact, paired = TRUE, exact = TRUE, conf.int = TRUE, conf.level = 0.90)
+
+save_ref("wilcoxon_signed_rank_exact.csv", list(
+  statistic = wsr_exact_two$statistic,
+  p_value = wsr_exact_two$p.value,
+  p_value_less = wsr_exact_less$p.value,
+  p_value_greater = wsr_exact_greater$p.value,
+  estimate = wsr_exact_ci$estimate,
+  conf_low_95 = wsr_exact_ci$conf.int[1],
+  conf_high_95 = wsr_exact_ci$conf.int[2],
+  conf_low_90 = wsr_exact_ci90$conf.int[1],
+  conf_high_90 = wsr_exact_ci90$conf.int[2]
 ))
 
 # Kruskal-Wallis test
@@ -404,6 +486,10 @@ dm_ae_h1 <- dm.test(e1, e2, alternative = "two.sided", h = 1, power = 1)
 # Diebold-Mariano test with squared error loss, h=3
 dm_se_h3 <- dm.test(e1, e2, alternative = "two.sided", h = 3, power = 2)
 
+# Diebold-Mariano test with alternative hypotheses
+dm_less <- dm.test(e1, e2, alternative = "less", h = 1, power = 2)
+dm_greater <- dm.test(e1, e2, alternative = "greater", h = 1, power = 2)
+
 save_ref("diebold_mariano.csv", list(
   # Squared error, h=1
   statistic_se_h1 = dm_se_h1$statistic,
@@ -413,7 +499,10 @@ save_ref("diebold_mariano.csv", list(
   p_value_ae_h1 = dm_ae_h1$p.value,
   # Squared error, h=3
   statistic_se_h3 = dm_se_h3$statistic,
-  p_value_se_h3 = dm_se_h3$p.value
+  p_value_se_h3 = dm_se_h3$p.value,
+  # Alternative hypotheses
+  p_value_less_se_h1 = dm_less$p.value,
+  p_value_greater_se_h1 = dm_greater$p.value
 ))
 
 # ============================================
@@ -542,12 +631,16 @@ save_vector("bm_x.csv", bm_x)
 save_vector("bm_y.csv", bm_y)
 
 bm_result <- brunner.munzel.test(bm_x, bm_y)
+bm_less <- brunner.munzel.test(bm_x, bm_y, alternative = "less")
+bm_greater <- brunner.munzel.test(bm_x, bm_y, alternative = "greater")
 
 save_ref("brunner_munzel.csv", list(
   statistic = bm_result$statistic,
   df = bm_result$parameter,
   p_value = bm_result$p.value,
-  estimate = bm_result$estimate
+  estimate = bm_result$estimate,
+  p_value_less = bm_less$p.value,
+  p_value_greater = bm_greater$p.value
 ))
 
 # ============================================

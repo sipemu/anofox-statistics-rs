@@ -3,8 +3,8 @@
 //! Run with: cargo run --example forecast
 
 use anofox_statistics::{
-    clark_west, diebold_mariano, model_confidence_set, mspe_adjusted_spa, spa_test, LossFunction,
-    MCSStatistic,
+    clark_west, diebold_mariano, model_confidence_set, mspe_adjusted_spa, spa_test, Alternative,
+    LossFunction, MCSStatistic,
 };
 
 fn main() {
@@ -43,6 +43,7 @@ fn main() {
         &model1_errors,
         LossFunction::SquaredError,
         1,
+        Alternative::TwoSided,
     )
     .unwrap();
     println!("   DM statistic: {:.4}", dm1.statistic);
@@ -64,6 +65,7 @@ fn main() {
         &model1_errors,
         LossFunction::AbsoluteError,
         1,
+        Alternative::TwoSided,
     )
     .unwrap();
     println!("   DM statistic: {:.4}", dm2.statistic);
@@ -77,6 +79,7 @@ fn main() {
         &model1_errors,
         LossFunction::SquaredError,
         3,
+        Alternative::TwoSided,
     )
     .unwrap();
     println!("   DM statistic: {:.4}", dm3.statistic);

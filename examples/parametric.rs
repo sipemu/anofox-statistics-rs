@@ -25,7 +25,7 @@ fn main() {
     println!("For two independent samples with possibly unequal variances.");
     println!("This is the recommended default for comparing two groups.\n");
 
-    let welch = t_test(&before, &after, TTestKind::Welch, Alternative::TwoSided).unwrap();
+    let welch = t_test(&before, &after, TTestKind::Welch, Alternative::TwoSided, 0.0).unwrap();
 
     println!("  t-statistic: {:.4}", welch.statistic);
     println!("  df:          {:.2}", welch.df);
@@ -41,7 +41,7 @@ fn main() {
     println!("For two independent samples with equal variances (pooled variance).");
     println!("Use only when you're confident variances are equal.\n");
 
-    let student = t_test(&before, &after, TTestKind::Student, Alternative::TwoSided).unwrap();
+    let student = t_test(&before, &after, TTestKind::Student, Alternative::TwoSided, 0.0).unwrap();
 
     println!("  t-statistic: {:.4}", student.statistic);
     println!("  df:          {:.2}", student.df);
@@ -53,7 +53,7 @@ fn main() {
     println!("For paired/matched samples (same subjects measured twice).");
     println!("Tests if the mean difference is zero.\n");
 
-    let paired = t_test(&before, &after, TTestKind::Paired, Alternative::TwoSided).unwrap();
+    let paired = t_test(&before, &after, TTestKind::Paired, Alternative::TwoSided, 0.0).unwrap();
 
     println!("  t-statistic:     {:.4}", paired.statistic);
     println!("  df:              {:.2}", paired.df);
@@ -66,7 +66,7 @@ fn main() {
 
     println!("--- Testing if 'after' > 'before' ---\n");
 
-    let greater = t_test(&after, &before, TTestKind::Welch, Alternative::Greater).unwrap();
+    let greater = t_test(&after, &before, TTestKind::Welch, Alternative::Greater, 0.0).unwrap();
     println!("  Alternative::Greater (H1: after > before)");
     println!("  t-statistic: {:.4}", greater.statistic);
     println!("  p-value:     {:.4}", greater.p_value);
@@ -80,7 +80,7 @@ fn main() {
     );
     println!();
 
-    let less = t_test(&after, &before, TTestKind::Welch, Alternative::Less).unwrap();
+    let less = t_test(&after, &before, TTestKind::Welch, Alternative::Less, 0.0).unwrap();
     println!("  Alternative::Less (H1: after < before)");
     println!("  t-statistic: {:.4}", less.statistic);
     println!("  p-value:     {:.4}", less.p_value);
@@ -113,6 +113,7 @@ fn main() {
         &with_outlier,
         TTestKind::Welch,
         Alternative::TwoSided,
+        0.0,
     )
     .unwrap();
 

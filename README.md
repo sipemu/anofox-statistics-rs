@@ -84,8 +84,8 @@ use anofox_statistics::{t_test, TTestKind, Alternative};
 let group1 = vec![1.2, 2.3, 3.4, 4.5, 5.6];
 let group2 = vec![2.1, 3.2, 4.3, 5.4, 6.5];
 
-// Welch t-test (unequal variances)
-let result = t_test(&group1, &group2, TTestKind::Welch, Alternative::TwoSided)
+// Welch t-test (unequal variances), mu=0.0 tests if mean difference equals zero
+let result = t_test(&group1, &group2, TTestKind::Welch, Alternative::TwoSided, 0.0)
     .expect("t-test should succeed");
 
 println!("t-statistic: {:.4}", result.statistic);
@@ -93,10 +93,13 @@ println!("p-value: {:.4}", result.p_value);
 println!("degrees of freedom: {:.4}", result.df);
 
 // Student t-test (equal variances assumed)
-let result = t_test(&group1, &group2, TTestKind::Student, Alternative::TwoSided)?;
+let result = t_test(&group1, &group2, TTestKind::Student, Alternative::TwoSided, 0.0)?;
 
 // Paired t-test
-let result = t_test(&group1, &group2, TTestKind::Paired, Alternative::Less)?;
+let result = t_test(&group1, &group2, TTestKind::Paired, Alternative::Less, 0.0)?;
+
+// Test if mean difference equals 0.5 (non-zero null hypothesis)
+let result = t_test(&group1, &group2, TTestKind::Welch, Alternative::TwoSided, 0.5)?;
 ```
 
 ### Yuen's Robust T-Test
@@ -131,23 +134,32 @@ println!("p-value: {:.4}", result.p_value);
 ### Nonparametric Tests
 
 ```rust
-use anofox_statistics::{mann_whitney_u, wilcoxon_signed_rank, kruskal_wallis, rank, brunner_munzel};
+use anofox_statistics::{mann_whitney_u, wilcoxon_signed_rank, kruskal_wallis, rank, brunner_munzel, Alternative};
 
 // Ranking
 let data = vec![3.0, 1.0, 4.0, 1.0, 5.0];
 let ranks = rank(&data)?;
 
-// Mann-Whitney U test
-let result = mann_whitney_u(&group1, &group2)?;
+// Mann-Whitney U test (two-sided, no continuity correction, normal approximation)
+let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, false, None)?;
+
+// With exact p-values (for small samples without ties)
+let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, true, None)?;
+
+// With confidence interval (Hodges-Lehmann estimate)
+let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, true, Some(0.95))?;
+if let Some(ci) = result.conf_int {
+    println!("95% CI: [{:.3}, {:.3}]", ci.lower, ci.upper);
+}
 
 // Wilcoxon signed-rank test (paired)
-let result = wilcoxon_signed_rank(&group1, &group2)?;
+let result = wilcoxon_signed_rank(&group1, &group2, Alternative::TwoSided, false, false, None)?;
 
 // Kruskal-Wallis test
 let result = kruskal_wallis(&groups)?;
 
 // Brunner-Munzel test (robust alternative to Mann-Whitney)
-let result = brunner_munzel(&group1, &group2)?;
+let result = brunner_munzel(&group1, &group2, Alternative::TwoSided)?;
 println!("Estimate P(X < Y): {:.4}", result.estimate);
 ```
 
@@ -209,14 +221,14 @@ let result = mmd_test(&sample1, &sample2, Kernel::GaussianMedian, 1000, Some(42)
 
 ```rust
 use anofox_statistics::{diebold_mariano, clark_west, spa_test, mspe_adjusted_spa,
-                        model_confidence_set, LossFunction, MCSStatistic};
+                        model_confidence_set, LossFunction, MCSStatistic, Alternative};
 
 // Forecast errors from two competing models
 let errors_model1 = vec![0.1, -0.2, 0.3, -0.1, 0.2];
 let errors_model2 = vec![0.2, -0.3, 0.4, -0.2, 0.3];
 
-// Diebold-Mariano test
-let result = diebold_mariano(&errors_model1, &errors_model2, LossFunction::SquaredError, 1)?;
+// Diebold-Mariano test (two-sided)
+let result = diebold_mariano(&errors_model1, &errors_model2, LossFunction::SquaredError, 1, Alternative::TwoSided)?;
 println!("DM statistic: {:.4}", result.statistic);
 println!("p-value: {:.4}", result.p_value);
 
@@ -265,7 +277,7 @@ println!("Eliminated: {:?}", result.eliminated_models);
 
 | Function | Description |
 |----------|-------------|
-| `t_test(x, y, kind, alternative)` | T-test (Welch, Student, or Paired) |
+| `t_test(x, y, kind, alternative, mu)` | T-test (Welch, Student, or Paired) with null hypothesis mu |
 | `yuen_test(x, y, trim)` | Yuen's trimmed mean t-test |
 | `brown_forsythe(groups)` | Brown-Forsythe test for homogeneity of variances |
 
@@ -274,10 +286,10 @@ println!("Eliminated: {:?}", result.eliminated_models);
 | Function | Description |
 |----------|-------------|
 | `rank(data)` | Compute ranks with average tie handling |
-| `mann_whitney_u(x, y)` | Mann-Whitney U test (Wilcoxon rank-sum) |
-| `wilcoxon_signed_rank(x, y)` | Wilcoxon signed-rank test for paired samples |
+| `mann_whitney_u(x, y, alternative, correct, exact, conf_level)` | Mann-Whitney U test with exact p-values and confidence intervals |
+| `wilcoxon_signed_rank(x, y, alternative, correct, exact, conf_level)` | Wilcoxon signed-rank test with exact p-values and confidence intervals |
 | `kruskal_wallis(groups)` | Kruskal-Wallis H test for k independent samples |
-| `brunner_munzel(x, y)` | Brunner-Munzel test for stochastic equality |
+| `brunner_munzel(x, y, alternative)` | Brunner-Munzel test for stochastic equality |
 
 ### Distributional Tests
 
@@ -306,7 +318,7 @@ println!("Eliminated: {:?}", result.eliminated_models);
 
 | Function | Description |
 |----------|-------------|
-| `diebold_mariano(e1, e2, loss, h)` | Diebold-Mariano test for predictive accuracy |
+| `diebold_mariano(e1, e2, loss, h, alternative)` | Diebold-Mariano test for predictive accuracy |
 | `clark_west(e1, e2, h)` | Clark-West test for nested model comparison |
 | `spa_test(benchmark, models, n_bootstrap, block_length, seed)` | Superior Predictive Ability test |
 | `mspe_adjusted_spa(benchmark, models, n_bootstrap, block_length, seed)` | MSPE-Adjusted SPA for multiple nested models |
@@ -341,7 +353,7 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `skewness()`, `kurtosis()` | `skewness()`, `kurtosis()` | e1071 |
 | `diebold_mariano()` | `dm.test()` | forecast |
 
-All 134 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
+All 136 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
 
 **For complete transparency on the validation process, see [`R/VALIDATION.md`](R/VALIDATION.md)**, which documents:
 - All 76 reference data files and their R generation code

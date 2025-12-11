@@ -1,7 +1,8 @@
 mod common;
 
 use anofox_statistics::{
-    clark_west, diebold_mariano, model_confidence_set, spa_test, LossFunction, MCSStatistic,
+    clark_west, diebold_mariano, model_confidence_set, spa_test, Alternative, LossFunction,
+    MCSStatistic,
 };
 use approx::assert_relative_eq;
 
@@ -17,7 +18,7 @@ fn test_dm_squared_error_h1() {
     let e1 = common::load_reference_vector("dm_e1.csv");
     let e2 = common::load_reference_vector("dm_e2.csv");
 
-    let result = diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1)
+    let result = diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1, Alternative::TwoSided)
         .expect("diebold_mariano should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_se_h1"], epsilon = EPSILON);
@@ -30,7 +31,7 @@ fn test_dm_absolute_error_h1() {
     let e1 = common::load_reference_vector("dm_e1.csv");
     let e2 = common::load_reference_vector("dm_e2.csv");
 
-    let result = diebold_mariano(&e1, &e2, LossFunction::AbsoluteError, 1)
+    let result = diebold_mariano(&e1, &e2, LossFunction::AbsoluteError, 1, Alternative::TwoSided)
         .expect("diebold_mariano should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_ae_h1"], epsilon = EPSILON);
@@ -43,7 +44,7 @@ fn test_dm_squared_error_h3() {
     let e1 = common::load_reference_vector("dm_e1.csv");
     let e2 = common::load_reference_vector("dm_e2.csv");
 
-    let result = diebold_mariano(&e1, &e2, LossFunction::SquaredError, 3)
+    let result = diebold_mariano(&e1, &e2, LossFunction::SquaredError, 3, Alternative::TwoSided)
         .expect("diebold_mariano should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_se_h3"], epsilon = EPSILON);
@@ -51,24 +52,56 @@ fn test_dm_squared_error_h3() {
 }
 
 #[test]
+fn test_dm_less() {
+    let refs = common::load_reference_scalars("diebold_mariano.csv");
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result = diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1, Alternative::Less)
+        .expect("diebold_mariano should succeed");
+
+    assert_relative_eq!(
+        result.p_value,
+        refs["p_value_less_se_h1"],
+        epsilon = EPSILON
+    );
+}
+
+#[test]
+fn test_dm_greater() {
+    let refs = common::load_reference_scalars("diebold_mariano.csv");
+    let e1 = common::load_reference_vector("dm_e1.csv");
+    let e2 = common::load_reference_vector("dm_e2.csv");
+
+    let result = diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1, Alternative::Greater)
+        .expect("diebold_mariano should succeed");
+
+    assert_relative_eq!(
+        result.p_value,
+        refs["p_value_greater_se_h1"],
+        epsilon = EPSILON
+    );
+}
+
+#[test]
 fn test_dm_empty_returns_error() {
     let e1: Vec<f64> = vec![];
     let e2: Vec<f64> = vec![];
-    assert!(diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1).is_err());
+    assert!(diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1, Alternative::TwoSided).is_err());
 }
 
 #[test]
 fn test_dm_unequal_length_returns_error() {
     let e1 = vec![1.0, 2.0, 3.0];
     let e2 = vec![1.0, 2.0];
-    assert!(diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1).is_err());
+    assert!(diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1, Alternative::TwoSided).is_err());
 }
 
 #[test]
 fn test_dm_insufficient_data_returns_error() {
     let e1 = vec![1.0, 2.0];
     let e2 = vec![1.5, 2.5];
-    assert!(diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1).is_err());
+    assert!(diebold_mariano(&e1, &e2, LossFunction::SquaredError, 1, Alternative::TwoSided).is_err());
 }
 
 // ============================================

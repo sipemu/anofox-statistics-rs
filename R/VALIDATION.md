@@ -70,8 +70,12 @@ Tests load the CSV files and compare Rust results against R references.
 | `rank_ties.csv` | Data with ties | `c(1, 2, 2, 3, 3, 3, 4)` |
 | `mw_x.csv` | Mann-Whitney X (n=30) | `rnorm(30, mean=5, sd=1)` |
 | `mw_y.csv` | Mann-Whitney Y (n=35) | `rnorm(35, mean=5.8, sd=1.2)` |
+| `mw_x_exact.csv` | Mann-Whitney exact X (n=8) | `c(1.1, 2.3, 3.5, 4.7, 5.9, 6.2, 7.4, 8.6)` |
+| `mw_y_exact.csv` | Mann-Whitney exact Y (n=9) | `c(2.2, 3.4, 4.6, 5.8, 7.0, 8.2, 9.4, 10.6, 11.8)` |
 | `wsr_x.csv` | Wilcoxon signed-rank X | `rnorm(25, mean=10, sd=2)` |
 | `wsr_y.csv` | Wilcoxon signed-rank Y | `wsr_x + rnorm(25, mean=0.5, sd=0.8)` |
+| `wsr_x_exact.csv` | Wilcoxon SR exact X (n=10) | `seq(10, 20, length.out=10)` |
+| `wsr_y_exact.csv` | Wilcoxon SR exact Y (n=10) | `wsr_x_exact - c(0.3, 0.5, ..., 2.1)` |
 | `kw_a.csv` | Kruskal-Wallis group A | `rnorm(20, mean=5, sd=1)` |
 | `kw_b.csv` | Kruskal-Wallis group B | `rnorm(22, mean=6, sd=1.2)` |
 | `kw_c.csv` | Kruskal-Wallis group C | `rnorm(18, mean=5.5, sd=0.9)` |
@@ -116,14 +120,17 @@ Tests load the CSV files and compare Rust results against R references.
 | `yuen.csv` | Yuen's test | `WRS2::yuen()` | statistic, df, p_value, diff for 20% and 10% trim |
 | `brown_forsythe.csv` | Brown-Forsythe | `car::leveneTest(center=median)` | F-statistic, df1, df2, p_value for 2 and 3 groups |
 | `ranks.csv` | Ranking | `rank(ties.method="average")` | All rank values for simple and tied data |
-| `mann_whitney.csv` | Mann-Whitney U | `wilcox.test(exact=FALSE, correct=FALSE)` | statistic, p_value |
-| `wilcoxon_signed_rank.csv` | Wilcoxon SR | `wilcox.test(paired=TRUE, exact=FALSE, correct=FALSE)` | statistic, p_value |
+| `mann_whitney.csv` | Mann-Whitney U | `wilcox.test(exact=FALSE, correct=FALSE/TRUE)` | statistic, p_value, p_value_less, p_value_greater, p_value_corrected, estimate, conf_low, conf_high |
+| `mann_whitney_exact.csv` | Mann-Whitney exact | `wilcox.test(exact=TRUE, conf.int=TRUE)` | statistic, p_value, p_value_less, p_value_greater, estimate, conf_low_95, conf_high_95, conf_low_90, conf_high_90 |
+| `wilcoxon_signed_rank.csv` | Wilcoxon SR | `wilcox.test(paired=TRUE, exact=FALSE, correct=FALSE/TRUE)` | statistic, p_value, p_value_less, p_value_greater, p_value_corrected, estimate, conf_low, conf_high |
+| `wilcoxon_signed_rank_exact.csv` | Wilcoxon SR exact | `wilcox.test(paired=TRUE, exact=TRUE, conf.int=TRUE)` | statistic, p_value, p_value_less, p_value_greater, estimate, conf_low_95, conf_high_95, conf_low_90, conf_high_90 |
 | `kruskal_wallis.csv` | Kruskal-Wallis | `kruskal.test()` | statistic, df, p_value |
 | `shapiro_wilk.csv` | Shapiro-Wilk | `shapiro.test()` | W, p_value for 5 test vectors |
 | `shapiro_wilk_edge.csv` | Shapiro-Wilk edge | `shapiro.test()` | W, p_value for n=3,4,5,10 |
 | `dagostino.csv` | D'Agostino | `moments::agostino.test()`, `moments::anscombe.test()` | Z_skew, Z_kurt, p_values |
-| `brunner_munzel.csv` | Brunner-Munzel | `lawstat::brunner.munzel.test()` | statistic, df, p_value, estimate |
-| `diebold_mariano.csv` | Diebold-Mariano | `forecast::dm.test()` | statistic, p_value for SE/AE loss, h=1/h=3 |
+| `brunner_munzel.csv` | Brunner-Munzel | `lawstat::brunner.munzel.test()` | statistic, df, p_value, estimate, p_value_less, p_value_greater |
+| `diebold_mariano.csv` | Diebold-Mariano | `forecast::dm.test()` | statistic, p_value for SE/AE loss, h=1/h=3, alternative=less/greater |
+| `ttest_welch.csv` | Welch t-test with mu | `t.test(var.equal=FALSE, mu=0.5)` | statistic_mu, p_value_mu |
 | `clark_west.csv` | Clark-West | Manual HAC computation | statistic, p_value for h=1 and h=3 |
 | `spa.csv` | SPA test | Manual computation | t-statistics, means for all models |
 | `mcs.csv` | Model Confidence Set | Manual computation | pairwise t-statistics, range statistic |
@@ -152,7 +159,7 @@ Tests load the CSV files and compare Rust results against R references.
 
 | Function | R Equivalent | Tolerance | Test Cases |
 |----------|-------------|-----------|------------|
-| `t_test(..., Welch)` | `t.test(var.equal=FALSE)` | 1e-10 | two-sided, less, greater |
+| `t_test(..., Welch)` | `t.test(var.equal=FALSE)` | 1e-10 | two-sided, less, greater, mu=0.5 |
 | `t_test(..., Student)` | `t.test(var.equal=TRUE)` | 1e-10 | two-sided, less, greater |
 | `t_test(..., Paired)` | `t.test(paired=TRUE)` | 1e-10 | two-sided, less, greater |
 | `yuen_test()` | `WRS2::yuen()` | 1e-10 | 20% trim, 10% trim |
@@ -165,10 +172,10 @@ Tests load the CSV files and compare Rust results against R references.
 | Function | R Equivalent | Tolerance | Test Cases |
 |----------|-------------|-----------|------------|
 | `rank()` | `base::rank(ties.method="average")` | 1e-10 | simple, with ties |
-| `mann_whitney_u()` | `wilcox.test(exact=FALSE, correct=FALSE)` | 1e-6 | normal approximation |
-| `wilcoxon_signed_rank()` | `wilcox.test(paired=TRUE, exact=FALSE, correct=FALSE)` | 1e-6 | normal approximation |
+| `mann_whitney_u()` | `wilcox.test(exact=FALSE)` | 1e-6 | two-sided, less, greater, continuity correction |
+| `wilcoxon_signed_rank()` | `wilcox.test(paired=TRUE, exact=FALSE)` | 1e-6 | two-sided, less, greater, continuity correction |
 | `kruskal_wallis()` | `kruskal.test()` | 1e-10 | 3 groups |
-| `brunner_munzel()` | `lawstat::brunner.munzel.test()` | 1e-10 | unequal variance data |
+| `brunner_munzel()` | `lawstat::brunner.munzel.test()` | 1e-10 | two-sided, less, greater |
 
 ### 4. Distributional Tests
 
@@ -190,7 +197,7 @@ Tests load the CSV files and compare Rust results against R references.
 
 | Function | R Equivalent | Tolerance | Test Cases |
 |----------|-------------|-----------|------------|
-| `diebold_mariano()` | `forecast::dm.test()` | 1e-6 | SE/AE loss, h=1/h=3 |
+| `diebold_mariano()` | `forecast::dm.test()` | 1e-6 | SE/AE loss, h=1/h=3, alternative=two-sided/less/greater |
 | `clark_west()` | Manual HAC computation | 1e-6 | h=1, h=3 |
 | `spa_test()` | Manual computation | 1e-6 | 3 competing models |
 | `model_confidence_set()` | Manual computation | 1e-6 | 4 models |
@@ -234,7 +241,7 @@ fn test_welch_two_sided() {
     let g1 = common::load_reference_vector("ttest_g1.csv");
     let g2 = common::load_reference_vector("ttest_g2.csv");
 
-    let result = t_test(&g1, &g2, TTestKind::Welch, Alternative::TwoSided)
+    let result = t_test(&g1, &g2, TTestKind::Welch, Alternative::TwoSided, 0.0)
         .expect("t_test should succeed");
 
     assert_relative_eq!(result.statistic, refs["statistic_two"], epsilon = 1e-10);
@@ -277,13 +284,13 @@ install.packages(c("WRS2", "car", "lawstat", "e1071", "moments", "forecast"))
 | Category | Tests | Test Cases | Reference Files |
 |----------|-------|------------|-----------------|
 | Math Primitives | 7 | 41 | 8 |
-| Parametric | 5 | 21 | 13 |
-| Nonparametric | 5 | 15 | 14 |
+| Parametric | 5 | 22 | 13 |
+| Nonparametric | 5 | 23 | 14 |
 | Distributional | 2 | 17 | 12 |
 | Resampling | 3 | 13 | 4 |
 | Modern | 2 | 8 | 3 |
-| Forecast | 5 | 19 | 22 |
-| **Total** | **29** | **134** | **76** |
+| Forecast | 5 | 21 | 22 |
+| **Total** | **29** | **145** | **76** |
 
 ## Reproducibility
 
@@ -307,5 +314,5 @@ Rscript R/generate_refs.R
 # 3. Run validation tests
 cargo test
 
-# All 134 tests should pass
+# All 136 tests should pass (60 unit + 76 TDD integration)
 ```

@@ -45,7 +45,7 @@ fn main() {
     println!("  Control:   {:?}", control);
     println!();
 
-    let mw = mann_whitney_u(&treatment, &control).unwrap();
+    let mw = mann_whitney_u(&treatment, &control, Alternative::TwoSided, false, false, None).unwrap();
 
     println!("  U statistic: {:.4}", mw.statistic);
     println!("  p-value:     {:.6}", mw.p_value);
@@ -60,8 +60,8 @@ fn main() {
     );
     println!();
 
-    // Note: Mann-Whitney U in this library provides two-sided p-values only
-    // For one-sided interpretation, you can divide the p-value by 2 (when direction is correct)
+    // You can also use one-sided alternatives:
+    // mann_whitney_u(&treatment, &control, Alternative::Greater, false) for H1: treatment > control
     println!();
 
     // ========== WILCOXON SIGNED-RANK TEST ==========
@@ -77,7 +77,7 @@ fn main() {
     println!("  After:  {:?}", after);
     println!();
 
-    let wilcox = wilcoxon_signed_rank(&before, &after).unwrap();
+    let wilcox = wilcoxon_signed_rank(&before, &after, Alternative::TwoSided, false, false, None).unwrap();
 
     println!("  W statistic: {:.4}", wilcox.statistic);
     println!("  p-value:     {:.6}", wilcox.p_value);

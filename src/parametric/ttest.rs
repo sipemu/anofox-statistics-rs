@@ -46,6 +46,7 @@ pub struct TTestResult {
 /// * `y` - Second sample
 /// * `kind` - Type of t-test (Welch, Student, or Paired)
 /// * `alternative` - Alternative hypothesis direction
+/// * `mu` - Null hypothesis value for the true difference in means (default: 0.0)
 ///
 /// # Returns
 /// * `TTestResult` containing statistic, df, and p-value
@@ -54,16 +55,17 @@ pub fn t_test(
     y: &[f64],
     kind: TTestKind,
     alternative: Alternative,
+    mu: f64,
 ) -> Result<TTestResult> {
     match kind {
-        TTestKind::Welch => welch_t_test(x, y, alternative),
-        TTestKind::Student => student_t_test(x, y, alternative),
-        TTestKind::Paired => paired_t_test(x, y, alternative),
+        TTestKind::Welch => welch_t_test(x, y, alternative, mu),
+        TTestKind::Student => student_t_test(x, y, alternative, mu),
+        TTestKind::Paired => paired_t_test(x, y, alternative, mu),
     }
 }
 
 /// Welch's t-test for independent samples with unequal variances
-fn welch_t_test(x: &[f64], y: &[f64], alternative: Alternative) -> Result<TTestResult> {
+fn welch_t_test(x: &[f64], y: &[f64], alternative: Alternative, mu: f64) -> Result<TTestResult> {
     let nx = x.len();
     let ny = y.len();
 
@@ -87,8 +89,8 @@ fn welch_t_test(x: &[f64], y: &[f64], alternative: Alternative) -> Result<TTestR
     let se_y = var_y / ny_f;
     let se = (se_x + se_y).sqrt();
 
-    // t-statistic
-    let t_stat = (mean_x - mean_y) / se;
+    // t-statistic (testing H0: mean_x - mean_y = mu)
+    let t_stat = (mean_x - mean_y - mu) / se;
 
     // Welch-Satterthwaite degrees of freedom
     let num = (se_x + se_y).powi(2);
@@ -107,7 +109,7 @@ fn welch_t_test(x: &[f64], y: &[f64], alternative: Alternative) -> Result<TTestR
 }
 
 /// Student's t-test for independent samples with equal variances assumed
-fn student_t_test(x: &[f64], y: &[f64], alternative: Alternative) -> Result<TTestResult> {
+fn student_t_test(x: &[f64], y: &[f64], alternative: Alternative, mu: f64) -> Result<TTestResult> {
     let nx = x.len();
     let ny = y.len();
 
@@ -132,8 +134,8 @@ fn student_t_test(x: &[f64], y: &[f64], alternative: Alternative) -> Result<TTes
     // Standard error of the difference
     let se = (pooled_var * (1.0 / nx_f + 1.0 / ny_f)).sqrt();
 
-    // t-statistic
-    let t_stat = (mean_x - mean_y) / se;
+    // t-statistic (testing H0: mean_x - mean_y = mu)
+    let t_stat = (mean_x - mean_y - mu) / se;
 
     // Degrees of freedom
     let df = nx_f + ny_f - 2.0;
@@ -150,7 +152,7 @@ fn student_t_test(x: &[f64], y: &[f64], alternative: Alternative) -> Result<TTes
 }
 
 /// Paired t-test for dependent samples
-fn paired_t_test(x: &[f64], y: &[f64], alternative: Alternative) -> Result<TTestResult> {
+fn paired_t_test(x: &[f64], y: &[f64], alternative: Alternative, mu: f64) -> Result<TTestResult> {
     let n = x.len();
 
     if n != y.len() {
@@ -176,8 +178,8 @@ fn paired_t_test(x: &[f64], y: &[f64], alternative: Alternative) -> Result<TTest
     // Standard error of the mean difference
     let se = (var_diff / n_f).sqrt();
 
-    // t-statistic
-    let t_stat = mean_diff / se;
+    // t-statistic (testing H0: mean_diff = mu)
+    let t_stat = (mean_diff - mu) / se;
 
     // Degrees of freedom
     let df = n_f - 1.0;
