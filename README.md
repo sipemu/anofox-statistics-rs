@@ -7,7 +7,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Code Health](https://img.shields.io/badge/code%20health-85%25-brightgreen)](.)
 
-A comprehensive statistical hypothesis testing library for Rust, validated against R.
+A statistical hypothesis testing library for Rust, validated against R ([VALIDATION](R/VALIDATION.md)).
 
 This library provides a wide range of statistical tests commonly used in data analysis, all validated against R's implementations to ensure numerical accuracy.
 
