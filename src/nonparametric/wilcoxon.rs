@@ -70,6 +70,7 @@ pub struct WilcoxonResult {
 /// * `continuity_correction` - Whether to apply continuity correction (only for normal approximation)
 /// * `exact` - Whether to compute exact p-value (recommended for small samples without ties)
 /// * `conf_level` - If Some, compute confidence interval at this level (e.g., 0.95)
+/// * `mu` - If Some, test for location shift equal to this value instead of 0
 ///
 /// # Returns
 /// * `MannWhitneyResult` containing U statistic, p-value, and optionally estimate/CI
@@ -80,6 +81,7 @@ pub fn mann_whitney_u(
     continuity_correction: bool,
     exact: bool,
     conf_level: Option<f64>,
+    mu: Option<f64>,
 ) -> Result<MannWhitneyResult> {
     if x.is_empty() {
         return Err(StatError::EmptyData);
@@ -92,10 +94,15 @@ pub fn mann_whitney_u(
     let ny = y.len();
     let n = nx + ny;
 
+    // Apply location shift if mu is specified
+    let mu_shift = mu.unwrap_or(0.0);
+    let y_shifted: Vec<f64> = y.iter().map(|yi| yi + mu_shift).collect();
+    let y_use = if mu.is_some() { &y_shifted } else { y };
+
     // Combine samples and rank
     let mut combined: Vec<f64> = Vec::with_capacity(n);
     combined.extend_from_slice(x);
-    combined.extend_from_slice(y);
+    combined.extend_from_slice(y_use);
 
     let (ranks, tie_sizes) = rank_with_ties(&combined)?;
 
@@ -141,8 +148,7 @@ pub fn mann_whitney_u(
     };
 
     // Compute Hodges-Lehmann estimate and confidence interval if requested
-    let (estimate, conf_int) = if conf_level.is_some() {
-        let level = conf_level.unwrap();
+    let (estimate, conf_int) = if let Some(level) = conf_level {
         if !(0.0 < level && level < 1.0) {
             return Err(StatError::InvalidParameter(
                 "conf_level must be between 0 and 1".to_string(),
@@ -171,6 +177,7 @@ pub fn mann_whitney_u(
 /// * `continuity_correction` - Whether to apply continuity correction (only for normal approximation)
 /// * `exact` - Whether to compute exact p-value (recommended for small samples without ties)
 /// * `conf_level` - If Some, compute confidence interval at this level (e.g., 0.95)
+/// * `mu` - If Some, test if median difference equals this value instead of 0
 ///
 /// # Returns
 /// * `WilcoxonResult` containing V statistic, p-value, and optionally estimate/CI
@@ -181,6 +188,7 @@ pub fn wilcoxon_signed_rank(
     continuity_correction: bool,
     exact: bool,
     conf_level: Option<f64>,
+    mu: Option<f64>,
 ) -> Result<WilcoxonResult> {
     let n = x.len();
 
@@ -196,11 +204,14 @@ pub fn wilcoxon_signed_rank(
         )));
     }
 
+    // Apply mu shift if specified (null hypothesis: median difference = mu)
+    let mu_shift = mu.unwrap_or(0.0);
+
     // Compute differences and filter out zeros
     let diffs: Vec<f64> = x
         .iter()
         .zip(y.iter())
-        .map(|(xi, yi)| xi - yi)
+        .map(|(xi, yi)| xi - yi - mu_shift)
         .filter(|&d| d != 0.0)
         .collect();
 
@@ -262,8 +273,7 @@ pub fn wilcoxon_signed_rank(
     };
 
     // Compute Hodges-Lehmann estimate and confidence interval if requested
-    let (estimate, conf_int) = if conf_level.is_some() {
-        let level = conf_level.unwrap();
+    let (estimate, conf_int) = if let Some(level) = conf_level {
         if !(0.0 < level && level < 1.0) {
             return Err(StatError::InvalidParameter(
                 "conf_level must be between 0 and 1".to_string(),
@@ -327,7 +337,12 @@ fn mann_whitney_count_le(n1: usize, n2: usize, u: usize) -> u64 {
 fn mann_whitney_count_le_recursive(n1: usize, n2: usize, max_u: usize) -> u64 {
     use std::collections::HashMap;
 
-    fn count(n1: usize, n2: usize, u: usize, memo: &mut HashMap<(usize, usize, usize), u64>) -> u64 {
+    fn count(
+        n1: usize,
+        n2: usize,
+        u: usize,
+        memo: &mut HashMap<(usize, usize, usize), u64>,
+    ) -> u64 {
         if n1 == 0 {
             return 1; // Only one way: all n2 elements at the end
         }
@@ -480,14 +495,25 @@ fn mann_whitney_estimate_ci(
         mann_whitney_ci_approx_k(nx, ny, alpha)
     };
 
-    let lower = if k_lower > 0 { diffs[k_lower - 1] } else { diffs[0] };
-    let upper = if k_upper <= n_pairs { diffs[k_upper - 1] } else { diffs[n_pairs - 1] };
+    let lower = if k_lower > 0 {
+        diffs[k_lower - 1]
+    } else {
+        diffs[0]
+    };
+    let upper = if k_upper <= n_pairs {
+        diffs[k_upper - 1]
+    } else {
+        diffs[n_pairs - 1]
+    };
 
-    Ok((estimate, ConfidenceInterval {
-        lower,
-        upper,
-        conf_level,
-    }))
+    Ok((
+        estimate,
+        ConfidenceInterval {
+            lower,
+            upper,
+            conf_level,
+        },
+    ))
 }
 
 /// Find exact k values for Mann-Whitney CI using enumeration.
@@ -573,14 +599,25 @@ fn wilcoxon_estimate_ci(
         wilcoxon_ci_approx_k(n, alpha)
     };
 
-    let lower = if k_lower > 0 { walsh[k_lower - 1] } else { walsh[0] };
-    let upper = if k_upper <= n_walsh { walsh[k_upper - 1] } else { walsh[n_walsh - 1] };
+    let lower = if k_lower > 0 {
+        walsh[k_lower - 1]
+    } else {
+        walsh[0]
+    };
+    let upper = if k_upper <= n_walsh {
+        walsh[k_upper - 1]
+    } else {
+        walsh[n_walsh - 1]
+    };
 
-    Ok((estimate, ConfidenceInterval {
-        lower,
-        upper,
-        conf_level,
-    }))
+    Ok((
+        estimate,
+        ConfidenceInterval {
+            lower,
+            upper,
+            conf_level,
+        },
+    ))
 }
 
 /// Find exact k values for Wilcoxon CI.

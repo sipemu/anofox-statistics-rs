@@ -64,6 +64,7 @@ fn main() {
         TTestKind::Welch,
         Alternative::TwoSided,
         0.0,
+        None,
     )
     .unwrap();
 
@@ -91,7 +92,16 @@ fn main() {
     println!("Use when: Data is ordinal or non-normal.");
     println!();
 
-    let mw = mann_whitney_u(&treatment, &control, Alternative::TwoSided, false, false, None).unwrap();
+    let mw = mann_whitney_u(
+        &treatment,
+        &control,
+        Alternative::TwoSided,
+        false,
+        false,
+        None,
+        None,
+    )
+    .unwrap();
 
     println!("  U statistic: {:.4}", mw.statistic);
     println!("  p-value:     {:.6}", mw.p_value);

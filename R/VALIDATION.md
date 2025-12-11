@@ -114,21 +114,21 @@ Tests load the CSV files and compare Rust results against R references.
 | `math_basic.csv` | Math primitives | `mean()`, `var()`, `median()`, `mean(trim=0.2)` | mean, variance, median, trimmed mean for each test vector |
 | `math_extended.csv` | Extended math | `sd()`, `e1071::skewness()`, `e1071::kurtosis()` | std_dev, skewness (type=2), kurtosis (type=2) |
 | `math_skewed.csv` | Skewed data stats | `e1071::skewness()`, `e1071::kurtosis()` | skewness, kurtosis for skewed vector |
-| `ttest_welch.csv` | Welch t-test | `t.test(var.equal=FALSE)` | statistic, df, p_value for all 3 alternatives |
+| `ttest_welch.csv` | Welch t-test | `t.test(var.equal=FALSE)` | statistic, df, p_value for all 3 alternatives, mu=0.5, conf.int at 95/90/99% |
 | `ttest_student.csv` | Student t-test | `t.test(var.equal=TRUE)` | statistic, df, p_value for all 3 alternatives |
 | `ttest_paired.csv` | Paired t-test | `t.test(paired=TRUE)` | statistic, df, p_value for all 3 alternatives |
 | `yuen.csv` | Yuen's test | `WRS2::yuen()` | statistic, df, p_value, diff for 20% and 10% trim |
 | `brown_forsythe.csv` | Brown-Forsythe | `car::leveneTest(center=median)` | F-statistic, df1, df2, p_value for 2 and 3 groups |
 | `ranks.csv` | Ranking | `rank(ties.method="average")` | All rank values for simple and tied data |
-| `mann_whitney.csv` | Mann-Whitney U | `wilcox.test(exact=FALSE, correct=FALSE/TRUE)` | statistic, p_value, p_value_less, p_value_greater, p_value_corrected, estimate, conf_low, conf_high |
+| `mann_whitney.csv` | Mann-Whitney U | `wilcox.test(exact=FALSE, correct=FALSE/TRUE)` | statistic, p_value, p_value_less, p_value_greater, p_value_corrected, estimate, conf_low, conf_high, p_value_mu (mu=0.5) |
 | `mann_whitney_exact.csv` | Mann-Whitney exact | `wilcox.test(exact=TRUE, conf.int=TRUE)` | statistic, p_value, p_value_less, p_value_greater, estimate, conf_low_95, conf_high_95, conf_low_90, conf_high_90 |
-| `wilcoxon_signed_rank.csv` | Wilcoxon SR | `wilcox.test(paired=TRUE, exact=FALSE, correct=FALSE/TRUE)` | statistic, p_value, p_value_less, p_value_greater, p_value_corrected, estimate, conf_low, conf_high |
+| `wilcoxon_signed_rank.csv` | Wilcoxon SR | `wilcox.test(paired=TRUE, exact=FALSE, correct=FALSE/TRUE)` | statistic, p_value, p_value_less, p_value_greater, p_value_corrected, estimate, conf_low, conf_high, p_value_mu (mu=0.3) |
 | `wilcoxon_signed_rank_exact.csv` | Wilcoxon SR exact | `wilcox.test(paired=TRUE, exact=TRUE, conf.int=TRUE)` | statistic, p_value, p_value_less, p_value_greater, estimate, conf_low_95, conf_high_95, conf_low_90, conf_high_90 |
 | `kruskal_wallis.csv` | Kruskal-Wallis | `kruskal.test()` | statistic, df, p_value |
 | `shapiro_wilk.csv` | Shapiro-Wilk | `shapiro.test()` | W, p_value for 5 test vectors |
 | `shapiro_wilk_edge.csv` | Shapiro-Wilk edge | `shapiro.test()` | W, p_value for n=3,4,5,10 |
 | `dagostino.csv` | D'Agostino | `moments::agostino.test()`, `moments::anscombe.test()` | Z_skew, Z_kurt, p_values |
-| `brunner_munzel.csv` | Brunner-Munzel | `lawstat::brunner.munzel.test()` | statistic, df, p_value, estimate, p_value_less, p_value_greater |
+| `brunner_munzel.csv` | Brunner-Munzel | `lawstat::brunner.munzel.test()` | statistic, df, p_value, estimate, p_value_less, p_value_greater, conf.int at 95/90/99% |
 | `diebold_mariano.csv` | Diebold-Mariano | `forecast::dm.test()` | statistic, p_value for SE/AE loss, h=1/h=3, alternative=less/greater |
 | `ttest_welch.csv` | Welch t-test with mu | `t.test(var.equal=FALSE, mu=0.5)` | statistic_mu, p_value_mu |
 | `clark_west.csv` | Clark-West | Manual HAC computation | statistic, p_value for h=1 and h=3 |
@@ -159,7 +159,7 @@ Tests load the CSV files and compare Rust results against R references.
 
 | Function | R Equivalent | Tolerance | Test Cases |
 |----------|-------------|-----------|------------|
-| `t_test(..., Welch)` | `t.test(var.equal=FALSE)` | 1e-10 | two-sided, less, greater, mu=0.5 |
+| `t_test(..., Welch)` | `t.test(var.equal=FALSE)` | 1e-10 | two-sided, less, greater, mu=0.5, conf.level=0.95/0.90/0.99 |
 | `t_test(..., Student)` | `t.test(var.equal=TRUE)` | 1e-10 | two-sided, less, greater |
 | `t_test(..., Paired)` | `t.test(paired=TRUE)` | 1e-10 | two-sided, less, greater |
 | `yuen_test()` | `WRS2::yuen()` | 1e-10 | 20% trim, 10% trim |
@@ -172,10 +172,10 @@ Tests load the CSV files and compare Rust results against R references.
 | Function | R Equivalent | Tolerance | Test Cases |
 |----------|-------------|-----------|------------|
 | `rank()` | `base::rank(ties.method="average")` | 1e-10 | simple, with ties |
-| `mann_whitney_u()` | `wilcox.test(exact=FALSE)` | 1e-6 | two-sided, less, greater, continuity correction |
-| `wilcoxon_signed_rank()` | `wilcox.test(paired=TRUE, exact=FALSE)` | 1e-6 | two-sided, less, greater, continuity correction |
+| `mann_whitney_u()` | `wilcox.test(exact=FALSE/TRUE)` | 1e-6 | two-sided, less, greater, continuity correction, exact p-value, mu=0.5, conf.level=0.95/0.90 |
+| `wilcoxon_signed_rank()` | `wilcox.test(paired=TRUE, exact=FALSE/TRUE)` | 1e-6 | two-sided, less, greater, continuity correction, exact p-value, mu=0.3, conf.level=0.95/0.90 |
 | `kruskal_wallis()` | `kruskal.test()` | 1e-10 | 3 groups |
-| `brunner_munzel()` | `lawstat::brunner.munzel.test()` | 1e-10 | two-sided, less, greater |
+| `brunner_munzel()` | `lawstat::brunner.munzel.test()` | 1e-6 | two-sided, less, greater, alpha=0.05/0.10/0.01 (conf.int) |
 
 ### 4. Distributional Tests
 
@@ -284,13 +284,13 @@ install.packages(c("WRS2", "car", "lawstat", "e1071", "moments", "forecast"))
 | Category | Tests | Test Cases | Reference Files |
 |----------|-------|------------|-----------------|
 | Math Primitives | 7 | 41 | 8 |
-| Parametric | 5 | 22 | 13 |
-| Nonparametric | 5 | 23 | 14 |
+| Parametric | 5 | 25 | 13 |
+| Nonparametric | 5 | 42 | 14 |
 | Distributional | 2 | 17 | 12 |
 | Resampling | 3 | 13 | 4 |
 | Modern | 2 | 8 | 3 |
 | Forecast | 5 | 21 | 22 |
-| **Total** | **29** | **145** | **76** |
+| **Total** | **29** | **167** | **76** |
 
 ## Reproducibility
 
@@ -314,5 +314,5 @@ Rscript R/generate_refs.R
 # 3. Run validation tests
 cargo test
 
-# All 136 tests should pass (60 unit + 76 TDD integration)
+# All 227 tests should pass (60 unit + 167 TDD integration)
 ```

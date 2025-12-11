@@ -85,7 +85,7 @@ let group1 = vec![1.2, 2.3, 3.4, 4.5, 5.6];
 let group2 = vec![2.1, 3.2, 4.3, 5.4, 6.5];
 
 // Welch t-test (unequal variances), mu=0.0 tests if mean difference equals zero
-let result = t_test(&group1, &group2, TTestKind::Welch, Alternative::TwoSided, 0.0)
+let result = t_test(&group1, &group2, TTestKind::Welch, Alternative::TwoSided, 0.0, None)
     .expect("t-test should succeed");
 
 println!("t-statistic: {:.4}", result.statistic);
@@ -93,13 +93,19 @@ println!("p-value: {:.4}", result.p_value);
 println!("degrees of freedom: {:.4}", result.df);
 
 // Student t-test (equal variances assumed)
-let result = t_test(&group1, &group2, TTestKind::Student, Alternative::TwoSided, 0.0)?;
+let result = t_test(&group1, &group2, TTestKind::Student, Alternative::TwoSided, 0.0, None)?;
 
 // Paired t-test
-let result = t_test(&group1, &group2, TTestKind::Paired, Alternative::Less, 0.0)?;
+let result = t_test(&group1, &group2, TTestKind::Paired, Alternative::Less, 0.0, None)?;
 
 // Test if mean difference equals 0.5 (non-zero null hypothesis)
-let result = t_test(&group1, &group2, TTestKind::Welch, Alternative::TwoSided, 0.5)?;
+let result = t_test(&group1, &group2, TTestKind::Welch, Alternative::TwoSided, 0.5, None)?;
+
+// T-test with 95% confidence interval
+let result = t_test(&group1, &group2, TTestKind::Welch, Alternative::TwoSided, 0.0, Some(0.95))?;
+if let Some(ci) = result.conf_int {
+    println!("95% CI: [{:.3}, {:.3}]", ci.lower, ci.upper);
+}
 ```
 
 ### Yuen's Robust T-Test
@@ -141,26 +147,38 @@ let data = vec![3.0, 1.0, 4.0, 1.0, 5.0];
 let ranks = rank(&data)?;
 
 // Mann-Whitney U test (two-sided, no continuity correction, normal approximation)
-let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, false, None)?;
+let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, false, None, None)?;
 
 // With exact p-values (for small samples without ties)
-let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, true, None)?;
+let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, true, None, None)?;
 
 // With confidence interval (Hodges-Lehmann estimate)
-let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, true, Some(0.95))?;
+let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, true, Some(0.95), None)?;
 if let Some(ci) = result.conf_int {
     println!("95% CI: [{:.3}, {:.3}]", ci.lower, ci.upper);
 }
 
+// Test if location shift equals 0.5 (non-zero null hypothesis)
+let result = mann_whitney_u(&group1, &group2, Alternative::TwoSided, false, false, None, Some(0.5))?;
+
 // Wilcoxon signed-rank test (paired)
-let result = wilcoxon_signed_rank(&group1, &group2, Alternative::TwoSided, false, false, None)?;
+let result = wilcoxon_signed_rank(&group1, &group2, Alternative::TwoSided, false, false, None, None)?;
+
+// Wilcoxon with non-zero null hypothesis (test if median difference equals 0.5)
+let result = wilcoxon_signed_rank(&group1, &group2, Alternative::TwoSided, false, false, None, Some(0.5))?;
 
 // Kruskal-Wallis test
 let result = kruskal_wallis(&groups)?;
 
 // Brunner-Munzel test (robust alternative to Mann-Whitney)
-let result = brunner_munzel(&group1, &group2, Alternative::TwoSided)?;
+let result = brunner_munzel(&group1, &group2, Alternative::TwoSided, None)?;
 println!("Estimate P(X < Y): {:.4}", result.estimate);
+
+// Brunner-Munzel with 95% confidence interval
+let result = brunner_munzel(&group1, &group2, Alternative::TwoSided, Some(0.05))?;
+if let Some(ci) = result.conf_int {
+    println!("95% CI for P(X < Y): [{:.3}, {:.3}]", ci.lower, ci.upper);
+}
 ```
 
 ### Normality Tests
@@ -277,7 +295,7 @@ println!("Eliminated: {:?}", result.eliminated_models);
 
 | Function | Description |
 |----------|-------------|
-| `t_test(x, y, kind, alternative, mu)` | T-test (Welch, Student, or Paired) with null hypothesis mu |
+| `t_test(x, y, kind, alternative, mu, conf_level)` | T-test (Welch, Student, or Paired) with null hypothesis mu and optional confidence interval |
 | `yuen_test(x, y, trim)` | Yuen's trimmed mean t-test |
 | `brown_forsythe(groups)` | Brown-Forsythe test for homogeneity of variances |
 
@@ -286,10 +304,10 @@ println!("Eliminated: {:?}", result.eliminated_models);
 | Function | Description |
 |----------|-------------|
 | `rank(data)` | Compute ranks with average tie handling |
-| `mann_whitney_u(x, y, alternative, correct, exact, conf_level)` | Mann-Whitney U test with exact p-values and confidence intervals |
-| `wilcoxon_signed_rank(x, y, alternative, correct, exact, conf_level)` | Wilcoxon signed-rank test with exact p-values and confidence intervals |
+| `mann_whitney_u(x, y, alternative, correct, exact, conf_level, mu)` | Mann-Whitney U test with exact p-values, confidence intervals, and location shift hypothesis |
+| `wilcoxon_signed_rank(x, y, alternative, correct, exact, conf_level, mu)` | Wilcoxon signed-rank test with exact p-values, confidence intervals, and median difference hypothesis |
 | `kruskal_wallis(groups)` | Kruskal-Wallis H test for k independent samples |
-| `brunner_munzel(x, y, alternative)` | Brunner-Munzel test for stochastic equality |
+| `brunner_munzel(x, y, alternative, alpha)` | Brunner-Munzel test for stochastic equality with optional confidence interval |
 
 ### Distributional Tests
 
@@ -353,7 +371,7 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `skewness()`, `kurtosis()` | `skewness()`, `kurtosis()` | e1071 |
 | `diebold_mariano()` | `dm.test()` | forecast |
 
-All 136 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
+All 227 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
 
 **For complete transparency on the validation process, see [`R/VALIDATION.md`](R/VALIDATION.md)**, which documents:
 - All 76 reference data files and their R generation code

@@ -101,6 +101,11 @@ welch_greater <- t.test(g1, g2, var.equal = FALSE, alternative = "greater")
 # t-test with mu parameter (testing against non-zero null hypothesis)
 welch_mu <- t.test(g1, g2, var.equal = FALSE, alternative = "two.sided", mu = 0.5)
 
+# Confidence intervals at different levels
+welch_ci_95 <- t.test(g1, g2, var.equal = FALSE, conf.level = 0.95)
+welch_ci_90 <- t.test(g1, g2, var.equal = FALSE, conf.level = 0.90)
+welch_ci_99 <- t.test(g1, g2, var.equal = FALSE, conf.level = 0.99)
+
 save_ref("ttest_welch.csv", list(
   # Two-sided
   statistic_two = welch_two$statistic,
@@ -118,7 +123,14 @@ save_ref("ttest_welch.csv", list(
   p_value_greater = welch_greater$p.value,
   # With mu parameter
   statistic_mu = welch_mu$statistic,
-  p_value_mu = welch_mu$p.value
+  p_value_mu = welch_mu$p.value,
+  # Confidence intervals
+  conf_low_95 = welch_ci_95$conf.int[1],
+  conf_high_95 = welch_ci_95$conf.int[2],
+  conf_low_90 = welch_ci_90$conf.int[1],
+  conf_high_90 = welch_ci_90$conf.int[2],
+  conf_low_99 = welch_ci_99$conf.int[1],
+  conf_high_99 = welch_ci_99$conf.int[2]
 ))
 
 # Student t-test (equal variances assumed)
@@ -283,6 +295,11 @@ mw_corrected <- wilcox.test(mw_x, mw_y, exact = FALSE, correct = TRUE)
 # Confidence interval (requires conf.int=TRUE)
 mw_ci <- wilcox.test(mw_x, mw_y, exact = FALSE, correct = FALSE, conf.int = TRUE, conf.level = 0.95)
 
+# Test with mu parameter (null hypothesis: location shift = mu)
+mw_mu <- wilcox.test(mw_x, mw_y, mu = 0.5, exact = FALSE, correct = FALSE)
+mw_mu_less <- wilcox.test(mw_x, mw_y, mu = 0.5, alternative = "less", exact = FALSE, correct = FALSE)
+mw_mu_greater <- wilcox.test(mw_x, mw_y, mu = 0.5, alternative = "greater", exact = FALSE, correct = FALSE)
+
 save_ref("mann_whitney.csv", list(
   statistic = mw_result$statistic,
   p_value = mw_result$p.value,
@@ -291,7 +308,10 @@ save_ref("mann_whitney.csv", list(
   p_value_corrected = mw_corrected$p.value,
   estimate = mw_ci$estimate,
   conf_low = mw_ci$conf.int[1],
-  conf_high = mw_ci$conf.int[2]
+  conf_high = mw_ci$conf.int[2],
+  p_value_mu = mw_mu$p.value,
+  p_value_mu_less = mw_mu_less$p.value,
+  p_value_mu_greater = mw_mu_greater$p.value
 ))
 
 # Mann-Whitney with exact p-value (smaller samples, no ties)
@@ -335,6 +355,11 @@ wsr_corrected <- wilcox.test(wsr_x, wsr_y, paired = TRUE, exact = FALSE, correct
 # Confidence interval
 wsr_ci <- wilcox.test(wsr_x, wsr_y, paired = TRUE, exact = FALSE, correct = FALSE, conf.int = TRUE, conf.level = 0.95)
 
+# Test with mu parameter (null hypothesis: median difference = mu)
+wsr_mu <- wilcox.test(wsr_x, wsr_y, paired = TRUE, mu = 0.3, exact = FALSE, correct = FALSE)
+wsr_mu_less <- wilcox.test(wsr_x, wsr_y, paired = TRUE, mu = 0.3, alternative = "less", exact = FALSE, correct = FALSE)
+wsr_mu_greater <- wilcox.test(wsr_x, wsr_y, paired = TRUE, mu = 0.3, alternative = "greater", exact = FALSE, correct = FALSE)
+
 save_ref("wilcoxon_signed_rank.csv", list(
   statistic = wsr_result$statistic,
   p_value = wsr_result$p.value,
@@ -343,7 +368,10 @@ save_ref("wilcoxon_signed_rank.csv", list(
   p_value_corrected = wsr_corrected$p.value,
   estimate = wsr_ci$estimate,
   conf_low = wsr_ci$conf.int[1],
-  conf_high = wsr_ci$conf.int[2]
+  conf_high = wsr_ci$conf.int[2],
+  p_value_mu = wsr_mu$p.value,
+  p_value_mu_less = wsr_mu_less$p.value,
+  p_value_mu_greater = wsr_mu_greater$p.value
 ))
 
 # Wilcoxon Signed-Rank with exact p-value (smaller samples, no ties)
@@ -634,13 +662,25 @@ bm_result <- brunner.munzel.test(bm_x, bm_y)
 bm_less <- brunner.munzel.test(bm_x, bm_y, alternative = "less")
 bm_greater <- brunner.munzel.test(bm_x, bm_y, alternative = "greater")
 
+# Confidence intervals at different alpha levels
+bm_ci_95 <- brunner.munzel.test(bm_x, bm_y, alpha = 0.05)
+bm_ci_90 <- brunner.munzel.test(bm_x, bm_y, alpha = 0.10)
+bm_ci_99 <- brunner.munzel.test(bm_x, bm_y, alpha = 0.01)
+
 save_ref("brunner_munzel.csv", list(
   statistic = bm_result$statistic,
   df = bm_result$parameter,
   p_value = bm_result$p.value,
   estimate = bm_result$estimate,
   p_value_less = bm_less$p.value,
-  p_value_greater = bm_greater$p.value
+  p_value_greater = bm_greater$p.value,
+  # Confidence intervals (alpha=0.05 -> 95% CI)
+  conf_low_95 = bm_ci_95$conf.int[1],
+  conf_high_95 = bm_ci_95$conf.int[2],
+  conf_low_90 = bm_ci_90$conf.int[1],
+  conf_high_90 = bm_ci_90$conf.int[2],
+  conf_low_99 = bm_ci_99$conf.int[1],
+  conf_high_99 = bm_ci_99$conf.int[2]
 ))
 
 # ============================================

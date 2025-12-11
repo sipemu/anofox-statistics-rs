@@ -45,7 +45,16 @@ fn main() {
     println!("  Control:   {:?}", control);
     println!();
 
-    let mw = mann_whitney_u(&treatment, &control, Alternative::TwoSided, false, false, None).unwrap();
+    let mw = mann_whitney_u(
+        &treatment,
+        &control,
+        Alternative::TwoSided,
+        false,
+        false,
+        None,
+        None,
+    )
+    .unwrap();
 
     println!("  U statistic: {:.4}", mw.statistic);
     println!("  p-value:     {:.6}", mw.p_value);
@@ -77,7 +86,16 @@ fn main() {
     println!("  After:  {:?}", after);
     println!();
 
-    let wilcox = wilcoxon_signed_rank(&before, &after, Alternative::TwoSided, false, false, None).unwrap();
+    let wilcox = wilcoxon_signed_rank(
+        &before,
+        &after,
+        Alternative::TwoSided,
+        false,
+        false,
+        None,
+        None,
+    )
+    .unwrap();
 
     println!("  W statistic: {:.4}", wilcox.statistic);
     println!("  p-value:     {:.6}", wilcox.p_value);
@@ -139,7 +157,7 @@ fn main() {
     println!("  Y: {:?}", y);
     println!();
 
-    let bm = brunner_munzel(&x, &y, Alternative::TwoSided).unwrap();
+    let bm = brunner_munzel(&x, &y, Alternative::TwoSided, None).unwrap();
 
     println!("  t statistic: {:.4}", bm.statistic);
     println!("  df:          {:.2}", bm.df);

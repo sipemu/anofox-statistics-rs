@@ -3,6 +3,17 @@ use crate::nonparametric::ranks::rank;
 use crate::parametric::Alternative;
 use statrs::distribution::{ContinuousCDF, StudentsT};
 
+/// Confidence interval for Brunner-Munzel estimate
+#[derive(Debug, Clone)]
+pub struct BrunnerMunzelConfInt {
+    /// Lower bound of the confidence interval
+    pub lower: f64,
+    /// Upper bound of the confidence interval
+    pub upper: f64,
+    /// Confidence level (e.g., 0.95 for 95%)
+    pub conf_level: f64,
+}
+
 /// Result of the Brunner-Munzel test
 #[derive(Debug, Clone)]
 pub struct BrunnerMunzelResult {
@@ -14,6 +25,8 @@ pub struct BrunnerMunzelResult {
     pub p_value: f64,
     /// Estimated probability P(X < Y) + 0.5 * P(X = Y)
     pub estimate: f64,
+    /// Confidence interval for the estimate (if alpha was specified)
+    pub conf_int: Option<BrunnerMunzelConfInt>,
 }
 
 /// Validate Brunner-Munzel test inputs.
@@ -73,9 +86,10 @@ fn compute_bm_pvalue(statistic: f64, df: f64, alternative: Alternative) -> f64 {
 /// * `x` - First sample
 /// * `y` - Second sample
 /// * `alternative` - Alternative hypothesis
+/// * `alpha` - If Some, compute confidence interval at (1-alpha) level (e.g., 0.05 for 95% CI)
 ///
 /// # Returns
-/// * `BrunnerMunzelResult` containing statistic, df, p-value, and probability estimate
+/// * `BrunnerMunzelResult` containing statistic, df, p-value, probability estimate, and optional CI
 ///
 /// # References
 /// * Brunner, E. and Munzel, U. (2000). "The Nonparametric Behrens-Fisher Problem:
@@ -84,6 +98,7 @@ pub fn brunner_munzel(
     x: &[f64],
     y: &[f64],
     alternative: Alternative,
+    alpha: Option<f64>,
 ) -> Result<BrunnerMunzelResult> {
     let n1 = x.len();
     let n2 = y.len();
@@ -135,11 +150,34 @@ pub fn brunner_munzel(
     // P-value from t-distribution
     let p_value = compute_bm_pvalue(statistic, df, alternative);
 
+    // Confidence interval if alpha is specified
+    // SE = sqrt(v1 / (n1 * n2^2) + v2 / (n2 * n1^2))
+    let conf_int = if let Some(a) = alpha {
+        if !(0.0 < a && a < 1.0) {
+            return Err(StatError::InvalidParameter(
+                "alpha must be between 0 and 1".to_string(),
+            ));
+        }
+        let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
+        let t_crit = t_dist.inverse_cdf(1.0 - a / 2.0);
+        let se = (v1 / (n1_f * n2_f * n2_f) + v2 / (n2_f * n1_f * n1_f)).sqrt();
+        let lower = pst - t_crit * se;
+        let upper = pst + t_crit * se;
+        Some(BrunnerMunzelConfInt {
+            lower,
+            upper,
+            conf_level: 1.0 - a,
+        })
+    } else {
+        None
+    };
+
     Ok(BrunnerMunzelResult {
         statistic,
         df,
         p_value,
         estimate: pst,
+        conf_int,
     })
 }
 
@@ -156,7 +194,7 @@ mod tests {
         ];
         let y = vec![3.0, 3.0, 4.0, 3.0, 1.0, 2.0, 3.0, 1.0, 1.0, 5.0, 4.0];
 
-        let result = brunner_munzel(&x, &y, Alternative::TwoSided).unwrap();
+        let result = brunner_munzel(&x, &y, Alternative::TwoSided, None).unwrap();
 
         // R reference values:
         // statistic = 3.1375, df = 17.683, p-value = 0.005786, estimate = 0.788961
@@ -172,7 +210,7 @@ mod tests {
         let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let y = vec![1.0, 2.0, 3.0, 4.0, 5.0];
 
-        let result = brunner_munzel(&x, &y, Alternative::TwoSided).unwrap();
+        let result = brunner_munzel(&x, &y, Alternative::TwoSided, None).unwrap();
 
         // Statistic should be close to 0, estimate close to 0.5
         assert!(result.statistic.abs() < 0.5);
@@ -184,7 +222,7 @@ mod tests {
         let x: Vec<f64> = vec![];
         let y = vec![1.0, 2.0, 3.0];
 
-        assert!(brunner_munzel(&x, &y, Alternative::TwoSided).is_err());
+        assert!(brunner_munzel(&x, &y, Alternative::TwoSided, None).is_err());
     }
 
     #[test]
@@ -192,6 +230,6 @@ mod tests {
         let x = vec![1.0];
         let y = vec![1.0, 2.0, 3.0];
 
-        assert!(brunner_munzel(&x, &y, Alternative::TwoSided).is_err());
+        assert!(brunner_munzel(&x, &y, Alternative::TwoSided, None).is_err());
     }
 }

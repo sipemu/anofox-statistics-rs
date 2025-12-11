@@ -24,6 +24,17 @@ pub enum Alternative {
     Greater,
 }
 
+/// Confidence interval for t-test
+#[derive(Debug, Clone)]
+pub struct TTestConfInt {
+    /// Lower bound of the confidence interval
+    pub lower: f64,
+    /// Upper bound of the confidence interval
+    pub upper: f64,
+    /// Confidence level (e.g., 0.95 for 95%)
+    pub conf_level: f64,
+}
+
 /// Result of a t-test
 #[derive(Debug, Clone)]
 pub struct TTestResult {
@@ -37,6 +48,8 @@ pub struct TTestResult {
     pub mean_x: f64,
     /// Mean of second sample (None for one-sample or paired)
     pub mean_y: Option<f64>,
+    /// Confidence interval for the mean difference (if conf_level was specified)
+    pub conf_int: Option<TTestConfInt>,
 }
 
 /// Perform a t-test comparing two samples.
@@ -47,25 +60,33 @@ pub struct TTestResult {
 /// * `kind` - Type of t-test (Welch, Student, or Paired)
 /// * `alternative` - Alternative hypothesis direction
 /// * `mu` - Null hypothesis value for the true difference in means (default: 0.0)
+/// * `conf_level` - If Some, compute confidence interval at this level (e.g., 0.95)
 ///
 /// # Returns
-/// * `TTestResult` containing statistic, df, and p-value
+/// * `TTestResult` containing statistic, df, p-value, and optionally CI
 pub fn t_test(
     x: &[f64],
     y: &[f64],
     kind: TTestKind,
     alternative: Alternative,
     mu: f64,
+    conf_level: Option<f64>,
 ) -> Result<TTestResult> {
     match kind {
-        TTestKind::Welch => welch_t_test(x, y, alternative, mu),
-        TTestKind::Student => student_t_test(x, y, alternative, mu),
-        TTestKind::Paired => paired_t_test(x, y, alternative, mu),
+        TTestKind::Welch => welch_t_test(x, y, alternative, mu, conf_level),
+        TTestKind::Student => student_t_test(x, y, alternative, mu, conf_level),
+        TTestKind::Paired => paired_t_test(x, y, alternative, mu, conf_level),
     }
 }
 
 /// Welch's t-test for independent samples with unequal variances
-fn welch_t_test(x: &[f64], y: &[f64], alternative: Alternative, mu: f64) -> Result<TTestResult> {
+fn welch_t_test(
+    x: &[f64],
+    y: &[f64],
+    alternative: Alternative,
+    mu: f64,
+    conf_level: Option<f64>,
+) -> Result<TTestResult> {
     let nx = x.len();
     let ny = y.len();
 
@@ -99,17 +120,27 @@ fn welch_t_test(x: &[f64], y: &[f64], alternative: Alternative, mu: f64) -> Resu
 
     let p_value = compute_p_value(t_stat, df, alternative);
 
+    // Confidence interval for the difference in means
+    let conf_int = compute_conf_int(mean_x - mean_y, se, df, conf_level)?;
+
     Ok(TTestResult {
         statistic: t_stat,
         df,
         p_value,
         mean_x,
         mean_y: Some(mean_y),
+        conf_int,
     })
 }
 
 /// Student's t-test for independent samples with equal variances assumed
-fn student_t_test(x: &[f64], y: &[f64], alternative: Alternative, mu: f64) -> Result<TTestResult> {
+fn student_t_test(
+    x: &[f64],
+    y: &[f64],
+    alternative: Alternative,
+    mu: f64,
+    conf_level: Option<f64>,
+) -> Result<TTestResult> {
     let nx = x.len();
     let ny = y.len();
 
@@ -142,17 +173,27 @@ fn student_t_test(x: &[f64], y: &[f64], alternative: Alternative, mu: f64) -> Re
 
     let p_value = compute_p_value(t_stat, df, alternative);
 
+    // Confidence interval for the difference in means
+    let conf_int = compute_conf_int(mean_x - mean_y, se, df, conf_level)?;
+
     Ok(TTestResult {
         statistic: t_stat,
         df,
         p_value,
         mean_x,
         mean_y: Some(mean_y),
+        conf_int,
     })
 }
 
 /// Paired t-test for dependent samples
-fn paired_t_test(x: &[f64], y: &[f64], alternative: Alternative, mu: f64) -> Result<TTestResult> {
+fn paired_t_test(
+    x: &[f64],
+    y: &[f64],
+    alternative: Alternative,
+    mu: f64,
+    conf_level: Option<f64>,
+) -> Result<TTestResult> {
     let n = x.len();
 
     if n != y.len() {
@@ -186,12 +227,16 @@ fn paired_t_test(x: &[f64], y: &[f64], alternative: Alternative, mu: f64) -> Res
 
     let p_value = compute_p_value(t_stat, df, alternative);
 
+    // Confidence interval for the mean difference
+    let conf_int = compute_conf_int(mean_diff, se, df, conf_level)?;
+
     Ok(TTestResult {
         statistic: t_stat,
         df,
         p_value,
         mean_x: mean_diff,
         mean_y: None,
+        conf_int,
     })
 }
 
@@ -212,5 +257,33 @@ fn compute_p_value(t_stat: f64, df: f64, alternative: Alternative) -> f64 {
             // Right-tailed: P(T > t) = 1 - P(T < t)
             1.0 - t_dist.cdf(t_stat)
         }
+    }
+}
+
+/// Compute confidence interval for mean difference
+fn compute_conf_int(
+    estimate: f64,
+    se: f64,
+    df: f64,
+    conf_level: Option<f64>,
+) -> Result<Option<TTestConfInt>> {
+    match conf_level {
+        Some(level) => {
+            if !(0.0 < level && level < 1.0) {
+                return Err(StatError::InvalidParameter(
+                    "conf_level must be between 0 and 1".to_string(),
+                ));
+            }
+            let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
+            let alpha = 1.0 - level;
+            let t_crit = t_dist.inverse_cdf(1.0 - alpha / 2.0);
+            let margin = t_crit * se;
+            Ok(Some(TTestConfInt {
+                lower: estimate - margin,
+                upper: estimate + margin,
+                conf_level: level,
+            }))
+        }
+        None => Ok(None),
     }
 }
