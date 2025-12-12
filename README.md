@@ -321,6 +321,14 @@ All 245 test cases ensure numerical agreement with R within appropriate toleranc
 - [thiserror](https://crates.io/crates/thiserror) - Error handling
 - [rand](https://crates.io/crates/rand) - Random number generation for resampling
 
+## Attribution
+
+This library incorporates Rust implementations of algorithms from several open-source projects. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for complete attribution and license information.
+
+- **statrs** (MIT) - Statistical distributions
+- **rand** (MIT/Apache-2.0) - Random number generation
+- **R Statistical Computing** - Algorithm validation and methodology
+
 ## License
 
 MIT License
