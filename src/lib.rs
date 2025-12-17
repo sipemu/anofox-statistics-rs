@@ -1,3 +1,5 @@
+pub mod categorical;
+pub mod correlation;
 pub mod distributional;
 pub mod error;
 pub mod forecast;
@@ -7,6 +9,11 @@ pub mod parametric;
 pub mod resampling;
 pub mod utils;
 
+pub use correlation::{
+    distance_cor, distance_cor_test, icc, kendall, partial_cor, pearson, semi_partial_cor,
+    spearman, CorrelationConfInt, CorrelationMethod, CorrelationResult, DistanceCorResult,
+    ICCResult, ICCType, KendallVariant, PartialCorResult,
+};
 pub use distributional::{dagostino_k_squared, shapiro_wilk, DAgostinoResult, ShapiroWilkResult};
 pub use error::{Result, StatError};
 pub use forecast::{
@@ -31,4 +38,11 @@ pub use parametric::{
 pub use resampling::{
     permutation_t_test, CircularBlockBootstrap, PermutationEngine, PermutationResult,
     StationaryBootstrap,
+};
+
+pub use categorical::{
+    binom_test, chisq_goodness_of_fit, chisq_test, cohen_kappa, contingency_coef, cramers_v,
+    fisher_exact, g_test, mcnemar_exact, mcnemar_test, phi_coefficient, prop_test_one,
+    prop_test_two, AssociationResult, BinomTestResult, ChiSquareResult, FisherResult, KappaResult,
+    McNemarkExactResult, McNemarkResult, PropTestResult,
 };

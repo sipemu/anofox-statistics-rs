@@ -1547,5 +1547,293 @@ save_ref("permutation_t.csv", list(
   var_y = var_y
 ))
 
+# ============================================
+# PHASE 13: Correlation Tests
+# ============================================
+
+cat("\n=== Phase 13: Correlation Tests ===\n")
+
+set.seed(42)
+
+# Generate correlated data for testing
+n_cor <- 50
+cor_x <- rnorm(n_cor, mean = 10, sd = 2)
+cor_y <- 0.7 * cor_x + rnorm(n_cor, mean = 0, sd = 2)  # Positive correlation ~0.7
+
+save_vector("cor_x.csv", cor_x)
+save_vector("cor_y.csv", cor_y)
+
+# Pearson correlation
+pearson_result <- cor.test(cor_x, cor_y, method = "pearson")
+pearson_ci95 <- cor.test(cor_x, cor_y, method = "pearson", conf.level = 0.95)
+pearson_ci90 <- cor.test(cor_x, cor_y, method = "pearson", conf.level = 0.90)
+pearson_ci99 <- cor.test(cor_x, cor_y, method = "pearson", conf.level = 0.99)
+
+save_ref("pearson.csv", list(
+  estimate = pearson_result$estimate,
+  statistic = pearson_result$statistic,
+  df = pearson_result$parameter,
+  p_value = pearson_result$p.value,
+  conf_low_95 = pearson_ci95$conf.int[1],
+  conf_high_95 = pearson_ci95$conf.int[2],
+  conf_low_90 = pearson_ci90$conf.int[1],
+  conf_high_90 = pearson_ci90$conf.int[2],
+  conf_low_99 = pearson_ci99$conf.int[1],
+  conf_high_99 = pearson_ci99$conf.int[2]
+))
+
+# Spearman correlation
+spearman_result <- cor.test(cor_x, cor_y, method = "spearman")
+
+save_ref("spearman.csv", list(
+  estimate = spearman_result$estimate,
+  statistic = spearman_result$statistic,
+  p_value = spearman_result$p.value
+))
+
+# Kendall correlation
+kendall_result <- cor.test(cor_x, cor_y, method = "kendall")
+
+save_ref("kendall.csv", list(
+  estimate = kendall_result$estimate,
+  statistic = kendall_result$statistic,
+  p_value = kendall_result$p.value
+))
+
+# Perfect positive correlation
+cor_perfect_x <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+cor_perfect_y <- c(2, 4, 6, 8, 10, 12, 14, 16, 18, 20)
+
+save_vector("cor_perfect_x.csv", cor_perfect_x)
+save_vector("cor_perfect_y.csv", cor_perfect_y)
+
+pearson_perfect <- cor.test(cor_perfect_x, cor_perfect_y, method = "pearson")
+spearman_perfect <- cor.test(cor_perfect_x, cor_perfect_y, method = "spearman")
+kendall_perfect <- cor.test(cor_perfect_x, cor_perfect_y, method = "kendall")
+
+save_ref("correlation_perfect.csv", list(
+  pearson_r = pearson_perfect$estimate,
+  spearman_rho = spearman_perfect$estimate,
+  kendall_tau = kendall_perfect$estimate
+))
+
+# Negative correlation
+cor_neg_x <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+cor_neg_y <- c(20, 18, 16, 14, 12, 10, 8, 6, 4, 2)
+
+save_vector("cor_neg_x.csv", cor_neg_x)
+save_vector("cor_neg_y.csv", cor_neg_y)
+
+pearson_neg <- cor.test(cor_neg_x, cor_neg_y, method = "pearson")
+spearman_neg <- cor.test(cor_neg_x, cor_neg_y, method = "spearman")
+kendall_neg <- cor.test(cor_neg_x, cor_neg_y, method = "kendall")
+
+save_ref("correlation_negative.csv", list(
+  pearson_r = pearson_neg$estimate,
+  pearson_t = pearson_neg$statistic,
+  pearson_p = pearson_neg$p.value,
+  spearman_rho = spearman_neg$estimate,
+  spearman_p = spearman_neg$p.value,
+  kendall_tau = kendall_neg$estimate,
+  kendall_p = kendall_neg$p.value
+))
+
+# Data with ties (for Spearman and Kendall)
+cor_ties_x <- c(1, 2, 2, 3, 4, 4, 4, 5, 6, 7)
+cor_ties_y <- c(1, 1, 3, 3, 5, 5, 6, 7, 8, 8)
+
+save_vector("cor_ties_x.csv", cor_ties_x)
+save_vector("cor_ties_y.csv", cor_ties_y)
+
+spearman_ties <- cor.test(cor_ties_x, cor_ties_y, method = "spearman")
+kendall_ties <- cor.test(cor_ties_x, cor_ties_y, method = "kendall")
+
+save_ref("correlation_ties.csv", list(
+  spearman_rho = spearman_ties$estimate,
+  spearman_stat = spearman_ties$statistic,
+  spearman_p = spearman_ties$p.value,
+  kendall_tau = kendall_ties$estimate,
+  kendall_stat = kendall_ties$statistic,
+  kendall_p = kendall_ties$p.value
+))
+
+# Zero/weak correlation
+set.seed(123)
+cor_zero_x <- rnorm(30)
+cor_zero_y <- rnorm(30)
+
+save_vector("cor_zero_x.csv", cor_zero_x)
+save_vector("cor_zero_y.csv", cor_zero_y)
+
+pearson_zero <- cor.test(cor_zero_x, cor_zero_y, method = "pearson")
+spearman_zero <- cor.test(cor_zero_x, cor_zero_y, method = "spearman")
+kendall_zero <- cor.test(cor_zero_x, cor_zero_y, method = "kendall")
+
+save_ref("correlation_zero.csv", list(
+  pearson_r = pearson_zero$estimate,
+  pearson_t = pearson_zero$statistic,
+  pearson_df = pearson_zero$parameter,
+  pearson_p = pearson_zero$p.value,
+  spearman_rho = spearman_zero$estimate,
+  spearman_p = spearman_zero$p.value,
+  kendall_tau = kendall_zero$estimate,
+  kendall_p = kendall_zero$p.value
+))
+
+# ============================================
+# PHASE 14: Categorical Tests
+# ============================================
+
+cat("\n=== Phase 14: Categorical Tests ===\n")
+
+# Chi-square test of independence (2x2)
+chisq_2x2 <- matrix(c(10, 20, 30, 40), nrow = 2, byrow = TRUE)
+
+chisq_result <- chisq.test(chisq_2x2, correct = FALSE)
+chisq_yates <- chisq.test(chisq_2x2, correct = TRUE)
+
+save_ref("chisq_2x2.csv", list(
+  statistic = chisq_result$statistic,
+  df = chisq_result$parameter,
+  p_value = chisq_result$p.value,
+  statistic_yates = chisq_yates$statistic,
+  p_value_yates = chisq_yates$p.value
+))
+
+# Chi-square test of independence (3x3)
+chisq_3x3 <- matrix(c(10, 20, 30, 15, 25, 35, 20, 30, 40), nrow = 3, byrow = TRUE)
+
+chisq_3x3_result <- chisq.test(chisq_3x3, correct = FALSE)
+
+save_ref("chisq_3x3.csv", list(
+  statistic = chisq_3x3_result$statistic,
+  df = chisq_3x3_result$parameter,
+  p_value = chisq_3x3_result$p.value
+))
+
+# Chi-square goodness of fit (uniform)
+observed_gof <- c(20, 25, 22, 18, 15)
+gof_result <- chisq.test(observed_gof)
+
+save_ref("chisq_gof_uniform.csv", list(
+  statistic = gof_result$statistic,
+  df = gof_result$parameter,
+  p_value = gof_result$p.value
+))
+
+# Chi-square goodness of fit (custom proportions)
+observed_custom <- c(50, 30, 20)
+expected_props <- c(0.5, 0.3, 0.2)
+gof_custom <- chisq.test(observed_custom, p = expected_props)
+
+save_ref("chisq_gof_custom.csv", list(
+  statistic = gof_custom$statistic,
+  df = gof_custom$parameter,
+  p_value = gof_custom$p.value
+))
+
+# Fisher's exact test (2x2)
+fisher_2x2 <- matrix(c(3, 1, 1, 3), nrow = 2, byrow = TRUE)
+
+fisher_result <- fisher.test(fisher_2x2)
+
+save_ref("fisher_2x2.csv", list(
+  p_value = fisher_result$p.value,
+  odds_ratio = fisher_result$estimate,
+  conf_low = fisher_result$conf.int[1],
+  conf_high = fisher_result$conf.int[2]
+))
+
+# Fisher's exact test (extreme case)
+fisher_extreme <- matrix(c(5, 0, 0, 5), nrow = 2, byrow = TRUE)
+fisher_extreme_result <- fisher.test(fisher_extreme)
+
+save_ref("fisher_extreme.csv", list(
+  p_value = fisher_extreme_result$p.value,
+  odds_ratio = fisher_extreme_result$estimate
+))
+
+# Cramér's V (requires DescTools)
+if (requireNamespace("DescTools", quietly = TRUE)) {
+  library(DescTools)
+
+  cramers_v_2x2 <- CramerV(chisq_2x2)
+  cramers_v_3x3 <- CramerV(chisq_3x3)
+
+  save_ref("cramers_v.csv", list(
+    v_2x2 = cramers_v_2x2,
+    v_3x3 = cramers_v_3x3
+  ))
+} else {
+  cat("DescTools not installed, skipping Cramér's V\n")
+  # Manual computation for 2x2
+  chisq_stat <- chisq.test(chisq_2x2, correct = FALSE)$statistic
+  n <- sum(chisq_2x2)
+  k <- min(nrow(chisq_2x2) - 1, ncol(chisq_2x2) - 1)
+  cramers_v_2x2 <- sqrt(chisq_stat / (n * k))
+
+  chisq_stat_3x3 <- chisq.test(chisq_3x3, correct = FALSE)$statistic
+  n_3x3 <- sum(chisq_3x3)
+  k_3x3 <- min(nrow(chisq_3x3) - 1, ncol(chisq_3x3) - 1)
+  cramers_v_3x3 <- sqrt(chisq_stat_3x3 / (n_3x3 * k_3x3))
+
+  save_ref("cramers_v.csv", list(
+    v_2x2 = cramers_v_2x2,
+    v_3x3 = cramers_v_3x3
+  ))
+}
+
+# Phi coefficient (for 2x2)
+# phi = (ad - bc) / sqrt((a+b)(c+d)(a+c)(b+d))
+a <- chisq_2x2[1,1]; b <- chisq_2x2[1,2]
+c <- chisq_2x2[2,1]; d <- chisq_2x2[2,2]
+phi <- (a*d - b*c) / sqrt((a+b)*(c+d)*(a+c)*(b+d))
+
+save_ref("phi_coefficient.csv", list(
+  phi = phi
+))
+
+# Cohen's kappa (requires psych or irr)
+if (requireNamespace("psych", quietly = TRUE)) {
+  library(psych)
+
+  # Kappa for 3x3 agreement matrix
+  kappa_table <- matrix(c(20, 5, 0, 10, 30, 5, 0, 5, 25), nrow = 3, byrow = TRUE)
+
+  kappa_result <- cohen.kappa(kappa_table)
+
+  save_ref("cohen_kappa.csv", list(
+    kappa_unweighted = kappa_result$kappa,
+    kappa_weighted = kappa_result$weighted.kappa
+  ))
+} else {
+  cat("psych not installed, computing kappa manually\n")
+  # Manual kappa computation
+  kappa_table <- matrix(c(20, 5, 0, 10, 30, 5, 0, 5, 25), nrow = 3, byrow = TRUE)
+  n_kappa <- sum(kappa_table)
+
+  po <- sum(diag(kappa_table)) / n_kappa
+  row_totals <- rowSums(kappa_table)
+  col_totals <- colSums(kappa_table)
+  pe <- sum(row_totals * col_totals) / (n_kappa^2)
+
+  kappa_manual <- (po - pe) / (1 - pe)
+
+  save_ref("cohen_kappa.csv", list(
+    kappa_unweighted = kappa_manual,
+    kappa_weighted = NA  # Skip weighted if no package
+  ))
+}
+
+# Contingency coefficient
+# C = sqrt(chi^2 / (chi^2 + n))
+chisq_for_c <- chisq.test(chisq_2x2, correct = FALSE)$statistic
+n_for_c <- sum(chisq_2x2)
+cont_coef <- sqrt(chisq_for_c / (chisq_for_c + n_for_c))
+
+save_ref("contingency_coef.csv", list(
+  c_2x2 = cont_coef
+))
+
 cat("\n=== Reference generation complete ===\n")
 cat("Run 'cargo test' to verify Rust implementation against these references.\n")
