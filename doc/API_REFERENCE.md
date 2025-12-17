@@ -10,6 +10,9 @@ For runnable code examples demonstrating each test category, see the [examples/]
   - [t_test](#t_test)
   - [yuen_test](#yuen_test)
   - [brown_forsythe](#brown_forsythe)
+  - [one_way_anova](#one_way_anova)
+  - [two_way_anova](#two_way_anova)
+  - [repeated_measures_anova](#repeated_measures_anova)
 - [Nonparametric Tests](#nonparametric-tests)
   - [rank](#rank)
   - [mann_whitney_u](#mann_whitney_u)
@@ -46,6 +49,7 @@ For runnable code examples demonstrating each test category, see the [examples/]
 - [Enums](#enums)
   - [Alternative](#alternative)
   - [TTestKind](#ttestkind)
+  - [AnovaKind](#anovakind)
   - [LossFunction](#lossfunction)
   - [VarEstimator](#varestimator)
   - [MCSStatistic](#mcsstatistic)
@@ -173,6 +177,168 @@ pub fn brown_forsythe(groups: &[&[f64]]) -> Result<LeveneResult>
 **R equivalent:** `leveneTest(center=median)` (car)
 
 **Reference:** Brown, M. B., & Forsythe, A. B. (1974). "Robust Tests for the Equality of Variances." *Journal of the American Statistical Association*, 69(346), 364–367. [DOI: 10.2307/2285659](https://doi.org/10.2307/2285659)
+
+[Back to top](#table-of-contents)
+
+---
+
+### one_way_anova
+
+Performs one-way ANOVA for comparing means across multiple groups. Supports both Fisher's (equal variance) and Welch's (unequal variance) variants.
+
+```rust
+pub fn one_way_anova(groups: &[&[f64]], kind: AnovaKind) -> Result<OneWayAnovaResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `groups` | `&[&[f64]]` | Slice of slices, each containing one group's data (minimum 2 groups) |
+| `kind` | `AnovaKind` | Type of ANOVA: `Fisher` (equal variances) or `Welch` (unequal variances) |
+
+**Returns:** `OneWayAnovaResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | The F-statistic |
+| `df_between` | `f64` | Degrees of freedom between groups (k-1) |
+| `df_within` | `f64` | Degrees of freedom within groups (N-k or Welch-adjusted) |
+| `p_value` | `f64` | The p-value |
+| `ss_between` | `Option<f64>` | Sum of squares between groups (`None` for Welch) |
+| `ss_within` | `Option<f64>` | Sum of squares within groups (`None` for Welch) |
+| `ss_total` | `Option<f64>` | Total sum of squares (`None` for Welch) |
+| `ms_between` | `Option<f64>` | Mean square between groups (`None` for Welch) |
+| `ms_within` | `Option<f64>` | Mean square within groups (`None` for Welch) |
+| `n_groups` | `usize` | Number of groups |
+| `group_sizes` | `Vec<usize>` | Sample size of each group |
+| `group_means` | `Vec<f64>` | Mean of each group |
+| `grand_mean` | `Option<f64>` | Grand mean (`None` for Welch) |
+
+**R equivalent:** `oneway.test()` (stats), `aov()` (stats)
+
+**References:**
+- Fisher, R. A. (1925). *Statistical Methods for Research Workers.* Oliver and Boyd.
+- Welch, B. L. (1951). "On the Comparison of Several Mean Values: An Alternative Approach." *Biometrika*, 38(3–4), 330–336. [DOI: 10.2307/2332579](https://doi.org/10.2307/2332579)
+
+[Back to top](#table-of-contents)
+
+---
+
+### two_way_anova
+
+Performs two-way factorial ANOVA with interaction effects. Uses Type III sum of squares (marginal), supporting both balanced and unbalanced designs.
+
+```rust
+pub fn two_way_anova(
+    values: &[f64],
+    factor_a: &[usize],
+    factor_b: &[usize],
+) -> Result<TwoWayAnovaResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `values` | `&[f64]` | Response values |
+| `factor_a` | `&[usize]` | Factor A levels (0-indexed) for each observation |
+| `factor_b` | `&[usize]` | Factor B levels (0-indexed) for each observation |
+
+**Returns:** `TwoWayAnovaResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `factor_a` | `AnovaTableRow` | ANOVA results for Factor A |
+| `factor_b` | `AnovaTableRow` | ANOVA results for Factor B |
+| `interaction` | `AnovaTableRow` | ANOVA results for A×B interaction |
+| `residual` | `AnovaTableRow` | Residual (error) row |
+| `total` | `AnovaTableRow` | Total row |
+| `levels_a` | `usize` | Number of levels in Factor A |
+| `levels_b` | `usize` | Number of levels in Factor B |
+| `n` | `usize` | Total number of observations |
+| `grand_mean` | `f64` | Grand mean of all observations |
+| `cell_means` | `Vec<Vec<f64>>` | Cell means where `cell_means[a][b]` is the mean for level a of A and level b of B |
+| `marginal_means_a` | `Vec<f64>` | Marginal means for each level of Factor A |
+| `marginal_means_b` | `Vec<f64>` | Marginal means for each level of Factor B |
+
+**`AnovaTableRow` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source` | `String` | Source of variation label |
+| `ss` | `f64` | Sum of squares |
+| `df` | `f64` | Degrees of freedom |
+| `ms` | `f64` | Mean square (SS/df) |
+| `f_statistic` | `Option<f64>` | F-statistic (`None` for residual/total) |
+| `p_value` | `Option<f64>` | p-value (`None` for residual/total) |
+
+**R equivalent:** `Anova(type="III")` (car)
+
+**Reference:** Maxwell, S. E., & Delaney, H. D. (2004). *Designing Experiments and Analyzing Data: A Model Comparison Perspective.* (2nd ed.). Lawrence Erlbaum Associates.
+
+[Back to top](#table-of-contents)
+
+---
+
+### repeated_measures_anova
+
+Performs one-way repeated measures ANOVA for within-subjects designs. Includes Mauchly's sphericity test and Greenhouse-Geisser/Huynh-Feldt corrections.
+
+```rust
+pub fn repeated_measures_anova(
+    data: &[&[f64]],
+    compute_sphericity: bool,
+) -> Result<RmAnovaResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `data` | `&[&[f64]]` | Matrix where rows are subjects and columns are conditions |
+| `compute_sphericity` | `bool` | Whether to compute sphericity test and corrections (requires k ≥ 3) |
+
+**Returns:** `RmAnovaResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `within_subjects` | `AnovaTableRow` | Within-subjects (treatment) effect |
+| `subjects` | `AnovaTableRow` | Between-subjects (individual differences) |
+| `error` | `AnovaTableRow` | Error (subjects × conditions interaction) |
+| `total` | `AnovaTableRow` | Total |
+| `sphericity` | `Option<SphericityResult>` | Mauchly's sphericity test results |
+| `greenhouse_geisser` | `Option<CorrectedResult>` | Greenhouse-Geisser corrected results |
+| `huynh_feldt` | `Option<CorrectedResult>` | Huynh-Feldt corrected results |
+| `grand_mean` | `f64` | Grand mean of all observations |
+| `condition_means` | `Vec<f64>` | Mean of each condition |
+| `subject_means` | `Vec<f64>` | Mean of each subject |
+
+**`SphericityResult` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `w` | `f64` | Mauchly's W statistic |
+| `chi_square` | `f64` | Chi-square approximation |
+| `df` | `f64` | Degrees of freedom |
+| `p_value` | `f64` | p-value for sphericity test |
+
+**`CorrectedResult` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `epsilon` | `f64` | Epsilon correction factor (GG or HF) |
+| `df_num_corrected` | `f64` | Corrected numerator degrees of freedom |
+| `df_den_corrected` | `f64` | Corrected denominator degrees of freedom |
+| `f_statistic` | `f64` | F-statistic (same as uncorrected) |
+| `p_value` | `f64` | Corrected p-value |
+
+**R equivalent:** `ezANOVA()` (ez)
+
+**References:**
+- Mauchly, J. W. (1940). "Significance Test for Sphericity of a Normal n-Variate Distribution." *Annals of Mathematical Statistics*, 11(2), 204–209. [DOI: 10.1214/aoms/1177731915](https://doi.org/10.1214/aoms/1177731915)
+- Greenhouse, S. W., & Geisser, S. (1959). "On Methods in the Analysis of Profile Data." *Psychometrika*, 24(2), 95–112. [DOI: 10.1007/BF02289823](https://doi.org/10.1007/BF02289823)
+- Huynh, H., & Feldt, L. S. (1976). "Estimation of the Box Correction for Degrees of Freedom from Sample Data in Randomized Block and Split-Plot Designs." *Journal of Educational Statistics*, 1(1), 69–82. [DOI: 10.2307/1164736](https://doi.org/10.2307/1164736)
 
 [Back to top](#table-of-contents)
 
@@ -983,6 +1149,21 @@ pub enum TTestKind {
     Welch,    // Independent samples, unequal variances
     Student,  // Independent samples, equal variances assumed
     Paired,   // Paired samples
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### AnovaKind
+
+Type of one-way ANOVA to perform.
+
+```rust
+pub enum AnovaKind {
+    Fisher,  // Classic ANOVA (assumes equal variances)
+    Welch,   // Welch's ANOVA (robust to unequal variances)
 }
 ```
 

@@ -23,6 +23,9 @@ This library provides a wide range of statistical tests commonly used in data an
   - T-tests (Welch, Student, Paired) with all alternatives
   - Yuen's test (robust t-test using trimmed means)
   - Brown-Forsythe test (homogeneity of variances)
+  - One-way ANOVA (Fisher's and Welch's)
+  - Two-way ANOVA (factorial design with Type III SS)
+  - Repeated measures ANOVA (with Mauchly's sphericity test and GG/HF corrections)
 
 - **Nonparametric Tests**
   - Ranking with average tie handling
@@ -136,6 +139,71 @@ let result = brown_forsythe(&groups)?;
 
 println!("F-statistic: {:.4}", result.statistic);
 println!("p-value: {:.4}", result.p_value);
+```
+
+### One-Way ANOVA
+
+```rust
+use anofox_statistics::{one_way_anova, AnovaKind};
+
+let group1 = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+let group2 = vec![2.0, 3.0, 4.0, 5.0, 6.0];
+let group3 = vec![3.0, 4.0, 5.0, 6.0, 7.0];
+let groups: Vec<&[f64]> = vec![&group1, &group2, &group3];
+
+// Fisher's ANOVA (assumes equal variances)
+let result = one_way_anova(&groups, AnovaKind::Fisher)?;
+println!("F-statistic: {:.4}", result.statistic);
+println!("p-value: {:.4}", result.p_value);
+println!("Group means: {:?}", result.group_means);
+
+// Welch's ANOVA (robust to unequal variances)
+let result = one_way_anova(&groups, AnovaKind::Welch)?;
+```
+
+### Two-Way ANOVA
+
+```rust
+use anofox_statistics::two_way_anova;
+
+// Values with factor level arrays (long format)
+let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+let factor_a = vec![0, 0, 0, 0, 1, 1, 1, 1];  // 2 levels
+let factor_b = vec![0, 0, 1, 1, 0, 0, 1, 1];  // 2 levels
+
+let result = two_way_anova(&values, &factor_a, &factor_b)?;
+
+println!("Factor A: F={:.4}, p={:.4}", result.factor_a.f_statistic.unwrap(), result.factor_a.p_value.unwrap());
+println!("Factor B: F={:.4}, p={:.4}", result.factor_b.f_statistic.unwrap(), result.factor_b.p_value.unwrap());
+println!("Interaction: F={:.4}, p={:.4}", result.interaction.f_statistic.unwrap(), result.interaction.p_value.unwrap());
+```
+
+### Repeated Measures ANOVA
+
+```rust
+use anofox_statistics::repeated_measures_anova;
+
+// Matrix format: rows = subjects, columns = conditions
+let subject1 = vec![1.0, 2.0, 3.0];
+let subject2 = vec![2.0, 3.0, 4.0];
+let subject3 = vec![1.5, 2.5, 3.5];
+let data: Vec<&[f64]> = vec![&subject1, &subject2, &subject3];
+
+let result = repeated_measures_anova(&data, true)?;  // compute sphericity
+
+println!("F-statistic: {:.4}", result.within_subjects.f_statistic.unwrap());
+println!("p-value: {:.4}", result.within_subjects.p_value.unwrap());
+println!("Condition means: {:?}", result.condition_means);
+
+// Sphericity test (Mauchly's W) - only for k >= 3 conditions
+if let Some(sphericity) = &result.sphericity {
+    println!("Mauchly's W: {:.4}, p={:.4}", sphericity.w, sphericity.p_value);
+}
+
+// Greenhouse-Geisser corrected p-value
+if let Some(gg) = &result.greenhouse_geisser {
+    println!("GG epsilon: {:.4}, corrected p={:.4}", gg.epsilon, gg.p_value);
+}
 ```
 
 ### Nonparametric Tests
@@ -299,6 +367,9 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `t_test()` | `t.test()` | stats |
 | `yuen_test()` | `yuen()` | WRS2 |
 | `brown_forsythe()` | `leveneTest(center=median)` | car |
+| `one_way_anova()` | `oneway.test()`, `aov()` | stats |
+| `two_way_anova()` | `Anova(type="III")` | car |
+| `repeated_measures_anova()` | `ezANOVA()` | ez |
 | `mann_whitney_u()`, `wilcoxon_signed_rank()` | `wilcox.test()` | stats |
 | `kruskal_wallis()` | `kruskal.test()` | stats |
 | `brunner_munzel()` | `brunner.munzel.test()` | lawstat |
@@ -307,7 +378,7 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `skewness()`, `kurtosis()` | `skewness()`, `kurtosis()` | e1071 |
 | `diebold_mariano()` | `dm.test()` | forecast |
 
-All 245 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
+All 303 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
 
 **For complete transparency on the validation process, see [`R/VALIDATION.md`](R/VALIDATION.md)**, which documents:
 - All 76 reference data files and their R generation code

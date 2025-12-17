@@ -834,10 +834,8 @@ fn test_two_way_anova_balanced_2x3_structure() {
     assert_eq!(result.marginal_means_b.len(), 3);
 
     // Total SS should equal sum of all component SS
-    let ss_total = result.factor_a.ss
-        + result.factor_b.ss
-        + result.interaction.ss
-        + result.residual.ss;
+    let ss_total =
+        result.factor_a.ss + result.factor_b.ss + result.interaction.ss + result.residual.ss;
     assert_relative_eq!(result.total.ss, ss_total, epsilon = EPSILON);
 }
 
@@ -1080,7 +1078,10 @@ fn test_rm_anova_3_conditions_sphericity() {
 
     let sph = result.sphericity.unwrap();
     // Mauchly's W should be in (0, 1]
-    assert!(sph.w > 0.0 && sph.w <= 1.0, "Mauchly's W should be in (0, 1]");
+    assert!(
+        sph.w > 0.0 && sph.w <= 1.0,
+        "Mauchly's W should be in (0, 1]"
+    );
     // Chi-square should be non-negative
     assert!(sph.chi_square >= 0.0, "Chi-square should be non-negative");
     // p-value should be valid

@@ -3,9 +3,15 @@
 //! This module provides one-way, two-way, and repeated measures ANOVA tests
 //! with full R output parity.
 
+// Allow index-based loops for matrix operations where they are clearer than iterators
+#![allow(clippy::needless_range_loop)]
+
 use crate::error::{Result, StatError};
 use crate::utils::math::{mean, variance};
 use statrs::distribution::{ChiSquared, ContinuousCDF, FisherSnedecor};
+
+/// Type alias for validated ANOVA group statistics: (sizes, means, variances, total_n).
+type GroupStats = (Vec<usize>, Vec<f64>, Vec<f64>, usize);
 
 // =============================================================================
 // One-Way ANOVA
@@ -54,9 +60,7 @@ pub struct OneWayAnovaResult {
 }
 
 /// Validate groups and return their sizes, means, variances, and total count.
-fn validate_anova_groups(
-    groups: &[&[f64]],
-) -> Result<(Vec<usize>, Vec<f64>, Vec<f64>, usize)> {
+fn validate_anova_groups(groups: &[&[f64]]) -> Result<GroupStats> {
     if groups.len() < 2 {
         return Err(StatError::InvalidParameter(
             "ANOVA requires at least 2 groups".to_string(),
@@ -118,12 +122,7 @@ fn fisher_anova(
     let ss_within: f64 = groups
         .iter()
         .zip(group_means.iter())
-        .map(|(group, &group_mean)| {
-            group
-                .iter()
-                .map(|&x| (x - group_mean).powi(2))
-                .sum::<f64>()
-        })
+        .map(|(group, &group_mean)| group.iter().map(|&x| (x - group_mean).powi(2)).sum::<f64>())
         .sum();
 
     // SS_total = SS_between + SS_within
@@ -344,7 +343,7 @@ pub struct TwoWayAnovaResult {
     pub n: usize,
     /// Grand mean of all observations.
     pub grand_mean: f64,
-    /// Cell means: cell_means[a][b].
+    /// Cell means indexed by `cell_means[a][b]`.
     pub cell_means: Vec<Vec<f64>>,
     /// Marginal means for Factor A.
     pub marginal_means_a: Vec<f64>,
@@ -798,7 +797,7 @@ fn solve_linear_system(a: &[Vec<f64>], b: &[f64]) -> Vec<f64> {
     let n = b.len();
 
     // Create augmented matrix
-    let mut aug: Vec<Vec<f64>> = a.iter().map(|row| row.clone()).collect();
+    let mut aug: Vec<Vec<f64>> = a.to_vec();
     for i in 0..n {
         aug[i].push(b[i]);
     }
@@ -950,8 +949,7 @@ pub fn two_way_anova(
     }
 
     // Compute Type III Sum of Squares
-    let (ss_a, ss_b, ss_ab, ss_error) =
-        compute_two_way_type3_ss(&data, values, factor_a, factor_b);
+    let (ss_a, ss_b, ss_ab, ss_error) = compute_two_way_type3_ss(&data, values, factor_a, factor_b);
 
     // Compute total SS
     let ss_total: f64 = values.iter().map(|y| (y - grand_mean).powi(2)).sum();
@@ -1218,15 +1216,16 @@ pub fn repeated_measures_anova(data: &[&[f64]], compute_sphericity: bool) -> Res
         .sum();
 
     // SS_subjects = k * Σ_i (subject_mean_i - grand_mean)^2
-    let ss_subjects: f64 =
-        k * subject_means.iter().map(|m| (m - grand_mean).powi(2)).sum::<f64>();
+    let ss_subjects: f64 = k * subject_means
+        .iter()
+        .map(|m| (m - grand_mean).powi(2))
+        .sum::<f64>();
 
     // SS_conditions (within-subjects effect) = n * Σ_j (condition_mean_j - grand_mean)^2
-    let ss_conditions: f64 = n
-        * condition_means
-            .iter()
-            .map(|m| (m - grand_mean).powi(2))
-            .sum::<f64>();
+    let ss_conditions: f64 = n * condition_means
+        .iter()
+        .map(|m| (m - grand_mean).powi(2))
+        .sum::<f64>();
 
     // SS_error = SS_total - SS_subjects - SS_conditions
     let ss_error = ss_total - ss_subjects - ss_conditions;
@@ -1252,12 +1251,11 @@ pub fn repeated_measures_anova(data: &[&[f64]], compute_sphericity: bool) -> Res
     let p_value = 1.0 - f_dist.cdf(f_stat);
 
     // Sphericity test and corrections (only for k >= 3)
-    let (sphericity, greenhouse_geisser, huynh_feldt) =
-        if compute_sphericity && n_conditions >= 3 {
-            compute_sphericity_corrections(data, f_stat, df_conditions, df_error)?
-        } else {
-            (None, None, None)
-        };
+    let (sphericity, greenhouse_geisser, huynh_feldt) = if compute_sphericity && n_conditions >= 3 {
+        compute_sphericity_corrections(data, f_stat, df_conditions, df_error)?
+    } else {
+        (None, None, None)
+    };
 
     Ok(RmAnovaResult {
         within_subjects: AnovaTableRow {
@@ -1370,7 +1368,8 @@ fn compute_sphericity_corrections(
     let n_f = n as f64;
     let k_f = k as f64;
     let epsilon_hf = if (n_f - 1.0) * (k_f - 1.0) * epsilon_gg - 2.0 > 1e-15 {
-        ((n_f - 1.0) * (k_f - 1.0) * epsilon_gg - 2.0) / ((k_f - 1.0) * (n_f - 1.0 - (k_f - 1.0) * epsilon_gg))
+        ((n_f - 1.0) * (k_f - 1.0) * epsilon_gg - 2.0)
+            / ((k_f - 1.0) * (n_f - 1.0 - (k_f - 1.0) * epsilon_gg))
     } else {
         1.0
     };
@@ -1385,7 +1384,7 @@ fn compute_sphericity_corrections(
     } else {
         1.0
     };
-    let mauchly_w = mauchly_w.max(0.0).min(1.0);
+    let mauchly_w = mauchly_w.clamp(0.0, 1.0);
 
     // Chi-square statistic for Mauchly's test
     // chi^2 = -[n - 1 - (2k^2 - 3k + 3)/(6(k-1))] * ln(W)
