@@ -38,6 +38,24 @@ This library provides a wide range of statistical tests commonly used in data an
   - Shapiro-Wilk normality test (Royston AS R94)
   - D'Agostino's K-squared test (omnibus normality test using skewness and kurtosis)
 
+- **Correlation Analysis**
+  - Pearson's product-moment correlation with CI
+  - Spearman's rank correlation
+  - Kendall's tau (tau-a, tau-b, tau-c variants)
+  - Partial and semi-partial correlation
+  - Distance correlation (detects non-linear dependence)
+  - Intraclass correlation coefficient (ICC, 6 variants)
+
+- **Categorical Data Analysis**
+  - Chi-square test (independence and goodness-of-fit)
+  - Fisher's exact test for 2x2 tables
+  - G-test (log-likelihood ratio)
+  - McNemar's test (standard and exact)
+  - Effect sizes: Cramér's V, phi coefficient, contingency coefficient
+  - Cohen's kappa (unweighted and weighted)
+  - Proportion tests (one-sample and two-sample)
+  - Exact binomial test
+
 - **Resampling Methods**
   - Permutation engine with custom statistics
   - Permutation t-test
@@ -76,6 +94,8 @@ cargo run --example normality       # Shapiro-Wilk, D'Agostino's K-squared
 cargo run --example resampling      # Permutation tests, bootstrap methods
 cargo run --example modern          # Energy distance, MMD with different kernels
 cargo run --example forecast        # Diebold-Mariano, Clark-West, SPA, MCS
+cargo run --example correlation     # Pearson, Spearman, Kendall, partial, distance, ICC
+cargo run --example categorical     # Chi-square, Fisher, McNemar, Cramér's V, kappa
 ```
 
 ## Quick Start
@@ -304,6 +324,96 @@ println!("p-value: {:.4}", result.p_value);
 let result = mmd_test(&sample1, &sample2, Kernel::GaussianMedian, 1000, Some(42))?;
 ```
 
+### Correlation Analysis
+
+```rust
+use anofox_statistics::{pearson, spearman, kendall, partial_cor, distance_cor, icc,
+                        KendallVariant, ICCType};
+
+let x = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+let y = vec![2.1, 3.9, 6.1, 7.9, 10.1, 11.9, 14.1, 15.9, 18.1, 19.9];
+
+// Pearson correlation with 95% CI
+let result = pearson(&x, &y, Some(0.95))?;
+println!("Pearson r = {:.4}, p = {:.4}", result.estimate, result.p_value);
+
+// Spearman rank correlation
+let result = spearman(&x, &y, None)?;
+println!("Spearman rho = {:.4}", result.estimate);
+
+// Kendall's tau-b (default, matches R)
+let result = kendall(&x, &y, KendallVariant::TauB)?;
+println!("Kendall tau = {:.4}", result.estimate);
+
+// Partial correlation (controlling for z)
+let z = vec![1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5];
+let result = partial_cor(&x, &y, &[&z])?;
+println!("Partial r = {:.4}", result.estimate);
+
+// Distance correlation (detects non-linear dependence)
+let result = distance_cor(&x, &y)?;
+println!("Distance correlation = {:.4}", result.dcor);
+
+// ICC for inter-rater reliability
+let ratings = vec![
+    vec![9.0, 2.0, 5.0, 8.0],
+    vec![6.0, 1.0, 3.0, 2.0],
+    vec![8.0, 4.0, 6.0, 8.0],
+];
+let result = icc(&ratings, ICCType::ICC2)?;
+println!("ICC(2,1) = {:.4}", result.icc);
+```
+
+### Categorical Data Analysis
+
+```rust
+use anofox_statistics::{chisq_test, chisq_goodness_of_fit, fisher_exact, mcnemar_test,
+                        cramers_v, phi_coefficient, cohen_kappa, binom_test, Alternative};
+
+// Chi-square test of independence
+let observed = vec![
+    vec![10, 20, 30],
+    vec![15, 25, 35],
+];
+let result = chisq_test(&observed, false)?;
+println!("Chi-square = {:.4}, p = {:.4}", result.statistic, result.p_value);
+
+// Chi-square goodness-of-fit (test if die is fair)
+let rolls = vec![16, 18, 14, 17, 15, 20];
+let result = chisq_goodness_of_fit(&rolls, None)?;
+println!("Chi-square = {:.4}, p = {:.4}", result.statistic, result.p_value);
+
+// Fisher's exact test for 2x2 tables
+let table = [[3, 1], [1, 3]];
+let result = fisher_exact(&table, Alternative::TwoSided)?;
+println!("p-value = {:.4}, odds ratio = {:.4}", result.p_value, result.odds_ratio);
+
+// McNemar's test for paired data
+let before_after = [[10, 20], [5, 65]];
+let result = mcnemar_test(&before_after, false)?;
+println!("Chi-square = {:.4}, p = {:.4}", result.statistic, result.p_value);
+
+// Effect sizes
+let result = cramers_v(&observed)?;
+println!("Cramér's V = {:.4}", result.estimate);
+
+let result = phi_coefficient(&table)?;
+println!("Phi = {:.4}", result.estimate);
+
+// Cohen's kappa for inter-rater agreement
+let confusion = vec![
+    vec![20, 5, 0],
+    vec![10, 30, 5],
+    vec![0, 5, 25],
+];
+let result = cohen_kappa(&confusion, false)?;
+println!("Kappa = {:.4}, p = {:.4}", result.kappa, result.p_value);
+
+// Exact binomial test
+let result = binom_test(7, 10, 0.5, Alternative::TwoSided)?;
+println!("p-value = {:.4}", result.p_value);
+```
+
 ### Forecast Evaluation
 
 ```rust
@@ -377,6 +487,21 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `dagostino_k_squared()` | `agostino.test()`, `anscombe.test()` | moments |
 | `skewness()`, `kurtosis()` | `skewness()`, `kurtosis()` | e1071 |
 | `diebold_mariano()` | `dm.test()` | forecast |
+| `pearson()`, `spearman()` | `cor.test()` | stats |
+| `kendall()` | `cor.test(method="kendall")` | stats |
+| `partial_cor()`, `semi_partial_cor()` | `pcor.test()`, `spcor.test()` | ppcor |
+| `distance_cor()` | `dcor()` | energy |
+| `icc()` | `ICC()` | psych |
+| `chisq_test()` | `chisq.test()` | stats |
+| `chisq_goodness_of_fit()` | `chisq.test(p=...)` | stats |
+| `fisher_exact()` | `fisher.test()` | stats |
+| `g_test()` | `GTest()` | DescTools |
+| `mcnemar_test()` | `mcnemar.test()` | stats |
+| `cramers_v()` | `CramerV()` | DescTools |
+| `phi_coefficient()` | `phi()` | psych |
+| `cohen_kappa()` | `cohen.kappa()` | psych |
+| `binom_test()` | `binom.test()` | stats |
+| `prop_test_one()`, `prop_test_two()` | `prop.test()` | stats |
 
 All 303 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
 

@@ -22,6 +22,29 @@ For runnable code examples demonstrating each test category, see the [examples/]
 - [Distributional Tests](#distributional-tests)
   - [shapiro_wilk](#shapiro_wilk)
   - [dagostino_k_squared](#dagostino_k_squared)
+- [Correlation Tests](#correlation-tests)
+  - [pearson](#pearson)
+  - [spearman](#spearman)
+  - [kendall](#kendall)
+  - [partial_cor](#partial_cor)
+  - [semi_partial_cor](#semi_partial_cor)
+  - [distance_cor](#distance_cor)
+  - [distance_cor_test](#distance_cor_test)
+  - [icc](#icc)
+- [Categorical Tests](#categorical-tests)
+  - [chisq_test](#chisq_test)
+  - [chisq_goodness_of_fit](#chisq_goodness_of_fit)
+  - [g_test](#g_test)
+  - [fisher_exact](#fisher_exact)
+  - [mcnemar_test](#mcnemar_test)
+  - [mcnemar_exact](#mcnemar_exact)
+  - [cramers_v](#cramers_v)
+  - [phi_coefficient](#phi_coefficient)
+  - [contingency_coef](#contingency_coef)
+  - [cohen_kappa](#cohen_kappa)
+  - [prop_test_one](#prop_test_one)
+  - [prop_test_two](#prop_test_two)
+  - [binom_test](#binom_test)
 - [Resampling Methods](#resampling-methods)
   - [permutation_t_test](#permutation_t_test)
   - [PermutationEngine](#permutationengine)
@@ -54,6 +77,9 @@ For runnable code examples demonstrating each test category, see the [examples/]
   - [VarEstimator](#varestimator)
   - [MCSStatistic](#mcsstatistic)
   - [Kernel](#kernel)
+  - [CorrelationMethod](#correlationmethod)
+  - [KendallVariant](#kendallvariant)
+  - [ICCType](#icctype)
 
 ---
 
@@ -596,6 +622,659 @@ pub fn dagostino_k_squared(data: &[f64]) -> Result<DAgostinoResult>
 - D'Agostino, R. B. (1971). "An Omnibus Test of Normality for Moderate and Large Sample Size." *Biometrika*, 58(2), 341–348. [DOI: 10.2307/2334522](https://doi.org/10.2307/2334522)
 - D'Agostino, R. B., & Pearson, E. S. (1973). "Tests for Departure from Normality." *Biometrika*, 60(3), 613–622. [DOI: 10.2307/2335012](https://doi.org/10.2307/2335012)
 - D'Agostino, R. B., Belanger, A., & D'Agostino, R. B. Jr. (1990). "A Suggestion for Using Powerful and Informative Tests of Normality." *The American Statistician*, 44(4), 316–321. [DOI: 10.2307/2684359](https://doi.org/10.2307/2684359)
+
+[Back to top](#table-of-contents)
+
+---
+
+## Correlation Tests
+
+### pearson
+
+Computes Pearson's product-moment correlation coefficient with significance test.
+
+```rust
+pub fn pearson(x: &[f64], y: &[f64], conf_level: Option<f64>) -> Result<CorrelationResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First variable (must have at least 3 observations) |
+| `y` | `&[f64]` | Second variable (same length as x) |
+| `conf_level` | `Option<f64>` | Confidence level for CI (e.g., `Some(0.95)` for 95%) |
+
+**Returns:** `CorrelationResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `estimate` | `f64` | Correlation coefficient |
+| `statistic` | `f64` | t-statistic |
+| `df` | `Option<f64>` | Degrees of freedom (n-2) |
+| `p_value` | `f64` | Two-sided p-value |
+| `conf_int` | `Option<CorrelationConfInt>` | Confidence interval (Fisher's z-transformation) |
+| `method` | `CorrelationMethod` | Method used (`Pearson`) |
+| `n` | `usize` | Sample size |
+
+**R equivalent:** `cor.test(x, y, method = "pearson")`
+
+**Reference:** Pearson, K. (1895). "Notes on Regression and Inheritance in the Case of Two Parents." *Proceedings of the Royal Society of London*, 58, 240–242.
+
+[Back to top](#table-of-contents)
+
+---
+
+### spearman
+
+Computes Spearman's rank correlation coefficient with significance test.
+
+```rust
+pub fn spearman(x: &[f64], y: &[f64], conf_level: Option<f64>) -> Result<CorrelationResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First variable (must have at least 3 observations) |
+| `y` | `&[f64]` | Second variable (same length as x) |
+| `conf_level` | `Option<f64>` | Confidence level for CI |
+
+**Returns:** `CorrelationResult` (same structure as pearson)
+
+**R equivalent:** `cor.test(x, y, method = "spearman")`
+
+**Reference:** Spearman, C. (1904). "The Proof and Measurement of Association between Two Things." *American Journal of Psychology*, 15(1), 72–101.
+
+[Back to top](#table-of-contents)
+
+---
+
+### kendall
+
+Computes Kendall's tau correlation coefficient with significance test.
+
+```rust
+pub fn kendall(x: &[f64], y: &[f64], variant: KendallVariant) -> Result<CorrelationResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First variable |
+| `y` | `&[f64]` | Second variable |
+| `variant` | `KendallVariant` | Which tau variant: `TauA`, `TauB` (default), or `TauC` |
+
+**Returns:** `CorrelationResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `estimate` | `f64` | Kendall's tau |
+| `statistic` | `f64` | z-statistic (normal approximation) |
+| `df` | `Option<f64>` | `None` (uses normal approximation) |
+| `p_value` | `f64` | Two-sided p-value |
+
+**R equivalent:** `cor.test(x, y, method = "kendall")` (uses tau-b)
+
+**Reference:** Kendall, M. G. (1938). "A New Measure of Rank Correlation." *Biometrika*, 30(1/2), 81–93.
+
+[Back to top](#table-of-contents)
+
+---
+
+### partial_cor
+
+Computes partial correlation between x and y, controlling for z variables.
+
+```rust
+pub fn partial_cor(x: &[f64], y: &[f64], z: &[&[f64]]) -> Result<PartialCorResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First variable |
+| `y` | `&[f64]` | Second variable |
+| `z` | `&[&[f64]]` | Control variables (each inner slice is one variable) |
+
+**Returns:** `PartialCorResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `estimate` | `f64` | Partial correlation coefficient |
+| `statistic` | `f64` | t-statistic |
+| `df` | `f64` | Degrees of freedom (n - k - 2) |
+| `p_value` | `f64` | Two-sided p-value |
+| `n` | `usize` | Sample size |
+| `n_controls` | `usize` | Number of control variables |
+
+**R equivalent:** `ppcor::pcor.test(x, y, z)`
+
+[Back to top](#table-of-contents)
+
+---
+
+### semi_partial_cor
+
+Computes semi-partial (part) correlation between x and y, controlling for z on y only.
+
+```rust
+pub fn semi_partial_cor(x: &[f64], y: &[f64], z: &[&[f64]]) -> Result<PartialCorResult>
+```
+
+**Parameters:** Same as `partial_cor`
+
+**Returns:** `PartialCorResult`
+
+**R equivalent:** `ppcor::spcor.test(x, y, z)`
+
+[Back to top](#table-of-contents)
+
+---
+
+### distance_cor
+
+Computes distance correlation between two vectors.
+
+```rust
+pub fn distance_cor(x: &[f64], y: &[f64]) -> Result<DistanceCorResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First variable |
+| `y` | `&[f64]` | Second variable |
+
+**Returns:** `DistanceCorResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dcor` | `f64` | Distance correlation (0 to 1) |
+| `dcov` | `f64` | Distance covariance |
+| `dvar_x` | `f64` | Distance variance of X |
+| `dvar_y` | `f64` | Distance variance of Y |
+| `statistic` | `f64` | Test statistic (n × dCov²) |
+| `p_value` | `Option<f64>` | `None` (use `distance_cor_test` for p-value) |
+| `n` | `usize` | Sample size |
+
+**R equivalent:** `energy::dcor(x, y)`
+
+**Reference:** Székely, G. J., & Rizzo, M. L. (2007). "Measuring and Testing Dependence by Correlation of Distances." *Annals of Statistics*, 35(6), 2769–2794.
+
+[Back to top](#table-of-contents)
+
+---
+
+### distance_cor_test
+
+Computes distance correlation with permutation test for significance.
+
+```rust
+pub fn distance_cor_test(
+    x: &[f64],
+    y: &[f64],
+    n_permutations: usize,
+    seed: Option<u64>,
+) -> Result<DistanceCorResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First variable |
+| `y` | `&[f64]` | Second variable |
+| `n_permutations` | `usize` | Number of permutations |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+**Returns:** `DistanceCorResult` with `p_value` populated
+
+**R equivalent:** `energy::dcor.test(x, y, R = n_permutations)`
+
+[Back to top](#table-of-contents)
+
+---
+
+### icc
+
+Computes Intraclass Correlation Coefficient for reliability analysis.
+
+```rust
+pub fn icc(data: &[Vec<f64>], icc_type: ICCType) -> Result<ICCResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `data` | `&[Vec<f64>]` | Matrix where rows = subjects, columns = raters |
+| `icc_type` | `ICCType` | Type of ICC to compute |
+
+**Returns:** `ICCResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `icc` | `f64` | ICC value (-1 to 1) |
+| `icc_type` | `ICCType` | Type computed |
+| `f_value` | `f64` | F-statistic |
+| `df1` | `f64` | Numerator degrees of freedom |
+| `df2` | `f64` | Denominator degrees of freedom |
+| `p_value` | `f64` | p-value |
+| `conf_int_lower` | `f64` | 95% CI lower bound |
+| `conf_int_upper` | `f64` | 95% CI upper bound |
+| `n_subjects` | `usize` | Number of subjects |
+| `n_raters` | `usize` | Number of raters |
+
+**R equivalent:** `psych::ICC(data)` or `irr::icc(data)`
+
+**Reference:** Shrout, P. E., & Fleiss, J. L. (1979). "Intraclass Correlations: Uses in Assessing Rater Reliability." *Psychological Bulletin*, 86(2), 420–428.
+
+[Back to top](#table-of-contents)
+
+---
+
+## Categorical Tests
+
+### chisq_test
+
+Pearson's chi-square test of independence for contingency tables.
+
+```rust
+pub fn chisq_test(observed: &[Vec<usize>], correction: bool) -> Result<ChiSquareResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `observed` | `&[Vec<usize>]` | Contingency table (at least 2×2) |
+| `correction` | `bool` | Apply Yates' continuity correction (2×2 only) |
+
+**Returns:** `ChiSquareResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | Chi-square statistic |
+| `df` | `f64` | Degrees of freedom ((r-1)(c-1)) |
+| `p_value` | `f64` | p-value |
+| `expected` | `Vec<Vec<f64>>` | Expected frequencies |
+| `residuals` | `Option<Vec<Vec<f64>>>` | Standardized residuals |
+
+**R equivalent:** `chisq.test(matrix, correct = FALSE)`
+
+**Reference:** Pearson, K. (1900). "On the Criterion that a Given System of Deviations from the Probable in the Case of a Correlated System of Variables is Such that it Can be Reasonably Supposed to have Arisen from Random Sampling." *The London, Edinburgh, and Dublin Philosophical Magazine*, 50(302), 157–175.
+
+[Back to top](#table-of-contents)
+
+---
+
+### chisq_goodness_of_fit
+
+Chi-square goodness-of-fit test.
+
+```rust
+pub fn chisq_goodness_of_fit(
+    observed: &[usize],
+    expected_props: Option<&[f64]>,
+) -> Result<ChiSquareResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `observed` | `&[usize]` | Observed counts |
+| `expected_props` | `Option<&[f64]>` | Expected proportions (must sum to 1). `None` = uniform |
+
+**Returns:** `ChiSquareResult`
+
+**R equivalent:** `chisq.test(x, p = expected_props)`
+
+[Back to top](#table-of-contents)
+
+---
+
+### g_test
+
+G-test (log-likelihood ratio test) for contingency tables.
+
+```rust
+pub fn g_test(observed: &[Vec<usize>]) -> Result<ChiSquareResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `observed` | `&[Vec<usize>]` | Contingency table |
+
+**Returns:** `ChiSquareResult` with G statistic (asymptotically chi-square)
+
+**R equivalent:** `DescTools::GTest(matrix)`
+
+**Reference:** Wilks, S. S. (1935). "The Likelihood Test of Independence in Contingency Tables." *Annals of Mathematical Statistics*, 6(4), 190–196.
+
+[Back to top](#table-of-contents)
+
+---
+
+### fisher_exact
+
+Fisher's exact test for 2×2 contingency tables.
+
+```rust
+pub fn fisher_exact(table: &[[usize; 2]; 2], alternative: Alternative) -> Result<FisherResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `table` | `&[[usize; 2]; 2]` | 2×2 table `[[a, b], [c, d]]` |
+| `alternative` | `Alternative` | `TwoSided`, `Less`, or `Greater` |
+
+**Returns:** `FisherResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `p_value` | `f64` | Exact p-value |
+| `odds_ratio` | `f64` | Sample odds ratio (ad/bc) |
+| `conf_int_lower` | `f64` | 95% CI lower bound for odds ratio |
+| `conf_int_upper` | `f64` | 95% CI upper bound for odds ratio |
+| `alternative` | `Alternative` | Alternative hypothesis |
+
+**R equivalent:** `fisher.test(matrix)`
+
+**Reference:** Fisher, R. A. (1922). "On the Interpretation of χ² from Contingency Tables, and the Calculation of P." *Journal of the Royal Statistical Society*, 85(1), 87–94.
+
+[Back to top](#table-of-contents)
+
+---
+
+### mcnemar_test
+
+McNemar's test for paired nominal data.
+
+```rust
+pub fn mcnemar_test(table: &[[usize; 2]; 2], correction: bool) -> Result<McNemarkResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `table` | `&[[usize; 2]; 2]` | 2×2 table of paired observations |
+| `correction` | `bool` | Apply Edwards' continuity correction |
+
+**Returns:** `McNemarkResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `f64` | Chi-square statistic |
+| `df` | `f64` | Degrees of freedom (always 1) |
+| `p_value` | `f64` | p-value |
+| `corrected` | `bool` | Whether correction was applied |
+
+**R equivalent:** `mcnemar.test(matrix, correct = FALSE)`
+
+**Reference:** McNemar, Q. (1947). "Note on the Sampling Error of the Difference Between Correlated Proportions or Percentages." *Psychometrika*, 12(2), 153–157.
+
+[Back to top](#table-of-contents)
+
+---
+
+### mcnemar_exact
+
+McNemar's exact test using binomial distribution.
+
+```rust
+pub fn mcnemar_exact(table: &[[usize; 2]; 2]) -> Result<McNemarkExactResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `table` | `&[[usize; 2]; 2]` | 2×2 table of paired observations |
+
+**Returns:** `McNemarkExactResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `p_value` | `f64` | Exact two-sided p-value |
+| `b` | `usize` | Discordant pairs (off-diagonal) |
+| `c` | `usize` | Discordant pairs (off-diagonal) |
+
+[Back to top](#table-of-contents)
+
+---
+
+### cramers_v
+
+Cramér's V effect size for chi-square test.
+
+```rust
+pub fn cramers_v(observed: &[Vec<usize>]) -> Result<AssociationResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `observed` | `&[Vec<usize>]` | Contingency table |
+
+**Returns:** `AssociationResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `estimate` | `f64` | Cramér's V (0 to 1) |
+| `se` | `Option<f64>` | Standard error (if available) |
+| `conf_int_lower` | `Option<f64>` | CI lower bound |
+| `conf_int_upper` | `Option<f64>` | CI upper bound |
+
+**Formula:** V = √(χ² / (n × min(r-1, c-1)))
+
+**R equivalent:** `DescTools::CramerV(matrix)`
+
+[Back to top](#table-of-contents)
+
+---
+
+### phi_coefficient
+
+Phi coefficient for 2×2 contingency tables.
+
+```rust
+pub fn phi_coefficient(table: &[[usize; 2]; 2]) -> Result<AssociationResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `table` | `&[[usize; 2]; 2]` | 2×2 table |
+
+**Returns:** `AssociationResult` with phi coefficient (-1 to 1)
+
+**Formula:** φ = (ad - bc) / √((a+b)(c+d)(a+c)(b+d))
+
+**R equivalent:** `psych::phi(matrix)`
+
+[Back to top](#table-of-contents)
+
+---
+
+### contingency_coef
+
+Contingency coefficient (Pearson's C).
+
+```rust
+pub fn contingency_coef(observed: &[Vec<usize>]) -> Result<AssociationResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `observed` | `&[Vec<usize>]` | Contingency table |
+
+**Returns:** `AssociationResult` with C (0 to √((k-1)/k))
+
+**Formula:** C = √(χ² / (χ² + n))
+
+[Back to top](#table-of-contents)
+
+---
+
+### cohen_kappa
+
+Cohen's kappa for inter-rater agreement.
+
+```rust
+pub fn cohen_kappa(table: &[Vec<usize>], weighted: bool) -> Result<KappaResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `table` | `&[Vec<usize>]` | Square confusion matrix (rows = rater 1, cols = rater 2) |
+| `weighted` | `bool` | Use weighted kappa with linear weights |
+
+**Returns:** `KappaResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `kappa` | `f64` | Kappa coefficient (-1 to 1) |
+| `se` | `f64` | Standard error |
+| `z` | `f64` | z-statistic |
+| `p_value` | `f64` | Two-sided p-value |
+| `conf_int_lower` | `f64` | 95% CI lower bound |
+| `conf_int_upper` | `f64` | 95% CI upper bound |
+| `weighted` | `bool` | Whether weighted kappa was used |
+
+**Formula:** κ = (Po - Pe) / (1 - Pe)
+
+**R equivalent:** `psych::cohen.kappa(matrix)`
+
+**Reference:** Cohen, J. (1960). "A Coefficient of Agreement for Nominal Scales." *Educational and Psychological Measurement*, 20(1), 37–46.
+
+[Back to top](#table-of-contents)
+
+---
+
+### prop_test_one
+
+One-sample proportion test (z-test approximation).
+
+```rust
+pub fn prop_test_one(
+    successes: usize,
+    n: usize,
+    p0: f64,
+    alternative: Alternative,
+) -> Result<PropTestResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `successes` | `usize` | Number of successes |
+| `n` | `usize` | Total trials |
+| `p0` | `f64` | Null hypothesis proportion |
+| `alternative` | `Alternative` | Alternative hypothesis |
+
+**Returns:** `PropTestResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `estimate` | `Vec<f64>` | Estimated proportion(s) |
+| `statistic` | `f64` | z-statistic |
+| `df` | `Option<f64>` | `None` |
+| `p_value` | `f64` | p-value |
+| `conf_int_lower` | `f64` | Wilson score CI lower bound |
+| `conf_int_upper` | `f64` | Wilson score CI upper bound |
+| `null_value` | `f64` | Null proportion |
+| `alternative` | `Alternative` | Alternative hypothesis |
+
+**R equivalent:** `prop.test(x, n, p = p0, correct = FALSE)`
+
+[Back to top](#table-of-contents)
+
+---
+
+### prop_test_two
+
+Two-sample proportion test.
+
+```rust
+pub fn prop_test_two(
+    successes: [usize; 2],
+    totals: [usize; 2],
+    alternative: Alternative,
+    correction: bool,
+) -> Result<PropTestResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `successes` | `[usize; 2]` | Successes in each group |
+| `totals` | `[usize; 2]` | Total trials in each group |
+| `alternative` | `Alternative` | Alternative hypothesis |
+| `correction` | `bool` | Apply Yates' continuity correction |
+
+**Returns:** `PropTestResult` with chi-square statistic (z²)
+
+**R equivalent:** `prop.test(c(x1, x2), c(n1, n2))`
+
+[Back to top](#table-of-contents)
+
+---
+
+### binom_test
+
+Exact binomial test.
+
+```rust
+pub fn binom_test(
+    successes: usize,
+    n: usize,
+    p0: f64,
+    alternative: Alternative,
+) -> Result<BinomTestResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `successes` | `usize` | Number of successes |
+| `n` | `usize` | Total trials |
+| `p0` | `f64` | Null hypothesis probability |
+| `alternative` | `Alternative` | Alternative hypothesis |
+
+**Returns:** `BinomTestResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `estimate` | `f64` | Estimated probability |
+| `successes` | `usize` | Number of successes |
+| `n` | `usize` | Total trials |
+| `p_value` | `f64` | Exact p-value |
+| `conf_int_lower` | `f64` | Clopper-Pearson CI lower bound |
+| `conf_int_upper` | `f64` | Clopper-Pearson CI upper bound |
+| `null_value` | `f64` | Null probability |
+| `alternative` | `Alternative` | Alternative hypothesis |
+
+**R equivalent:** `binom.test(x, n, p = p0)`
 
 [Back to top](#table-of-contents)
 
@@ -1226,6 +1905,57 @@ pub enum Kernel {
     Linear,                                                 // x·y
     Polynomial { degree: u32, scale: f64, offset: f64 },   // (scale·x·y + offset)^degree
     Laplacian { bandwidth: f64 },                          // exp(-||x-y||/σ)
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### CorrelationMethod
+
+Correlation method used in correlation tests.
+
+```rust
+pub enum CorrelationMethod {
+    Pearson,
+    Spearman,
+    Kendall,
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### KendallVariant
+
+Variant of Kendall's tau to compute.
+
+```rust
+pub enum KendallVariant {
+    TauA,   // No tie adjustment
+    TauB,   // Tie-adjusted (default, matches R)
+    TauC,   // Stuart's tau-c for rectangular tables
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### ICCType
+
+Type of Intraclass Correlation Coefficient to compute.
+
+```rust
+pub enum ICCType {
+    ICC1,   // One-way random effects, absolute agreement, single rater
+    ICC2,   // Two-way random effects, absolute agreement, single rater (default)
+    ICC3,   // Two-way mixed effects, consistency, single rater
+    ICC1k,  // One-way random effects, absolute agreement, average of k raters
+    ICC2k,  // Two-way random effects, absolute agreement, average of k raters
+    ICC3k,  // Two-way mixed effects, consistency, average of k raters
 }
 ```
 
