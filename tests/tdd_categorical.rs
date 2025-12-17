@@ -66,11 +66,7 @@ fn test_chisq_2x2_yates_vs_r() {
 
 #[test]
 fn test_chisq_3x3_vs_r() {
-    let observed = vec![
-        vec![10, 20, 30],
-        vec![15, 25, 35],
-        vec![20, 30, 40],
-    ];
+    let observed = vec![vec![10, 20, 30], vec![15, 25, 35], vec![20, 30, 40]];
     let refs = common::load_reference_scalars("chisq_3x3.csv");
 
     let result = chisq_test(&observed, false).unwrap();
@@ -210,11 +206,7 @@ fn test_cramers_v_2x2_vs_r() {
 
 #[test]
 fn test_cramers_v_3x3_vs_r() {
-    let observed = vec![
-        vec![10, 20, 30],
-        vec![15, 25, 35],
-        vec![20, 30, 40],
-    ];
+    let observed = vec![vec![10, 20, 30], vec![15, 25, 35], vec![20, 30, 40]];
     let refs = common::load_reference_scalars("cramers_v.csv");
 
     let result = cramers_v(&observed).unwrap();
@@ -271,11 +263,7 @@ fn test_contingency_coef_vs_r() {
 
 #[test]
 fn test_cohen_kappa_vs_r() {
-    let table = vec![
-        vec![20, 5, 0],
-        vec![10, 30, 5],
-        vec![0, 5, 25],
-    ];
+    let table = vec![vec![20, 5, 0], vec![10, 30, 5], vec![0, 5, 25]];
 
     // Compute kappa manually to match R's formula
     // Po = (20+30+25)/100 = 0.75

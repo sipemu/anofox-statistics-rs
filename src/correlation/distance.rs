@@ -214,7 +214,10 @@ fn double_center(a: &[Vec<f64>]) -> Vec<Vec<f64>> {
     let n = a.len();
 
     // Row means
-    let row_means: Vec<f64> = a.iter().map(|row| row.iter().sum::<f64>() / n as f64).collect();
+    let row_means: Vec<f64> = a
+        .iter()
+        .map(|row| row.iter().sum::<f64>() / n as f64)
+        .collect();
 
     // Column means
     let col_means: Vec<f64> = (0..n)

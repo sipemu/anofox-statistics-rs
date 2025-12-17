@@ -284,7 +284,10 @@ pub fn cohen_kappa(table: &[Vec<usize>], weighted: bool) -> Result<KappaResult> 
     let n_f = n as f64;
 
     // Compute row and column marginals
-    let row_totals: Vec<f64> = table.iter().map(|row| row.iter().sum::<usize>() as f64).collect();
+    let row_totals: Vec<f64> = table
+        .iter()
+        .map(|row| row.iter().sum::<usize>() as f64)
+        .collect();
     let col_totals: Vec<f64> = (0..k)
         .map(|j| table.iter().map(|row| row[j]).sum::<usize>() as f64)
         .collect();

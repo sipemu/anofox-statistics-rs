@@ -166,9 +166,8 @@ pub fn icc(data: &[Vec<f64>], icc_type: ICCType) -> Result<ICCResult> {
     };
 
     // Compute confidence interval using F-distribution
-    let (conf_int_lower, conf_int_upper) = compute_icc_ci(
-        icc_value, f_value, df1, df2, n, k, icc_type,
-    );
+    let (conf_int_lower, conf_int_upper) =
+        compute_icc_ci(icc_value, f_value, df1, df2, n, k, icc_type);
 
     Ok(ICCResult {
         icc: icc_value,
@@ -256,10 +255,18 @@ fn compute_anova_components(data: &[Vec<f64>]) -> (f64, f64, f64, f64) {
         .sum();
 
     // SS_between_subjects (rows) = k * sum((row_mean - grand_mean)^2)
-    let ss_r: f64 = k_f * row_means.iter().map(|&m| (m - grand_mean).powi(2)).sum::<f64>();
+    let ss_r: f64 = k_f
+        * row_means
+            .iter()
+            .map(|&m| (m - grand_mean).powi(2))
+            .sum::<f64>();
 
     // SS_between_raters (columns) = n * sum((col_mean - grand_mean)^2)
-    let ss_c: f64 = n_f * col_means.iter().map(|&m| (m - grand_mean).powi(2)).sum::<f64>();
+    let ss_c: f64 = n_f
+        * col_means
+            .iter()
+            .map(|&m| (m - grand_mean).powi(2))
+            .sum::<f64>();
 
     // SS_error (residual) = SS_total - SS_r - SS_c
     let ss_e = (ss_total - ss_r - ss_c).max(0.0);

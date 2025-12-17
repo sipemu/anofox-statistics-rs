@@ -73,6 +73,14 @@ This library provides a wide range of statistical tests commonly used in data an
   - MSPE-Adjusted SPA test for multiple nested models (Clark-West + bootstrap)
   - Model Confidence Set (Hansen, Lunde, & Nason, 2011)
 
+- **Equivalence Testing (TOST)**
+  - TOST for means: one-sample, two-sample, and paired t-tests
+  - TOST for correlations (Pearson and Spearman)
+  - TOST for proportions (one-sample and two-sample)
+  - Wilcoxon TOST (non-parametric equivalence)
+  - Bootstrap TOST (resampling-based)
+  - Yuen TOST (robust trimmed means)
+
 ## Installation
 
 Add to your `Cargo.toml`:
@@ -468,6 +476,41 @@ println!("Models in MCS: {:?}", result.included_models);
 println!("Eliminated: {:?}", result.eliminated_models);
 ```
 
+### Equivalence Testing (TOST)
+
+TOST (Two One-Sided Tests) tests whether an effect is small enough to be considered practically equivalent to zero, rather than just testing if it differs from zero.
+
+```rust
+use anofox_statistics::{tost_t_test_two_sample, tost_correlation, tost_yuen,
+                        EquivalenceBounds, CorrelationTostMethod};
+
+let group1 = vec![10.1, 10.0, 9.9, 10.2, 10.0, 9.8, 10.1, 10.0];
+let group2 = vec![10.0, 10.1, 9.9, 10.0, 10.2, 9.9, 10.0, 10.1];
+
+// Two-sample TOST: test if mean difference is within ±0.5
+let bounds = EquivalenceBounds::Symmetric { delta: 0.5 };
+let result = tost_t_test_two_sample(&group1, &group2, &bounds, 0.05, false)?;
+println!("Equivalent: {}", result.equivalent);
+println!("TOST p-value: {:.4}", result.tost_p_value);
+println!("90% CI: [{:.4}, {:.4}]", result.ci.0, result.ci.1);
+
+// Using Cohen's d effect size bounds (±0.5 SD)
+let bounds = EquivalenceBounds::CohenD { d: 0.5 };
+let result = tost_t_test_two_sample(&group1, &group2, &bounds, 0.05, false)?;
+
+// Correlation TOST: test if correlation is equivalent to zero
+let x = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+let y = vec![5.1, 4.9, 5.0, 5.2, 4.8, 5.1, 4.9, 5.0, 5.1, 4.9];  // Near-zero correlation
+let bounds = EquivalenceBounds::Symmetric { delta: 0.3 };
+let result = tost_correlation(&x, &y, 0.0, &bounds, 0.05, CorrelationTostMethod::Pearson)?;
+
+// Robust TOST using trimmed means (resistant to outliers)
+let data_with_outlier = vec![10.0, 11.0, 12.0, 13.0, 14.0, 100.0];  // Outlier
+let normal_data = vec![10.1, 11.1, 12.1, 13.1, 14.1, 15.1];
+let bounds = EquivalenceBounds::Symmetric { delta: 2.0 };
+let result = tost_yuen(&data_with_outlier, &normal_data, &bounds, 0.05, 0.2)?;  // 20% trim
+```
+
 ## Validation
 
 This library is developed using Test-Driven Development (TDD) with R as the oracle (ground truth). All implementations are validated against R's statistical functions:
@@ -502,6 +545,12 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `cohen_kappa()` | `cohen.kappa()` | psych |
 | `binom_test()` | `binom.test()` | stats |
 | `prop_test_one()`, `prop_test_two()` | `prop.test()` | stats |
+| `tost_t_test_*()` | `TOSTone()`, `TOSTtwo()`, `TOSTpaired()` | TOSTER |
+| `tost_correlation()` | `TOSTr()` | TOSTER |
+| `tost_prop_*()` | `TOSTtwo.prop()` | TOSTER |
+| `tost_wilcoxon_*()` | `wilcox_TOST()` | TOSTER |
+| `tost_bootstrap()` | `boot_t_TOST()` | TOSTER |
+| `tost_yuen()` | `yuen.TOST()` | WRS2 |
 
 All 303 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
 

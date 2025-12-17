@@ -372,7 +372,11 @@ fn clopper_pearson_ci(successes: usize, n: usize, conf_level: f64) -> (f64, f64)
     let upper = if successes == n {
         1.0
     } else {
-        beta_quantile(1.0 - alpha / 2.0, (successes + 1) as f64, (n - successes) as f64)
+        beta_quantile(
+            1.0 - alpha / 2.0,
+            (successes + 1) as f64,
+            (n - successes) as f64,
+        )
     };
 
     (lower, upper)

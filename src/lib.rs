@@ -1,6 +1,7 @@
 pub mod categorical;
 pub mod correlation;
 pub mod distributional;
+pub mod equivalence;
 pub mod error;
 pub mod forecast;
 pub mod modern;
@@ -45,4 +46,9 @@ pub use categorical::{
     fisher_exact, g_test, mcnemar_exact, mcnemar_test, phi_coefficient, prop_test_one,
     prop_test_two, AssociationResult, BinomTestResult, ChiSquareResult, FisherResult, KappaResult,
     McNemarkExactResult, McNemarkResult, PropTestResult,
+};
+pub use equivalence::{
+    tost_bootstrap, tost_correlation, tost_prop_one, tost_prop_two, tost_t_test_one_sample,
+    tost_t_test_paired, tost_t_test_two_sample, tost_wilcoxon_paired, tost_wilcoxon_two_sample,
+    tost_yuen, CorrelationTostMethod, EquivalenceBounds, OneSidedTestResult, TostResult,
 };

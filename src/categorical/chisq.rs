@@ -383,11 +383,7 @@ mod tests {
 
     #[test]
     fn test_chisq_larger_table() {
-        let observed = vec![
-            vec![10, 20, 30],
-            vec![20, 30, 40],
-            vec![30, 40, 50],
-        ];
+        let observed = vec![vec![10, 20, 30], vec![20, 30, 40], vec![30, 40, 50]];
 
         let result = chisq_test(&observed, false).unwrap();
 

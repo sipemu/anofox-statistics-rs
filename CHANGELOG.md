@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-12-17
+
+### Added
+
+- **Equivalence Testing Module**: New `equivalence` module providing TOST (Two One-Sided Tests) procedures for establishing practical equivalence
+
+- **TOST for T-Tests**:
+  - `tost_t_test_one_sample()`: One-sample equivalence test
+  - `tost_t_test_two_sample()`: Two-sample equivalence test (Welch/Student)
+  - `tost_t_test_paired()`: Paired samples equivalence test
+
+- **TOST for Correlations**:
+  - `tost_correlation()`: Test if correlation is practically equivalent to zero (or other value)
+  - Supports Pearson and Spearman methods via `CorrelationTostMethod` enum
+  - Uses Fisher's z-transformation for inference
+
+- **TOST for Proportions**:
+  - `tost_prop_one()`: Single proportion equivalence test
+  - `tost_prop_two()`: Two proportions equivalence test
+
+- **Non-parametric TOST**:
+  - `tost_wilcoxon_paired()`: Paired Wilcoxon signed-rank equivalence test
+  - `tost_wilcoxon_two_sample()`: Two-sample Wilcoxon rank-sum equivalence test
+  - Uses Hodges-Lehmann estimator for location
+
+- **Robust and Resampling TOST**:
+  - `tost_bootstrap()`: Bootstrap-based equivalence test with percentile CI
+  - `tost_yuen()`: Robust trimmed means equivalence test
+
+- **New Types**:
+  - `TostResult`: Comprehensive result struct with estimates, CIs, bounds, and test statistics
+  - `OneSidedTestResult`: Result for each one-sided test within TOST
+  - `EquivalenceBounds`: Enum supporting Raw, Symmetric, and Cohen's d bounds
+  - `CorrelationTostMethod`: Enum for Pearson/Spearman correlation methods
+
+- **Documentation**:
+  - Full API documentation for all 10 TOST functions
+  - R validation reference (TOSTER package)
+  - Usage examples in README and API reference
+
+### R Equivalents
+
+All TOST functions are designed to match the TOSTER package in R:
+- `TOSTER::TOSTone()`, `TOSTtwo()`, `TOSTpaired()` for t-tests
+- `TOSTER::TOSTr()` for correlations
+- `TOSTER::TOSTtwo.prop()` for proportions
+- `TOSTER::wilcox_TOST()` for Wilcoxon tests
+- `TOSTER::boot_t_TOST()` for bootstrap
+
 ## [0.3.0] - 2025-12-12
 
 ### Added

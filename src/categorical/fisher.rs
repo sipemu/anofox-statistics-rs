@@ -151,8 +151,7 @@ fn hypergeometric_pmf(k: usize, big_k: usize, big_n_minus_k: usize, n: usize) ->
 
     let big_n = big_k + big_n_minus_k;
 
-    let log_prob = log_binomial_coeff(big_k, k)
-        + log_binomial_coeff(big_n_minus_k, n_minus_k)
+    let log_prob = log_binomial_coeff(big_k, k) + log_binomial_coeff(big_n_minus_k, n_minus_k)
         - log_binomial_coeff(big_n, n);
 
     log_prob.exp()
@@ -189,8 +188,7 @@ fn log_factorial(n: usize) -> f64 {
 
     // Stirling's approximation for larger n
     let n_f = n as f64;
-    n_f * n_f.ln() - n_f + 0.5 * (2.0 * std::f64::consts::PI * n_f).ln()
-        + 1.0 / (12.0 * n_f)
+    n_f * n_f.ln() - n_f + 0.5 * (2.0 * std::f64::consts::PI * n_f).ln() + 1.0 / (12.0 * n_f)
         - 1.0 / (360.0 * n_f.powi(3))
 }
 

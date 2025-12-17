@@ -59,6 +59,17 @@ For runnable code examples demonstrating each test category, see the [examples/]
   - [spa_test](#spa_test)
   - [mspe_adjusted_spa](#mspe_adjusted_spa)
   - [model_confidence_set](#model_confidence_set)
+- [Equivalence Testing (TOST)](#equivalence-testing-tost)
+  - [tost_t_test_one_sample](#tost_t_test_one_sample)
+  - [tost_t_test_two_sample](#tost_t_test_two_sample)
+  - [tost_t_test_paired](#tost_t_test_paired)
+  - [tost_correlation](#tost_correlation)
+  - [tost_prop_one](#tost_prop_one)
+  - [tost_prop_two](#tost_prop_two)
+  - [tost_wilcoxon_paired](#tost_wilcoxon_paired)
+  - [tost_wilcoxon_two_sample](#tost_wilcoxon_two_sample)
+  - [tost_bootstrap](#tost_bootstrap)
+  - [tost_yuen](#tost_yuen)
 - [Math Primitives](#math-primitives)
   - [mean](#mean)
   - [stable_mean](#stable_mean)
@@ -80,6 +91,8 @@ For runnable code examples demonstrating each test category, see the [examples/]
   - [CorrelationMethod](#correlationmethod)
   - [KendallVariant](#kendallvariant)
   - [ICCType](#icctype)
+  - [EquivalenceBounds](#equivalencebounds)
+  - [CorrelationTostMethod](#correlationtostmethod)
 
 ---
 
@@ -1676,6 +1689,339 @@ pub fn model_confidence_set(
 
 ---
 
+## Equivalence Testing (TOST)
+
+TOST (Two One-Sided Tests) is used to test equivalence hypotheses, where the goal is to demonstrate that an effect is small enough to be considered practically equivalent to zero (or some other value).
+
+### tost_t_test_one_sample
+
+One-sample TOST to test if a mean is equivalent to a specified value.
+
+```rust
+pub fn tost_t_test_one_sample(
+    x: &[f64],
+    mu: f64,
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | Sample data |
+| `mu` | `f64` | Value to test equivalence against (usually 0) |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds specification |
+| `alpha` | `f64` | Significance level (e.g., 0.05) |
+
+**R equivalent:** `TOSTER::TOSTone()`
+
+[Back to top](#table-of-contents)
+
+---
+
+### tost_t_test_two_sample
+
+Two-sample TOST to test if two means are equivalent.
+
+```rust
+pub fn tost_t_test_two_sample(
+    x: &[f64],
+    y: &[f64],
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+    pooled: bool,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds specification |
+| `alpha` | `f64` | Significance level |
+| `pooled` | `bool` | If true, use pooled variance (Student's t); if false, use Welch's t |
+
+**R equivalent:** `TOSTER::TOSTtwo()`
+
+[Back to top](#table-of-contents)
+
+---
+
+### tost_t_test_paired
+
+Paired-samples TOST to test if paired differences are equivalent to zero.
+
+```rust
+pub fn tost_t_test_paired(
+    x: &[f64],
+    y: &[f64],
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample (same length as x) |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds specification |
+| `alpha` | `f64` | Significance level |
+
+**R equivalent:** `TOSTER::TOSTpaired()`
+
+[Back to top](#table-of-contents)
+
+---
+
+### tost_correlation
+
+TOST for a correlation coefficient.
+
+```rust
+pub fn tost_correlation(
+    x: &[f64],
+    y: &[f64],
+    rho_null: f64,
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+    method: CorrelationTostMethod,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First variable |
+| `y` | `&[f64]` | Second variable |
+| `rho_null` | `f64` | Null correlation value (usually 0) |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds (Raw or Symmetric only) |
+| `alpha` | `f64` | Significance level |
+| `method` | `CorrelationTostMethod` | Pearson or Spearman |
+
+**R equivalent:** `TOSTER::TOSTr()`
+
+[Back to top](#table-of-contents)
+
+---
+
+### tost_prop_one
+
+TOST for a single proportion.
+
+```rust
+pub fn tost_prop_one(
+    x: usize,
+    n: usize,
+    p0: f64,
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `usize` | Number of successes |
+| `n` | `usize` | Total trials |
+| `p0` | `f64` | Null proportion to test against |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds (Raw or Symmetric only) |
+| `alpha` | `f64` | Significance level |
+
+[Back to top](#table-of-contents)
+
+---
+
+### tost_prop_two
+
+TOST for two independent proportions.
+
+```rust
+pub fn tost_prop_two(
+    x1: usize,
+    n1: usize,
+    x2: usize,
+    n2: usize,
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x1` | `usize` | Number of successes in group 1 |
+| `n1` | `usize` | Total trials in group 1 |
+| `x2` | `usize` | Number of successes in group 2 |
+| `n2` | `usize` | Total trials in group 2 |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds (Raw or Symmetric only) |
+| `alpha` | `f64` | Significance level |
+
+**R equivalent:** `TOSTER::TOSTtwo.prop()`
+
+[Back to top](#table-of-contents)
+
+---
+
+### tost_wilcoxon_paired
+
+Non-parametric TOST for paired samples using Wilcoxon signed-rank test.
+
+```rust
+pub fn tost_wilcoxon_paired(
+    x: &[f64],
+    y: &[f64],
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample (same length as x) |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds (Raw or Symmetric only) |
+| `alpha` | `f64` | Significance level |
+
+**R equivalent:** `TOSTER::wilcox_TOST(paired = TRUE)`
+
+[Back to top](#table-of-contents)
+
+---
+
+### tost_wilcoxon_two_sample
+
+Non-parametric TOST for two independent samples using Wilcoxon rank-sum test.
+
+```rust
+pub fn tost_wilcoxon_two_sample(
+    x: &[f64],
+    y: &[f64],
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds (Raw or Symmetric only) |
+| `alpha` | `f64` | Significance level |
+
+**R equivalent:** `TOSTER::wilcox_TOST(paired = FALSE)`
+
+[Back to top](#table-of-contents)
+
+---
+
+### tost_bootstrap
+
+Bootstrap TOST for two independent samples.
+
+```rust
+pub fn tost_bootstrap(
+    x: &[f64],
+    y: &[f64],
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+    n_bootstrap: usize,
+    seed: Option<u64>,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds specification |
+| `alpha` | `f64` | Significance level |
+| `n_bootstrap` | `usize` | Number of bootstrap samples (≥ 100) |
+| `seed` | `Option<u64>` | Random seed for reproducibility |
+
+**R equivalent:** `TOSTER::boot_t_TOST()`
+
+[Back to top](#table-of-contents)
+
+---
+
+### tost_yuen
+
+Robust TOST using Yuen's trimmed means.
+
+```rust
+pub fn tost_yuen(
+    x: &[f64],
+    y: &[f64],
+    bounds: &EquivalenceBounds,
+    alpha: f64,
+    trim: f64,
+) -> Result<TostResult>
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `&[f64]` | First sample |
+| `y` | `&[f64]` | Second sample |
+| `bounds` | `&EquivalenceBounds` | Equivalence bounds specification |
+| `alpha` | `f64` | Significance level |
+| `trim` | `f64` | Proportion to trim from each tail (0 to 0.5) |
+
+**R equivalent:** `WRS2::yuen.TOST()`
+
+[Back to top](#table-of-contents)
+
+---
+
+### TostResult
+
+Result structure returned by all TOST functions.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `estimate` | `f64` | Point estimate of the effect |
+| `ci` | `(f64, f64)` | Confidence interval at (1 - 2α) level |
+| `bounds` | `(f64, f64)` | Equivalence bounds used (lower, upper) |
+| `lower_test` | `OneSidedTestResult` | Result of lower bound test |
+| `upper_test` | `OneSidedTestResult` | Result of upper bound test |
+| `tost_p_value` | `f64` | TOST p-value: max(p_lower, p_upper) |
+| `equivalent` | `bool` | Whether equivalence was established |
+| `alpha` | `f64` | Significance level used |
+| `n` | `usize` | Sample size |
+| `df` | `Option<f64>` | Degrees of freedom (if applicable) |
+| `method` | `String` | Name of the test method |
+
+### OneSidedTestResult
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `hypothesis` | `String` | Null hypothesis description |
+| `statistic` | `f64` | Test statistic |
+| `p_value` | `f64` | p-value for this one-sided test |
+| `rejected` | `bool` | Whether null was rejected |
+
+**Reference:** Schuirmann, D. J. (1987). "A Comparison of the Two One-Sided Tests Procedure and the Power Approach for Assessing the Equivalence of Average Bioavailability." *Journal of Pharmacokinetics and Biopharmaceutics*, 15(6), 657–680.
+
+[Back to top](#table-of-contents)
+
+---
+
 ## Math Primitives
 
 ### mean
@@ -1956,6 +2302,45 @@ pub enum ICCType {
     ICC1k,  // One-way random effects, absolute agreement, average of k raters
     ICC2k,  // Two-way random effects, absolute agreement, average of k raters
     ICC3k,  // Two-way mixed effects, consistency, average of k raters
+}
+```
+
+[Back to top](#table-of-contents)
+
+---
+
+### EquivalenceBounds
+
+Specification of equivalence bounds for TOST tests.
+
+```rust
+pub enum EquivalenceBounds {
+    Raw { lower: f64, upper: f64 },  // Asymmetric bounds in raw units
+    Symmetric { delta: f64 },        // Symmetric ±delta bounds
+    CohenD { d: f64 },               // Bounds as ±d standard deviations
+}
+```
+
+| Variant | Description |
+|---------|-------------|
+| `Raw` | Asymmetric bounds specified in raw measurement units |
+| `Symmetric` | Symmetric bounds ±delta in raw units |
+| `CohenD` | Bounds as Cohen's d effect sizes (converted to raw using pooled SD) |
+
+**Note:** For correlation and proportion tests, only `Raw` and `Symmetric` bounds are allowed.
+
+[Back to top](#table-of-contents)
+
+---
+
+### CorrelationTostMethod
+
+Method for computing correlation in TOST.
+
+```rust
+pub enum CorrelationTostMethod {
+    Pearson,   // Pearson product-moment correlation
+    Spearman,  // Spearman rank correlation
 }
 ```
 

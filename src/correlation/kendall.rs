@@ -102,14 +102,7 @@ pub fn kendall(x: &[f64], y: &[f64], variant: KendallVariant) -> Result<Correlat
     // With ties, use more complex formula
 
     let (z_stat, p_value) = compute_kendall_significance(
-        tau,
-        n,
-        concordant,
-        discordant,
-        ties_x,
-        ties_y,
-        ties_xy,
-        variant,
+        tau, n, concordant, discordant, ties_x, ties_y, ties_xy, variant,
     );
 
     Ok(CorrelationResult {
