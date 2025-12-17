@@ -23,8 +23,10 @@ pub use nonparametric::{
     BrunnerMunzelResult, KruskalResult, MannWhitneyResult, WilcoxonResult,
 };
 pub use parametric::{
-    brown_forsythe, t_test, yuen_test, Alternative, LeveneResult, TTestKind, TTestResult,
-    YuenConfInt, YuenResult,
+    brown_forsythe, one_way_anova, repeated_measures_anova, t_test, two_way_anova, yuen_test,
+    Alternative, AnovaKind, AnovaTableRow, CorrectedResult, LeveneResult, OneWayAnovaResult,
+    RmAnovaResult, SphericityResult, TTestKind, TTestResult, TwoWayAnovaResult, YuenConfInt,
+    YuenResult,
 };
 pub use resampling::{
     permutation_t_test, CircularBlockBootstrap, PermutationEngine, PermutationResult,

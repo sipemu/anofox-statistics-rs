@@ -1,0 +1,2 @@
+"fisher_statistic","fisher_df_between","fisher_df_within","fisher_p_value","fisher_ss_between","fisher_ss_within","welch_statistic","welch_df_between","welch_df_within","welch_p_value","ttest_statistic","ttest_p_value"
+0.00395464333483371,1,43,0.950148737081395,0.00543695718929621,59.1176344729878,0.00413610175158358,1,42.9656281823889,0.949019668509795,-0.0628859549886441,0.950148737081395

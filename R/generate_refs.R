@@ -257,6 +257,535 @@ save_ref("brown_forsythe.csv", list(
 ))
 
 # ============================================
+# PHASE 2c: One-Way ANOVA
+# ============================================
+
+cat("\n=== Phase 2c: One-Way ANOVA ===\n")
+
+# Use same groups from Brown-Forsythe and add more for testing
+# g1, g2, g3 are already defined (from levene section)
+
+# Create data frame for aov()
+anova_data_3g <- data.frame(
+  value = c(g1, g2, g3),
+  group = factor(c(rep("A", length(g1)), rep("B", length(g2)), rep("C", length(g3))))
+)
+
+# Fisher's ANOVA (equal variances assumed) - 3 groups
+fisher_3g <- aov(value ~ group, data = anova_data_3g)
+fisher_3g_summary <- summary(fisher_3g)[[1]]
+
+# Welch's ANOVA (unequal variances) - 3 groups
+welch_3g <- oneway.test(value ~ group, data = anova_data_3g, var.equal = FALSE)
+
+# Fisher via oneway.test for comparison
+fisher_oneway_3g <- oneway.test(value ~ group, data = anova_data_3g, var.equal = TRUE)
+
+# Group statistics
+group_means_3g <- tapply(anova_data_3g$value, anova_data_3g$group, mean)
+grand_mean_3g <- mean(anova_data_3g$value)
+
+save_ref("anova_fisher_3g.csv", list(
+  statistic = fisher_3g_summary$`F value`[1],
+  df_between = fisher_3g_summary$Df[1],
+  df_within = fisher_3g_summary$Df[2],
+  p_value = fisher_3g_summary$`Pr(>F)`[1],
+  ss_between = fisher_3g_summary$`Sum Sq`[1],
+  ss_within = fisher_3g_summary$`Sum Sq`[2],
+  ms_between = fisher_3g_summary$`Mean Sq`[1],
+  ms_within = fisher_3g_summary$`Mean Sq`[2],
+  grand_mean = grand_mean_3g,
+  mean_a = group_means_3g["A"],
+  mean_b = group_means_3g["B"],
+  mean_c = group_means_3g["C"]
+))
+
+save_ref("anova_welch_3g.csv", list(
+  statistic = welch_3g$statistic,
+  df_between = welch_3g$parameter[1],
+  df_within = welch_3g$parameter[2],
+  p_value = welch_3g$p.value
+))
+
+# 2 groups (edge case - should equal t-test squared)
+anova_data_2g <- data.frame(
+  value = c(g1, g2),
+  group = factor(c(rep("A", length(g1)), rep("B", length(g2))))
+)
+
+fisher_2g <- aov(value ~ group, data = anova_data_2g)
+fisher_2g_summary <- summary(fisher_2g)[[1]]
+welch_2g <- oneway.test(value ~ group, data = anova_data_2g, var.equal = FALSE)
+
+# Compare with t-test (F should equal t^2)
+ttest_2g <- t.test(g1, g2, var.equal = TRUE)
+
+save_ref("anova_2g.csv", list(
+  fisher_statistic = fisher_2g_summary$`F value`[1],
+  fisher_df_between = fisher_2g_summary$Df[1],
+  fisher_df_within = fisher_2g_summary$Df[2],
+  fisher_p_value = fisher_2g_summary$`Pr(>F)`[1],
+  fisher_ss_between = fisher_2g_summary$`Sum Sq`[1],
+  fisher_ss_within = fisher_2g_summary$`Sum Sq`[2],
+  welch_statistic = welch_2g$statistic,
+  welch_df_between = welch_2g$parameter[1],
+  welch_df_within = welch_2g$parameter[2],
+  welch_p_value = welch_2g$p.value,
+  ttest_statistic = ttest_2g$statistic,
+  ttest_p_value = ttest_2g$p.value
+))
+
+# Test with 4 groups with unequal variances
+set.seed(42)
+g_low_var <- rnorm(15, mean = 10, sd = 0.5)
+g_high_var <- rnorm(15, mean = 10, sd = 3.0)
+g_med_var1 <- rnorm(15, mean = 12, sd = 1.0)
+g_med_var2 <- rnorm(15, mean = 11, sd = 1.5)
+
+save_vector("anova_g_low_var.csv", g_low_var)
+save_vector("anova_g_high_var.csv", g_high_var)
+save_vector("anova_g_med_var1.csv", g_med_var1)
+save_vector("anova_g_med_var2.csv", g_med_var2)
+
+anova_data_4g <- data.frame(
+  value = c(g_low_var, g_high_var, g_med_var1, g_med_var2),
+  group = factor(c(rep("A", 15), rep("B", 15), rep("C", 15), rep("D", 15)))
+)
+
+fisher_4g <- aov(value ~ group, data = anova_data_4g)
+fisher_4g_summary <- summary(fisher_4g)[[1]]
+welch_4g <- oneway.test(value ~ group, data = anova_data_4g, var.equal = FALSE)
+
+save_ref("anova_4g.csv", list(
+  fisher_statistic = fisher_4g_summary$`F value`[1],
+  fisher_df_between = fisher_4g_summary$Df[1],
+  fisher_df_within = fisher_4g_summary$Df[2],
+  fisher_p_value = fisher_4g_summary$`Pr(>F)`[1],
+  fisher_ss_between = fisher_4g_summary$`Sum Sq`[1],
+  fisher_ss_within = fisher_4g_summary$`Sum Sq`[2],
+  fisher_ms_between = fisher_4g_summary$`Mean Sq`[1],
+  fisher_ms_within = fisher_4g_summary$`Mean Sq`[2],
+  welch_statistic = welch_4g$statistic,
+  welch_df_between = welch_4g$parameter[1],
+  welch_df_within = welch_4g$parameter[2],
+  welch_p_value = welch_4g$p.value
+))
+
+# ============================================
+# PHASE 2d: Two-Way ANOVA
+# ============================================
+
+cat("\n=== Phase 2d: Two-Way ANOVA ===\n")
+
+# Load car package for Type III SS
+library(car)
+
+# Test case 1: Balanced 2x3 design
+set.seed(42)
+n_per_cell <- 5
+factor_a_2way <- rep(c(0, 1), each = n_per_cell * 3)
+factor_b_2way <- rep(rep(c(0, 1, 2), each = n_per_cell), 2)
+
+# Generate data with effects
+# A effect: level 1 adds 2
+# B effect: level 1 adds 1, level 2 adds 2
+# Interaction: A1:B1 adds extra 0.5
+values_2way <- rnorm(30, mean = 10, sd = 1) +
+  ifelse(factor_a_2way == 1, 2, 0) +
+  ifelse(factor_b_2way == 1, 1, 0) +
+  ifelse(factor_b_2way == 2, 2, 0) +
+  ifelse(factor_a_2way == 0 & factor_b_2way == 1, 0.5, 0)
+
+# Save data to separate file
+write.csv(data.frame(
+  value = values_2way,
+  factor_a = factor_a_2way,
+  factor_b = factor_b_2way
+), "R/data/anova_2way_balanced_data.csv", row.names = FALSE)
+cat("Generated: R/data/anova_2way_balanced_data.csv\n")
+
+# Create data frame for aov
+anova_2way_df <- data.frame(
+  value = values_2way,
+  factor_a = factor(factor_a_2way),
+  factor_b = factor(factor_b_2way)
+)
+
+# Type I (sequential) SS via base aov - for balanced designs, equals Type III
+anova_2way_type1 <- aov(value ~ factor_a * factor_b, data = anova_2way_df)
+anova_2way_type1_summary <- summary(anova_2way_type1)[[1]]
+
+# Type III SS via car::Anova
+anova_2way_type3 <- Anova(anova_2way_type1, type = "III")
+
+save_ref("anova_2way_balanced.csv", list(
+  # Type I SS (from base aov) - for balanced, equals Type III
+  ss_a = anova_2way_type1_summary$`Sum Sq`[1],
+  ss_b = anova_2way_type1_summary$`Sum Sq`[2],
+  ss_ab = anova_2way_type1_summary$`Sum Sq`[3],
+  ss_error = anova_2way_type1_summary$`Sum Sq`[4],
+  df_a = anova_2way_type1_summary$Df[1],
+  df_b = anova_2way_type1_summary$Df[2],
+  df_ab = anova_2way_type1_summary$Df[3],
+  df_error = anova_2way_type1_summary$Df[4],
+  ms_a = anova_2way_type1_summary$`Mean Sq`[1],
+  ms_b = anova_2way_type1_summary$`Mean Sq`[2],
+  ms_ab = anova_2way_type1_summary$`Mean Sq`[3],
+  ms_error = anova_2way_type1_summary$`Mean Sq`[4],
+  f_a = anova_2way_type1_summary$`F value`[1],
+  f_b = anova_2way_type1_summary$`F value`[2],
+  f_ab = anova_2way_type1_summary$`F value`[3],
+  p_a = anova_2way_type1_summary$`Pr(>F)`[1],
+  p_b = anova_2way_type1_summary$`Pr(>F)`[2],
+  p_ab = anova_2way_type1_summary$`Pr(>F)`[3],
+  grand_mean = mean(values_2way)
+))
+
+# Test case 2: 2x2 balanced design
+set.seed(42)
+n_22 <- 4
+factor_a_22 <- rep(c(0, 1), each = n_22 * 2)
+factor_b_22 <- rep(rep(c(0, 1), each = n_22), 2)
+
+values_22 <- c(
+  5.2, 5.8, 5.5, 5.3,  # A0-B0
+  6.1, 6.3, 5.9, 6.0,  # A0-B1
+  7.2, 7.5, 7.1, 7.4,  # A1-B0
+  8.5, 8.8, 8.2, 8.6   # A1-B1
+)
+
+write.csv(data.frame(
+  value = values_22,
+  factor_a = factor_a_22,
+  factor_b = factor_b_22
+), "R/data/anova_2way_22_data.csv", row.names = FALSE)
+cat("Generated: R/data/anova_2way_22_data.csv\n")
+
+anova_22_df <- data.frame(
+  value = values_22,
+  factor_a = factor(factor_a_22),
+  factor_b = factor(factor_b_22)
+)
+
+anova_22 <- aov(value ~ factor_a * factor_b, data = anova_22_df)
+anova_22_summary <- summary(anova_22)[[1]]
+
+save_ref("anova_2way_22.csv", list(
+  ss_a = anova_22_summary$`Sum Sq`[1],
+  ss_b = anova_22_summary$`Sum Sq`[2],
+  ss_ab = anova_22_summary$`Sum Sq`[3],
+  ss_error = anova_22_summary$`Sum Sq`[4],
+  df_a = anova_22_summary$Df[1],
+  df_b = anova_22_summary$Df[2],
+  df_ab = anova_22_summary$Df[3],
+  df_error = anova_22_summary$Df[4],
+  f_a = anova_22_summary$`F value`[1],
+  f_b = anova_22_summary$`F value`[2],
+  f_ab = anova_22_summary$`F value`[3],
+  p_a = anova_22_summary$`Pr(>F)`[1],
+  p_b = anova_22_summary$`Pr(>F)`[2],
+  p_ab = anova_22_summary$`Pr(>F)`[3],
+  grand_mean = mean(values_22)
+))
+
+# Test case 3: Unbalanced design (different n per cell)
+set.seed(42)
+# A=0,B=0: n=3; A=0,B=1: n=5; A=1,B=0: n=4; A=1,B=1: n=6
+factor_a_unbal <- c(rep(0, 8), rep(1, 10))
+factor_b_unbal <- c(rep(0, 3), rep(1, 5), rep(0, 4), rep(1, 6))
+
+values_unbal <- rnorm(18, mean = 10, sd = 1) +
+  ifelse(factor_a_unbal == 1, 2, 0) +
+  ifelse(factor_b_unbal == 1, 1.5, 0)
+
+write.csv(data.frame(
+  value = values_unbal,
+  factor_a = factor_a_unbal,
+  factor_b = factor_b_unbal
+), "R/data/anova_2way_unbalanced_data.csv", row.names = FALSE)
+cat("Generated: R/data/anova_2way_unbalanced_data.csv\n")
+
+anova_unbal_df <- data.frame(
+  value = values_unbal,
+  factor_a = factor(factor_a_unbal),
+  factor_b = factor(factor_b_unbal)
+)
+
+anova_unbal <- aov(value ~ factor_a * factor_b, data = anova_unbal_df)
+anova_unbal_type3 <- Anova(anova_unbal, type = "III")
+anova_unbal_summary <- summary(anova_unbal)[[1]]
+
+save_ref("anova_2way_unbalanced.csv", list(
+  # Type I SS (from base aov)
+  ss_a_type1 = anova_unbal_summary$`Sum Sq`[1],
+  ss_b_type1 = anova_unbal_summary$`Sum Sq`[2],
+  ss_ab_type1 = anova_unbal_summary$`Sum Sq`[3],
+  ss_error = anova_unbal_summary$`Sum Sq`[4],
+  df_a = anova_unbal_summary$Df[1],
+  df_b = anova_unbal_summary$Df[2],
+  df_ab = anova_unbal_summary$Df[3],
+  df_error = anova_unbal_summary$Df[4],
+  f_a_type1 = anova_unbal_summary$`F value`[1],
+  f_b_type1 = anova_unbal_summary$`F value`[2],
+  f_ab_type1 = anova_unbal_summary$`F value`[3],
+  p_a_type1 = anova_unbal_summary$`Pr(>F)`[1],
+  p_b_type1 = anova_unbal_summary$`Pr(>F)`[2],
+  p_ab_type1 = anova_unbal_summary$`Pr(>F)`[3],
+  # Type III SS (from car::Anova)
+  ss_a_type3 = anova_unbal_type3$`Sum Sq`[2],
+  ss_b_type3 = anova_unbal_type3$`Sum Sq`[3],
+  ss_ab_type3 = anova_unbal_type3$`Sum Sq`[4],
+  f_a_type3 = anova_unbal_type3$`F value`[2],
+  f_b_type3 = anova_unbal_type3$`F value`[3],
+  f_ab_type3 = anova_unbal_type3$`F value`[4],
+  p_a_type3 = anova_unbal_type3$`Pr(>F)`[2],
+  p_b_type3 = anova_unbal_type3$`Pr(>F)`[3],
+  p_ab_type3 = anova_unbal_type3$`Pr(>F)`[4],
+  grand_mean = mean(values_unbal)
+))
+
+# ============================================
+# PHASE 2e: Repeated Measures ANOVA
+# ============================================
+
+cat("\n=== Phase 2e: Repeated Measures ANOVA ===\n")
+
+# Helper function to compute RM ANOVA with sphericity corrections
+# using base R functions
+compute_rm_anova <- function(data, n_subjects, n_conditions) {
+  # Reshape to wide format
+  wide_data <- matrix(data$value, nrow = n_subjects, ncol = n_conditions, byrow = TRUE)
+
+  # Grand mean
+  grand_mean <- mean(data$value)
+
+  # Subject means (row means)
+  subject_means <- rowMeans(wide_data)
+
+  # Condition means (column means)
+  condition_means <- colMeans(wide_data)
+
+  n <- n_subjects
+  k <- n_conditions
+
+  # SS components
+  ss_total <- sum((data$value - grand_mean)^2)
+  ss_subjects <- k * sum((subject_means - grand_mean)^2)
+  ss_conditions <- n * sum((condition_means - grand_mean)^2)
+  ss_error <- ss_total - ss_subjects - ss_conditions
+
+  # Degrees of freedom
+  df_conditions <- k - 1
+  df_error <- (n - 1) * (k - 1)
+
+  # Mean squares
+  ms_conditions <- ss_conditions / df_conditions
+  ms_error <- ss_error / df_error
+
+  # F-statistic and p-value
+  f_stat <- ms_conditions / ms_error
+  p_value <- 1 - pf(f_stat, df_conditions, df_error)
+
+  result <- list(
+    ss_condition = ss_conditions,
+    ss_error = ss_error,
+    df_condition = df_conditions,
+    df_error = df_error,
+    f_statistic = f_stat,
+    p_value = p_value,
+    grand_mean = grand_mean,
+    condition_means = condition_means
+  )
+
+  # Sphericity corrections (only for k >= 3)
+  if (k >= 3) {
+    # Compute covariance matrix of conditions
+    cov_matrix <- cov(wide_data)
+
+    # Mauchly's test
+    # Create contrast matrix (difference contrasts)
+    p <- k - 1
+    C <- matrix(0, nrow = p, ncol = k)
+    for (i in 1:p) {
+      C[i, i] <- 1
+      C[i, i + 1] <- -1
+    }
+
+    # Orthonormalize using QR decomposition
+    C_orth <- qr.Q(qr(t(C)))
+    C_orth <- t(C_orth)
+
+    # Transform covariance matrix
+    CSC <- C_orth %*% cov_matrix %*% t(C_orth)
+
+    # Mauchly's W
+    det_CSC <- det(CSC)
+    trace_CSC <- sum(diag(CSC))
+    mauchly_w <- det_CSC / (trace_CSC / p)^p
+    mauchly_w <- max(0, min(1, mauchly_w))
+
+    # Chi-square statistic
+    correction <- (2 * k^2 - 3 * k + 3) / (6 * (k - 1))
+    chi_sq <- -(n - 1 - correction) * log(mauchly_w)
+    df_chi <- p * (p + 1) / 2 - 1
+    mauchly_p <- 1 - pchisq(chi_sq, df_chi)
+
+    # Greenhouse-Geisser epsilon
+    eigenvalues <- eigen(CSC, symmetric = TRUE, only.values = TRUE)$values
+    sum_eigen <- sum(eigenvalues)
+    sum_eigen_sq <- sum(eigenvalues^2)
+    gg_epsilon <- (sum_eigen^2) / (p * sum_eigen_sq)
+    gg_epsilon <- max(1/(k-1), min(1, gg_epsilon))
+
+    # Huynh-Feldt epsilon
+    hf_epsilon <- ((n - 1) * (k - 1) * gg_epsilon - 2) / ((k - 1) * (n - 1 - (k - 1) * gg_epsilon))
+    hf_epsilon <- max(gg_epsilon, min(1, hf_epsilon))
+
+    # Corrected p-values
+    gg_p <- 1 - pf(f_stat, df_conditions * gg_epsilon, df_error * gg_epsilon)
+    hf_p <- 1 - pf(f_stat, df_conditions * hf_epsilon, df_error * hf_epsilon)
+
+    result$mauchly_w <- mauchly_w
+    result$mauchly_p <- mauchly_p
+    result$gg_epsilon <- gg_epsilon
+    result$hf_epsilon <- hf_epsilon
+    result$gg_p <- gg_p
+    result$hf_p <- hf_p
+  }
+
+  return(result)
+}
+
+# Test case 1: 3 conditions (sphericity test applicable)
+set.seed(42)
+n_subjects <- 10
+n_conditions <- 3
+
+# Generate data with condition effect and subject effects
+rm_subject_effects <- rnorm(n_subjects, mean = 0, sd = 2)
+rm_condition_effects <- c(0, 2, 4)  # Increasing effect
+
+rm_data <- data.frame(
+  subject = rep(1:n_subjects, each = n_conditions),
+  condition = rep(0:(n_conditions - 1), n_subjects),
+  value = NA
+)
+
+for (i in 1:n_subjects) {
+  for (j in 1:n_conditions) {
+    rm_data$value[(i - 1) * n_conditions + j] <-
+      rm_subject_effects[i] + rm_condition_effects[j] + rnorm(1, sd = 1)
+  }
+}
+
+write.csv(rm_data, "R/data/rm_anova_3cond_data.csv", row.names = FALSE)
+cat("Generated: R/data/rm_anova_3cond_data.csv\n")
+
+# Compute RM ANOVA
+rm_result <- compute_rm_anova(rm_data, n_subjects, n_conditions)
+
+save_ref("rm_anova_3cond.csv", list(
+  # ANOVA table
+  ss_condition = rm_result$ss_condition,
+  ss_error = rm_result$ss_error,
+  df_condition = rm_result$df_condition,
+  df_error = rm_result$df_error,
+  f_statistic = rm_result$f_statistic,
+  p_value = rm_result$p_value,
+  # Sphericity test
+  mauchly_w = rm_result$mauchly_w,
+  mauchly_p = rm_result$mauchly_p,
+  # Corrections
+  gg_epsilon = rm_result$gg_epsilon,
+  hf_epsilon = rm_result$hf_epsilon,
+  gg_p = rm_result$gg_p,
+  hf_p = rm_result$hf_p,
+  # Means
+  grand_mean = rm_result$grand_mean,
+  condition_mean_0 = rm_result$condition_means[1],
+  condition_mean_1 = rm_result$condition_means[2],
+  condition_mean_2 = rm_result$condition_means[3]
+))
+
+# Test case 2: 2 conditions (no sphericity test)
+set.seed(42)
+n_conditions_2 <- 2
+
+rm_data_2cond <- data.frame(
+  subject = rep(1:n_subjects, each = n_conditions_2),
+  condition = rep(0:(n_conditions_2 - 1), n_subjects),
+  value = NA
+)
+
+rm_cond_effects_2 <- c(0, 3)
+for (i in 1:n_subjects) {
+  for (j in 1:n_conditions_2) {
+    rm_data_2cond$value[(i - 1) * n_conditions_2 + j] <-
+      rm_subject_effects[i] + rm_cond_effects_2[j] + rnorm(1, sd = 1)
+  }
+}
+
+write.csv(rm_data_2cond, "R/data/rm_anova_2cond_data.csv", row.names = FALSE)
+cat("Generated: R/data/rm_anova_2cond_data.csv\n")
+
+rm_result_2cond <- compute_rm_anova(rm_data_2cond, n_subjects, n_conditions_2)
+
+save_ref("rm_anova_2cond.csv", list(
+  ss_condition = rm_result_2cond$ss_condition,
+  ss_error = rm_result_2cond$ss_error,
+  df_condition = rm_result_2cond$df_condition,
+  df_error = rm_result_2cond$df_error,
+  f_statistic = rm_result_2cond$f_statistic,
+  p_value = rm_result_2cond$p_value,
+  grand_mean = rm_result_2cond$grand_mean
+))
+
+# Test case 3: Strong sphericity violation (4 conditions with varied variance)
+set.seed(42)
+n_conditions_4 <- 4
+
+rm_data_4cond <- data.frame(
+  subject = rep(1:n_subjects, each = n_conditions_4),
+  condition = rep(0:(n_conditions_4 - 1), n_subjects),
+  value = NA
+)
+
+# Condition effects with varying SD to violate sphericity
+rm_cond_effects_4 <- c(0, 1, 5, 3)
+rm_cond_sd <- c(0.5, 0.5, 2.0, 1.0)
+
+for (i in 1:n_subjects) {
+  for (j in 1:n_conditions_4) {
+    rm_data_4cond$value[(i - 1) * n_conditions_4 + j] <-
+      rm_subject_effects[i] + rm_cond_effects_4[j] + rnorm(1, sd = rm_cond_sd[j])
+  }
+}
+
+write.csv(rm_data_4cond, "R/data/rm_anova_4cond_data.csv", row.names = FALSE)
+cat("Generated: R/data/rm_anova_4cond_data.csv\n")
+
+rm_result_4cond <- compute_rm_anova(rm_data_4cond, n_subjects, n_conditions_4)
+
+save_ref("rm_anova_4cond.csv", list(
+  # ANOVA table
+  ss_condition = rm_result_4cond$ss_condition,
+  ss_error = rm_result_4cond$ss_error,
+  df_condition = rm_result_4cond$df_condition,
+  df_error = rm_result_4cond$df_error,
+  f_statistic = rm_result_4cond$f_statistic,
+  p_value = rm_result_4cond$p_value,
+  # Sphericity test
+  mauchly_w = rm_result_4cond$mauchly_w,
+  mauchly_p = rm_result_4cond$mauchly_p,
+  # Corrections
+  gg_epsilon = rm_result_4cond$gg_epsilon,
+  hf_epsilon = rm_result_4cond$hf_epsilon,
+  gg_p = rm_result_4cond$gg_p,
+  hf_p = rm_result_4cond$hf_p,
+  grand_mean = rm_result_4cond$grand_mean
+))
+
+# ============================================
 # PHASE 3: Nonparametric Tests References
 # ============================================
 
