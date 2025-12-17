@@ -294,13 +294,13 @@ pub fn cohen_kappa(table: &[Vec<usize>], weighted: bool) -> Result<KappaResult> 
 
     let (kappa, se) = if weighted && k > 2 {
         // Weighted kappa with linear weights
-        let mut w = vec![vec![0.0; k]; k];
-        for i in 0..k {
-            for j in 0..k {
-                // Linear weights: w_ij = 1 - |i-j|/(k-1)
-                w[i][j] = 1.0 - (i as f64 - j as f64).abs() / (k - 1) as f64;
-            }
-        }
+        let w: Vec<Vec<f64>> = (0..k)
+            .map(|i| {
+                (0..k)
+                    .map(|j| 1.0 - (i as f64 - j as f64).abs() / (k - 1) as f64)
+                    .collect()
+            })
+            .collect();
 
         // Observed weighted agreement
         let mut po_w = 0.0;

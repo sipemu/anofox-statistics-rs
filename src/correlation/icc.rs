@@ -111,7 +111,7 @@ pub fn icc(data: &[Vec<f64>], icc_type: ICCType) -> Result<ICCResult> {
             // One-way random: ICC(1) = (MS_R - MS_W) / (MS_R + (k-1)*MS_W)
             let icc = (ms_r - ms_w) / (ms_r + (k as f64 - 1.0) * ms_w);
             let f = ms_r / ms_w;
-            ((icc, f, (n - 1) as f64, (n as f64 * (k as f64 - 1.0))))
+            (icc, f, (n - 1) as f64, n as f64 * (k as f64 - 1.0))
         }
         ICCType::ICC2 => {
             // Two-way random, absolute agreement
@@ -120,21 +120,21 @@ pub fn icc(data: &[Vec<f64>], icc_type: ICCType) -> Result<ICCResult> {
             let denom = ms_r + (k as f64 - 1.0) * ms_e + k as f64 * (ms_c - ms_e) / n as f64;
             let icc = if denom > 0.0 { numer / denom } else { 0.0 };
             let f = ms_r / ms_e;
-            ((icc, f, (n - 1) as f64, ((n - 1) * (k - 1)) as f64))
+            (icc, f, (n - 1) as f64, ((n - 1) * (k - 1)) as f64)
         }
         ICCType::ICC3 => {
             // Two-way mixed, consistency
             // ICC(3,1) = (MS_R - MS_E) / (MS_R + (k-1)*MS_E)
             let icc = (ms_r - ms_e) / (ms_r + (k as f64 - 1.0) * ms_e);
             let f = ms_r / ms_e;
-            ((icc, f, (n - 1) as f64, ((n - 1) * (k - 1)) as f64))
+            (icc, f, (n - 1) as f64, ((n - 1) * (k - 1)) as f64)
         }
         ICCType::ICC1k => {
             // One-way random, average of k raters
             // ICC(1,k) = (MS_R - MS_W) / MS_R
             let icc = (ms_r - ms_w) / ms_r;
             let f = ms_r / ms_w;
-            ((icc, f, (n - 1) as f64, (n as f64 * (k as f64 - 1.0))))
+            (icc, f, (n - 1) as f64, n as f64 * (k as f64 - 1.0))
         }
         ICCType::ICC2k => {
             // Two-way random, absolute agreement, average of k raters
@@ -143,14 +143,14 @@ pub fn icc(data: &[Vec<f64>], icc_type: ICCType) -> Result<ICCResult> {
             let denom = ms_r + (ms_c - ms_e) / n as f64;
             let icc = if denom > 0.0 { numer / denom } else { 0.0 };
             let f = ms_r / ms_e;
-            ((icc, f, (n - 1) as f64, ((n - 1) * (k - 1)) as f64))
+            (icc, f, (n - 1) as f64, ((n - 1) * (k - 1)) as f64)
         }
         ICCType::ICC3k => {
             // Two-way mixed, consistency, average of k raters
             // ICC(3,k) = (MS_R - MS_E) / MS_R
             let icc = (ms_r - ms_e) / ms_r;
             let f = ms_r / ms_e;
-            ((icc, f, (n - 1) as f64, ((n - 1) * (k - 1)) as f64))
+            (icc, f, (n - 1) as f64, ((n - 1) * (k - 1)) as f64)
         }
     };
 
@@ -291,7 +291,7 @@ fn compute_anova_components(data: &[Vec<f64>]) -> (f64, f64, f64, f64) {
 
 /// Compute confidence interval for ICC.
 fn compute_icc_ci(
-    icc: f64,
+    _icc: f64,
     f_value: f64,
     df1: f64,
     df2: f64,
@@ -311,7 +311,7 @@ fn compute_icc_ci(
     let f_lower = f_dist.inverse_cdf(alpha / 2.0);
     let f_upper = f_dist.inverse_cdf(1.0 - alpha / 2.0);
 
-    let n_f = n as f64;
+    let _n = n; // Suppress unused warning - kept for potential future use
     let k_f = k as f64;
 
     // The CI formulas depend on the ICC type

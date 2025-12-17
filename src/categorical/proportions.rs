@@ -458,7 +458,9 @@ fn log_gamma(x: f64) -> f64 {
     }
 
     // Lanczos approximation coefficients
+    #[allow(clippy::excessive_precision)]
     let g = 7.0;
+    #[allow(clippy::excessive_precision)]
     let c = [
         0.99999999999980993,
         676.5203681218851,
@@ -473,8 +475,8 @@ fn log_gamma(x: f64) -> f64 {
 
     let x = x - 1.0;
     let mut y = c[0];
-    for i in 1..9 {
-        y += c[i] / (x + i as f64);
+    for (i, coef) in c.iter().enumerate().skip(1) {
+        y += coef / (x + i as f64);
     }
 
     let t = x + g + 0.5;

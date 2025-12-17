@@ -78,11 +78,7 @@ pub fn pearson(x: &[f64], y: &[f64], conf_level: Option<f64>) -> Result<Correlat
     };
 
     // Compute confidence interval using Fisher z-transformation
-    let conf_int = if let Some(level) = conf_level {
-        Some(fisher_z_confidence_interval(r, n, level))
-    } else {
-        None
-    };
+    let conf_int = conf_level.map(|level| fisher_z_confidence_interval(r, n, level));
 
     Ok(CorrelationResult {
         estimate: r,

@@ -1,6 +1,6 @@
 //! Partial and semi-partial correlation coefficients.
 
-use crate::correlation::{mean, validate_correlation_input, CorrelationMethod, CorrelationResult};
+use crate::correlation::{mean, validate_correlation_input};
 use crate::error::{Result, StatError};
 use statrs::distribution::{ContinuousCDF, StudentsT};
 

@@ -89,7 +89,7 @@ pub fn fisher_exact(table: &[[usize; 2]; 2], alternative: Alternative) -> Result
     let p_value = match alternative {
         Alternative::TwoSided => {
             // Sum probabilities of all tables as or more extreme than observed
-            let min_a = if row1 > col2 { row1 - col2 } else { 0 };
+            let min_a = row1.saturating_sub(col2);
             let max_a = row1.min(col1);
 
             let mut p = 0.0;
@@ -112,7 +112,7 @@ pub fn fisher_exact(table: &[[usize; 2]; 2], alternative: Alternative) -> Result
         }
         Alternative::Less => {
             // P(X <= a)
-            let min_a = if row1 > col2 { row1 - col2 } else { 0 };
+            let min_a = row1.saturating_sub(col2);
             let mut p = 0.0;
             for k in min_a..=a {
                 p += hypergeometric_pmf(k, col1, n - col1, row1);
