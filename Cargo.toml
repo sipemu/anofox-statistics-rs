@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "crates/anofox-statistics-js"]
+
 [package]
 name = "anofox-statistics"
 version = "0.4.0"

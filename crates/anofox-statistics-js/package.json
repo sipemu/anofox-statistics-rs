@@ -1,0 +1,51 @@
+{
+  "name": "anofox-statistics",
+  "version": "0.4.0",
+  "description": "A comprehensive statistical hypothesis testing library validated against R, compiled to WebAssembly",
+  "keywords": [
+    "statistics",
+    "hypothesis-testing",
+    "t-test",
+    "shapiro-wilk",
+    "nonparametric",
+    "anova",
+    "mann-whitney",
+    "wilcoxon",
+    "chi-squared",
+    "wasm",
+    "webassembly"
+  ],
+  "homepage": "https://github.com/sipemu/anofox-statistics-rs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sipemu/anofox-statistics-rs.git"
+  },
+  "license": "MIT",
+  "author": "Simon Müller <code@santic.info>",
+  "files": [
+    "pkg/**/*"
+  ],
+  "main": "pkg/anofox_statistics_js.js",
+  "module": "pkg/anofox_statistics_js.js",
+  "types": "pkg/anofox_statistics_js.d.ts",
+  "exports": {
+    ".": {
+      "import": "./pkg/anofox_statistics_js.js",
+      "require": "./pkg/anofox_statistics_js.js",
+      "types": "./pkg/anofox_statistics_js.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "wasm-pack build --target web --out-dir pkg",
+    "build:nodejs": "wasm-pack build --target nodejs --out-dir pkg-nodejs",
+    "build:bundler": "wasm-pack build --target bundler --out-dir pkg-bundler",
+    "test": "wasm-pack test --node",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@wasm-tool/wasm-pack-plugin": "^1.7.0"
+  },
+  "sideEffects": [
+    "./pkg/anofox_statistics_js.js"
+  ]
+}
