@@ -35,7 +35,7 @@ jobs:
       - name: Update package.json for npm
         run: |
           cd crates/anofox-statistics-js/pkg
-          jq '.name = "anofox-statistics" | .homepage = "https://github.com/sipemu/anofox-statistics-rs" | .keywords += ["t-test", "shapiro-wilk", "anova", "mann-whitney", "wilcoxon", "chi-squared", "webassembly"]' package.json > package.json.tmp
+          jq '.name = "@sipemu/anofox-statistics" | .homepage = "https://github.com/sipemu/anofox-statistics-rs" | .keywords += ["t-test", "shapiro-wilk", "anova", "mann-whitney", "wilcoxon", "chi-squared", "webassembly"]' package.json > package.json.tmp
           mv package.json.tmp package.json
 
       - name: Copy README

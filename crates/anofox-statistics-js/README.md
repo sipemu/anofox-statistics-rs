@@ -1,11 +1,11 @@
-# anofox-statistics
+# @sipemu/anofox-statistics
 
 A comprehensive statistical hypothesis testing library compiled to WebAssembly for JavaScript/TypeScript applications. All tests are validated against R.
 
 ## Installation
 
 ```bash
-npm install anofox-statistics
+npm install @sipemu/anofox-statistics
 ```
 
 ## Usage
@@ -21,7 +21,7 @@ import init, {
   JsTTestKind,
   JsAlternative,
   JsAnovaKind
-} from 'anofox-statistics';
+} from '@sipemu/anofox-statistics';
 
 // Initialize the WASM module
 await init();
@@ -43,7 +43,7 @@ console.log(result);
 ### Node.js
 
 ```javascript
-const { tTest, JsTTestKind, JsAlternative } = require('anofox-statistics');
+const { tTest, JsTTestKind, JsAlternative } = require('@sipemu/anofox-statistics');
 
 // Use directly (WASM auto-initializes)
 const result = tTest(
@@ -167,7 +167,7 @@ enum JsMCSStatistic { Max, Range }
 ### Normality Testing
 
 ```javascript
-import init, { shapiroWilk, andersonDarling } from 'anofox-statistics';
+import init, { shapiroWilk, andersonDarling } from '@sipemu/anofox-statistics';
 
 await init();
 
@@ -183,7 +183,7 @@ console.log(`Anderson-Darling: A=${ad.statistic.toFixed(4)}, p=${ad.p_value.toFi
 ### ANOVA with Post-hoc
 
 ```javascript
-import init, { oneWayAnova, JsAnovaKind } from 'anofox-statistics';
+import init, { oneWayAnova, JsAnovaKind } from '@sipemu/anofox-statistics';
 
 await init();
 
@@ -201,7 +201,7 @@ console.log(`p-value: ${result.p_value.toFixed(6)}`);
 ### Equivalence Testing (TOST)
 
 ```javascript
-import init, { tostTwoSample, JsAlternative } from 'anofox-statistics';
+import init, { tostTwoSample, JsAlternative } from '@sipemu/anofox-statistics';
 
 await init();
 
@@ -222,7 +222,7 @@ import init, {
   JsLossFunction,
   JsAlternative,
   JsVarEstimator
-} from 'anofox-statistics';
+} from '@sipemu/anofox-statistics';
 
 await init();
 
@@ -249,7 +249,7 @@ import init, {
   tTest,
   JsTTestKind,
   JsAlternative
-} from 'anofox-statistics';
+} from '@sipemu/anofox-statistics';
 
 await init();
 
