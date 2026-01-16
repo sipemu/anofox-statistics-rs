@@ -7,6 +7,13 @@ on:
     branches: [main, master]
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      publish_npm:
+        description: 'Publish to npm'
+        required: false
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -118,7 +125,7 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     needs: [test, clippy, fmt, docs, build-wasm]
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_npm)
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
