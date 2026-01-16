@@ -78,8 +78,15 @@ pub fn js_t_test(
     mu: Option<f64>,
     conf_level: Option<f64>,
 ) -> Result<JsValue, JsError> {
-    let result = t_test(x, y, kind.into(), alternative.into(), mu.unwrap_or(0.0), conf_level)
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let result = t_test(
+        x,
+        y,
+        kind.into(),
+        alternative.into(),
+        mu.unwrap_or(0.0),
+        conf_level,
+    )
+    .map_err(|e| JsError::new(&e.to_string()))?;
 
     let js_result = TTestResultJs {
         statistic: result.statistic,
@@ -247,7 +254,8 @@ pub fn js_one_way_anova(groups: js_sys::Array, kind: JsAnovaKind) -> Result<JsVa
     let groups_vec = groups_vec.map_err(|_: JsValue| JsError::new("Invalid input arrays"))?;
     let group_refs: Vec<&[f64]> = groups_vec.iter().map(|g| g.as_slice()).collect();
 
-    let result = one_way_anova(&group_refs, kind.into()).map_err(|e| JsError::new(&e.to_string()))?;
+    let result =
+        one_way_anova(&group_refs, kind.into()).map_err(|e| JsError::new(&e.to_string()))?;
 
     let js_result = OneWayAnovaResultJs {
         statistic: result.statistic,

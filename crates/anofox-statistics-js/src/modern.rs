@@ -1,4 +1,6 @@
-use anofox_statistics::{energy_distance_test, energy_distance_test_1d, mmd_test, mmd_test_1d, Kernel};
+use anofox_statistics::{
+    energy_distance_test, energy_distance_test_1d, mmd_test, mmd_test_1d, Kernel,
+};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 

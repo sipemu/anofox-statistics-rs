@@ -22,7 +22,10 @@ struct ChiSquareResultJs {
 /// @param yatesCorrection - Apply Yates continuity correction for 2x2 tables (default: false)
 /// @returns Object with statistic, df, p_value, expected frequencies
 #[wasm_bindgen(js_name = chiSquareTest)]
-pub fn js_chisq_test(observed: js_sys::Array, yates_correction: Option<bool>) -> Result<JsValue, JsError> {
+pub fn js_chisq_test(
+    observed: js_sys::Array,
+    yates_correction: Option<bool>,
+) -> Result<JsValue, JsError> {
     let table: Result<Vec<Vec<usize>>, _> = observed
         .iter()
         .map(|row| {
@@ -35,8 +38,8 @@ pub fn js_chisq_test(observed: js_sys::Array, yates_correction: Option<bool>) ->
 
     let table = table.map_err(|_| JsError::new("Invalid contingency table"))?;
 
-    let result =
-        chisq_test(&table, yates_correction.unwrap_or(false)).map_err(|e| JsError::new(&e.to_string()))?;
+    let result = chisq_test(&table, yates_correction.unwrap_or(false))
+        .map_err(|e| JsError::new(&e.to_string()))?;
 
     let js_result = ChiSquareResultJs {
         statistic: result.statistic,
@@ -133,10 +136,22 @@ pub fn js_fisher_exact(
         return Err(JsError::new("Fisher's exact test requires a 2x2 table"));
     }
 
-    let a = rows[0].get(0).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let b = rows[0].get(1).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let c = rows[1].get(0).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let d = rows[1].get(1).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let a = rows[0]
+        .get(0)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let b = rows[0]
+        .get(1)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let c = rows[1]
+        .get(0)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let d = rows[1]
+        .get(1)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
 
     let table_arr = [[a, b], [c, d]];
 
@@ -183,7 +198,9 @@ pub fn js_cramers_v(observed: js_sys::Array) -> Result<JsValue, JsError> {
 
     let result = cramers_v(&table).map_err(|e| JsError::new(&e.to_string()))?;
 
-    let js_result = AssociationResultJs { estimate: result.estimate };
+    let js_result = AssociationResultJs {
+        estimate: result.estimate,
+    };
 
     serde_wasm_bindgen::to_value(&js_result).map_err(|e| JsError::new(&e.to_string()))
 }
@@ -200,16 +217,30 @@ pub fn js_phi_coefficient(table: js_sys::Array) -> Result<JsValue, JsError> {
         return Err(JsError::new("Phi coefficient requires a 2x2 table"));
     }
 
-    let a = rows[0].get(0).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let b = rows[0].get(1).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let c = rows[1].get(0).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let d = rows[1].get(1).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let a = rows[0]
+        .get(0)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let b = rows[0]
+        .get(1)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let c = rows[1]
+        .get(0)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let d = rows[1]
+        .get(1)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
 
     let table_arr = [[a, b], [c, d]];
 
     let result = phi_coefficient(&table_arr).map_err(|e| JsError::new(&e.to_string()))?;
 
-    let js_result = AssociationResultJs { estimate: result.estimate };
+    let js_result = AssociationResultJs {
+        estimate: result.estimate,
+    };
 
     serde_wasm_bindgen::to_value(&js_result).map_err(|e| JsError::new(&e.to_string()))
 }
@@ -234,7 +265,9 @@ pub fn js_contingency_coef(observed: js_sys::Array) -> Result<JsValue, JsError> 
 
     let result = contingency_coef(&table).map_err(|e| JsError::new(&e.to_string()))?;
 
-    let js_result = AssociationResultJs { estimate: result.estimate };
+    let js_result = AssociationResultJs {
+        estimate: result.estimate,
+    };
 
     serde_wasm_bindgen::to_value(&js_result).map_err(|e| JsError::new(&e.to_string()))
 }
@@ -269,8 +302,8 @@ pub fn js_cohen_kappa(table: js_sys::Array, weighted: Option<bool>) -> Result<Js
 
     let matrix = matrix.map_err(|_| JsError::new("Invalid agreement matrix"))?;
 
-    let result =
-        cohen_kappa(&matrix, weighted.unwrap_or(false)).map_err(|e| JsError::new(&e.to_string()))?;
+    let result = cohen_kappa(&matrix, weighted.unwrap_or(false))
+        .map_err(|e| JsError::new(&e.to_string()))?;
 
     let js_result = KappaResultJs {
         kappa: result.kappa,
@@ -305,15 +338,27 @@ pub fn js_mcnemar_test(table: js_sys::Array, correction: Option<bool>) -> Result
         return Err(JsError::new("McNemar's test requires a 2x2 table"));
     }
 
-    let a = rows[0].get(0).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let b = rows[0].get(1).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let c = rows[1].get(0).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let d = rows[1].get(1).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let a = rows[0]
+        .get(0)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let b = rows[0]
+        .get(1)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let c = rows[1]
+        .get(0)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let d = rows[1]
+        .get(1)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
 
     let table_arr = [[a, b], [c, d]];
 
-    let result =
-        mcnemar_test(&table_arr, correction.unwrap_or(true)).map_err(|e| JsError::new(&e.to_string()))?;
+    let result = mcnemar_test(&table_arr, correction.unwrap_or(true))
+        .map_err(|e| JsError::new(&e.to_string()))?;
 
     let js_result = McNemarkResultJs {
         statistic: result.statistic,
@@ -343,10 +388,22 @@ pub fn js_mcnemar_exact(table: js_sys::Array) -> Result<JsValue, JsError> {
         return Err(JsError::new("McNemar's test requires a 2x2 table"));
     }
 
-    let a = rows[0].get(0).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let b = rows[0].get(1).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let c = rows[1].get(0).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
-    let d = rows[1].get(1).as_f64().ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let a = rows[0]
+        .get(0)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let b = rows[0]
+        .get(1)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let c = rows[1]
+        .get(0)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
+    let d = rows[1]
+        .get(1)
+        .as_f64()
+        .ok_or_else(|| JsError::new("Invalid table"))? as usize;
 
     let table_arr = [[a, b], [c, d]];
 
@@ -431,8 +488,8 @@ pub fn js_prop_test_one(
         JsAlternative::Greater => Alternative::Greater,
     };
 
-    let result = prop_test_one(successes, trials, p0, alt)
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let result =
+        prop_test_one(successes, trials, p0, alt).map_err(|e| JsError::new(&e.to_string()))?;
 
     let js_result = PropTestResultJs {
         statistic: result.statistic,

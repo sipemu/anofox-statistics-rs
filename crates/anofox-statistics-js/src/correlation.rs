@@ -103,13 +103,8 @@ impl From<JsKendallVariant> for KendallVariant {
 /// @param variant - Tau variant (TauA, TauB, TauC)
 /// @returns Object with estimate, statistic, p_value, conf_int
 #[wasm_bindgen(js_name = kendallCorrelation)]
-pub fn js_kendall(
-    x: &[f64],
-    y: &[f64],
-    variant: JsKendallVariant,
-) -> Result<JsValue, JsError> {
-    let result =
-        kendall(x, y, variant.into()).map_err(|e| JsError::new(&e.to_string()))?;
+pub fn js_kendall(x: &[f64], y: &[f64], variant: JsKendallVariant) -> Result<JsValue, JsError> {
+    let result = kendall(x, y, variant.into()).map_err(|e| JsError::new(&e.to_string()))?;
 
     let js_result = CorrelationResultJs {
         estimate: result.estimate,
@@ -303,10 +298,7 @@ struct ICCResultJs {
 /// @param iccType - ICC type (ICC1, ICC2, ICC3, ICC1k, ICC2k, ICC3k)
 /// @returns Object with icc, f_value, df1, df2, p_value, conf_int_lower, conf_int_upper
 #[wasm_bindgen(js_name = intraclassCorrelation)]
-pub fn js_icc(
-    data: js_sys::Array,
-    icc_type: JsICCType,
-) -> Result<JsValue, JsError> {
+pub fn js_icc(data: js_sys::Array, icc_type: JsICCType) -> Result<JsValue, JsError> {
     let data_vec: Result<Vec<Vec<f64>>, _> = data
         .iter()
         .map(|row| {
@@ -317,8 +309,7 @@ pub fn js_icc(
 
     let data_vec = data_vec.map_err(|_: JsValue| JsError::new("Invalid input arrays"))?;
 
-    let result =
-        icc(&data_vec, icc_type.into()).map_err(|e| JsError::new(&e.to_string()))?;
+    let result = icc(&data_vec, icc_type.into()).map_err(|e| JsError::new(&e.to_string()))?;
 
     let js_result = ICCResultJs {
         icc: result.icc,

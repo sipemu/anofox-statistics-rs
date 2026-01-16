@@ -102,8 +102,14 @@ pub fn js_tost_t_test_two_sample(
     let bounds = EquivalenceBounds::raw(lower_bound, upper_bound)
         .map_err(|e| JsError::new(&e.to_string()))?;
 
-    let result = tost_t_test_two_sample(x, y, &bounds, alpha.unwrap_or(0.05), pooled.unwrap_or(false))
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let result = tost_t_test_two_sample(
+        x,
+        y,
+        &bounds,
+        alpha.unwrap_or(0.05),
+        pooled.unwrap_or(false),
+    )
+    .map_err(|e| JsError::new(&e.to_string()))?;
 
     serde_wasm_bindgen::to_value(&convert_tost_result(result))
         .map_err(|e| JsError::new(&e.to_string()))
@@ -175,8 +181,15 @@ pub fn js_tost_correlation(
     let bounds = EquivalenceBounds::raw(lower_bound, upper_bound)
         .map_err(|e| JsError::new(&e.to_string()))?;
 
-    let result = tost_correlation(x, y, rho_null, &bounds, alpha.unwrap_or(0.05), method.into())
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let result = tost_correlation(
+        x,
+        y,
+        rho_null,
+        &bounds,
+        alpha.unwrap_or(0.05),
+        method.into(),
+    )
+    .map_err(|e| JsError::new(&e.to_string()))?;
 
     serde_wasm_bindgen::to_value(&convert_tost_result(result))
         .map_err(|e| JsError::new(&e.to_string()))
