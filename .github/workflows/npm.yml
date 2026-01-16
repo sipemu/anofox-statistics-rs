@@ -49,7 +49,7 @@ jobs:
           retention-days: 1
 
   test-wasm:
-    name: Test WebAssembly
+    name: Test WebAssembly (Rust)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -65,9 +65,41 @@ jobs:
       - name: Run WASM tests
         run: wasm-pack test --node crates/anofox-statistics-js
 
+  test-js:
+    name: Test JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Build WASM package
+        run: wasm-pack build crates/anofox-statistics-js --target web --release
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install test dependencies
+        run: |
+          cd js
+          npm install
+
+      - name: Run JavaScript tests
+        run: |
+          cd js
+          npm test
+
   publish-npm:
     name: Publish to npm
-    needs: [build-wasm, test-wasm]
+    needs: [build-wasm, test-wasm, test-js]
     runs-on: ubuntu-latest
     permissions:
       contents: read
