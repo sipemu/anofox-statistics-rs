@@ -1,3 +1,6 @@
+// Allow manual modulo checks for Rust < 1.87 compatibility (is_multiple_of was stabilized in 1.87)
+#![allow(clippy::manual_is_multiple_of)]
+
 pub mod categorical;
 pub mod correlation;
 pub mod distributional;

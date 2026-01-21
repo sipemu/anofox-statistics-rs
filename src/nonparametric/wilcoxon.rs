@@ -488,7 +488,7 @@ fn mann_whitney_estimate_ci(
     diffs.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     // Hodges-Lehmann estimate: median of pairwise differences
-    let estimate = if n_pairs.is_multiple_of(2) {
+    let estimate = if n_pairs % 2 == 0 {
         (diffs[n_pairs / 2 - 1] + diffs[n_pairs / 2]) / 2.0
     } else {
         diffs[n_pairs / 2]
@@ -592,7 +592,7 @@ fn wilcoxon_estimate_ci(
     walsh.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     // Hodges-Lehmann estimate: median of Walsh averages
-    let estimate = if n_walsh.is_multiple_of(2) {
+    let estimate = if n_walsh % 2 == 0 {
         (walsh[n_walsh / 2 - 1] + walsh[n_walsh / 2]) / 2.0
     } else {
         walsh[n_walsh / 2]
