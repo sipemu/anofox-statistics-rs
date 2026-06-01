@@ -243,7 +243,7 @@ fn hodges_lehmann_ci(data: &[f64], alpha: f64) -> Result<(f64, f64)> {
     // For (1-2*alpha) CI
     let z = normal.inverse_cdf(1.0 - alpha);
 
-    let k_lower = ((mu - z * sigma).floor() as usize).max(0);
+    let k_lower = (mu - z * sigma).floor() as usize;
     let k_upper = ((mu + z * sigma).ceil() as usize).min(n_walsh - 1);
 
     Ok((walsh[k_lower], walsh[k_upper]))
@@ -277,7 +277,7 @@ fn hodges_lehmann_ci_two_sample(x: &[f64], y: &[f64], alpha: f64) -> Result<(f64
     // For (1-2*alpha) CI
     let z = normal.inverse_cdf(1.0 - alpha);
 
-    let k_lower = ((mu - z * sigma).floor() as usize).max(0);
+    let k_lower = (mu - z * sigma).floor() as usize;
     let k_upper = ((mu + z * sigma).ceil() as usize).min(n_diffs - 1);
 
     Ok((diffs[k_lower], diffs[k_upper]))
@@ -332,11 +332,7 @@ fn wilcoxon_signed_rank_test(diffs: &[f64], greater: bool) -> Result<(f64, f64)>
     let normal = Normal::new(0.0, 1.0)
         .map_err(|e| StatError::InvalidParameter(format!("Failed to create normal: {}", e)))?;
 
-    let p = if greater {
-        normal.sf(z)
-    } else {
-        normal.cdf(z)
-    };
+    let p = if greater { normal.sf(z) } else { normal.cdf(z) };
 
     Ok((v, p))
 }
@@ -390,11 +386,7 @@ fn mann_whitney_test(x: &[f64], y: &[f64], greater: bool) -> Result<(f64, f64)> 
     let normal = Normal::new(0.0, 1.0)
         .map_err(|e| StatError::InvalidParameter(format!("Failed to create normal: {}", e)))?;
 
-    let p = if greater {
-        normal.sf(z)
-    } else {
-        normal.cdf(z)
-    };
+    let p = if greater { normal.sf(z) } else { normal.cdf(z) };
 
     Ok((u1, p))
 }

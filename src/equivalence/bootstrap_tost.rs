@@ -89,7 +89,7 @@ pub fn tost_bootstrap(
     boot_diffs.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     // Percentile confidence interval at (1 - 2*alpha) level
-    let lower_idx = ((n_bootstrap as f64 * alpha).floor() as usize).max(0);
+    let lower_idx = (n_bootstrap as f64 * alpha).floor() as usize;
     let upper_idx = ((n_bootstrap as f64 * (1.0 - alpha)).ceil() as usize).min(n_bootstrap - 1);
     let ci = (boot_diffs[lower_idx], boot_diffs[upper_idx]);
 
