@@ -11,6 +11,33 @@ A statistical hypothesis testing library for Rust, validated against R ([VALIDAT
 
 This library provides a wide range of statistical tests commonly used in data analysis, all validated against R's implementations to ensure numerical accuracy.
 
+## Use Cases
+
+**Need to run this on 10GB of data?** Use our [DuckDB extension](https://github.com/DataZooDE/anofox-statistics) for SQL-native statistical testing at scale.
+
+**Need to use this in a React Dashboard?** Use our [npm package](https://www.npmjs.com/package/@sipemu/anofox-statistics) for WebAssembly-powered statistical testing in the browser.
+
+```bash
+npm install @sipemu/anofox-statistics
+```
+
+```javascript
+import init, { tTest, shapiroWilk, JsTTestKind, JsAlternative } from '@sipemu/anofox-statistics';
+
+await init();
+
+// Test for normality
+const data = new Float64Array([2.3, 3.1, 2.8, 3.5, 2.9, 3.2, 2.7]);
+const sw = shapiroWilk(data);
+console.log(`Shapiro-Wilk: W=${sw.statistic.toFixed(4)}, p=${sw.p_value.toFixed(4)}`);
+
+// Two-sample Welch t-test
+const x = new Float64Array([1.2, 2.3, 3.1, 4.5, 5.2]);
+const y = new Float64Array([2.1, 3.4, 4.2, 5.6, 6.1]);
+const result = tTest(x, y, JsTTestKind.Welch, JsAlternative.TwoSided, 0.0, 0.95);
+console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
+```
+
 ## Features
 
 - **Math Primitives**
