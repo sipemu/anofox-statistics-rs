@@ -333,7 +333,7 @@ fn wilcoxon_signed_rank_test(diffs: &[f64], greater: bool) -> Result<(f64, f64)>
         .map_err(|e| StatError::InvalidParameter(format!("Failed to create normal: {}", e)))?;
 
     let p = if greater {
-        1.0 - normal.cdf(z)
+        normal.sf(z)
     } else {
         normal.cdf(z)
     };
@@ -391,7 +391,7 @@ fn mann_whitney_test(x: &[f64], y: &[f64], greater: bool) -> Result<(f64, f64)> 
         .map_err(|e| StatError::InvalidParameter(format!("Failed to create normal: {}", e)))?;
 
     let p = if greater {
-        1.0 - normal.cdf(z)
+        normal.sf(z)
     } else {
         normal.cdf(z)
     };

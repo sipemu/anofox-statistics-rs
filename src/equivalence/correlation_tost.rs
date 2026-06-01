@@ -95,7 +95,7 @@ pub fn tost_correlation(
     // Lower test: H0: rho <= lower_bound (in z-scale)
     // Test statistic: (z_r - z_lower) / se_z
     let stat_lower = (z_r - z_lower) / se_z;
-    let p_lower = 1.0 - normal.cdf(stat_lower);
+    let p_lower = normal.sf(stat_lower);
 
     // Upper test: H0: rho >= upper_bound (in z-scale)
     // Test statistic: (z_r - z_upper) / se_z

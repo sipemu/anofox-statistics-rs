@@ -1,9 +1,20 @@
-use anofox_statistics::{brunner_munzel, kruskal_wallis, mann_whitney_u, wilcoxon_signed_rank};
+use anofox_statistics::{
+    brunner_munzel, kruskal_wallis, mann_whitney_u, rank, wilcoxon_signed_rank,
+};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::parametric::JsAlternative;
 use anofox_statistics::Alternative;
+
+/// Rank a sample, assigning the average rank to ties.
+///
+/// @param data - Input sample as Float64Array
+/// @returns Float64Array of ranks (length matches input)
+#[wasm_bindgen(js_name = rank)]
+pub fn js_rank(data: &[f64]) -> Result<Vec<f64>, JsError> {
+    rank(data).map_err(|e| JsError::new(&e.to_string()))
+}
 
 #[derive(Serialize)]
 struct MannWhitneyResultJs {

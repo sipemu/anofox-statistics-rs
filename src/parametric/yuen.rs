@@ -115,9 +115,9 @@ pub fn yuen_test(
     // Compute p-value based on alternative hypothesis
     let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
     let p_value = match alternative {
-        Alternative::TwoSided => 2.0 * (1.0 - t_dist.cdf(t_stat.abs())),
+        Alternative::TwoSided => 2.0 * t_dist.sf(t_stat.abs()),
         Alternative::Less => t_dist.cdf(t_stat),
-        Alternative::Greater => 1.0 - t_dist.cdf(t_stat),
+        Alternative::Greater => t_dist.sf(t_stat),
     };
 
     // Compute confidence interval if requested

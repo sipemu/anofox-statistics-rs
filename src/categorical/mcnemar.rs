@@ -82,7 +82,7 @@ pub fn mcnemar_test(table: &[[usize; 2]; 2], correction: bool) -> Result<McNemar
     let df = 1.0;
     let p_value = if statistic > 0.0 {
         let chi_dist = ChiSquared::new(df).unwrap();
-        1.0 - chi_dist.cdf(statistic)
+        chi_dist.sf(statistic)
     } else {
         1.0
     };

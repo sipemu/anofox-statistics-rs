@@ -67,7 +67,7 @@ pub fn tost_t_test_one_sample(
     // Lower test: H0: estimate <= lower_bound (effect too negative)
     // Reject if estimate significantly greater than lower_bound
     let t_lower = (estimate - lower_bound) / se;
-    let p_lower = 1.0 - t_dist.cdf(t_lower);
+    let p_lower = t_dist.sf(t_lower);
 
     // Upper test: H0: estimate >= upper_bound (effect too positive)
     // Reject if estimate significantly less than upper_bound
@@ -202,7 +202,7 @@ pub fn tost_t_test_two_sample(
 
     // Lower test: H0: estimate <= lower_bound
     let t_lower = (estimate - lower_bound) / se;
-    let p_lower = 1.0 - t_dist.cdf(t_lower);
+    let p_lower = t_dist.sf(t_lower);
 
     // Upper test: H0: estimate >= upper_bound
     let t_upper = (estimate - upper_bound) / se;
@@ -318,7 +318,7 @@ pub fn tost_t_test_paired(
 
     // Lower test: H0: estimate <= lower_bound
     let t_lower = (estimate - lower_bound) / se;
-    let p_lower = 1.0 - t_dist.cdf(t_lower);
+    let p_lower = t_dist.sf(t_lower);
 
     // Upper test: H0: estimate >= upper_bound
     let t_upper = (estimate - upper_bound) / se;

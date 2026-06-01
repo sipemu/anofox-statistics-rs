@@ -93,7 +93,7 @@ pub fn chisq_test(observed: &[Vec<usize>], correction: bool) -> Result<ChiSquare
     // Compute p-value
     let p_value = if df > 0.0 && chi_sq.is_finite() {
         let chi_dist = ChiSquared::new(df).unwrap();
-        1.0 - chi_dist.cdf(chi_sq)
+        chi_dist.sf(chi_sq)
     } else {
         1.0
     };
@@ -217,7 +217,7 @@ pub fn chisq_goodness_of_fit(
     // Compute p-value
     let p_value = if df > 0.0 && chi_sq.is_finite() {
         let chi_dist = ChiSquared::new(df).unwrap();
-        1.0 - chi_dist.cdf(chi_sq)
+        chi_dist.sf(chi_sq)
     } else {
         1.0
     };
@@ -308,7 +308,7 @@ pub fn g_test(observed: &[Vec<usize>]) -> Result<ChiSquareResult> {
     // Compute p-value (G is approximately chi-square distributed)
     let p_value = if df > 0.0 && g_stat.is_finite() {
         let chi_dist = ChiSquared::new(df).unwrap();
-        1.0 - chi_dist.cdf(g_stat)
+        chi_dist.sf(g_stat)
     } else {
         1.0
     };

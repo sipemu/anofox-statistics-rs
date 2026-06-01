@@ -143,7 +143,7 @@ fn fisher_anova(
     let f_dist = FisherSnedecor::new(df_between, df_within).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_value = 1.0 - f_dist.cdf(f_stat);
+    let p_value = f_dist.sf(f_stat);
 
     Ok(OneWayAnovaResult {
         statistic: f_stat,
@@ -239,7 +239,7 @@ fn welch_anova(
     let f_dist = FisherSnedecor::new(df_between, df_within).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_value = 1.0 - f_dist.cdf(f_stat);
+    let p_value = f_dist.sf(f_stat);
 
     Ok(OneWayAnovaResult {
         statistic: f_stat,
@@ -984,17 +984,17 @@ pub fn two_way_anova(
     let f_dist_a = FisherSnedecor::new(df_a, df_error).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_a = 1.0 - f_dist_a.cdf(f_a);
+    let p_a = f_dist_a.sf(f_a);
 
     let f_dist_b = FisherSnedecor::new(df_b, df_error).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_b = 1.0 - f_dist_b.cdf(f_b);
+    let p_b = f_dist_b.sf(f_b);
 
     let f_dist_ab = FisherSnedecor::new(df_ab, df_error).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_ab = 1.0 - f_dist_ab.cdf(f_ab);
+    let p_ab = f_dist_ab.sf(f_ab);
 
     Ok(TwoWayAnovaResult {
         factor_a: AnovaTableRow {
@@ -1248,7 +1248,7 @@ pub fn repeated_measures_anova(data: &[&[f64]], compute_sphericity: bool) -> Res
     let f_dist = FisherSnedecor::new(df_conditions, df_error).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_value = 1.0 - f_dist.cdf(f_stat);
+    let p_value = f_dist.sf(f_stat);
 
     // Sphericity test and corrections (only for k >= 3)
     let (sphericity, greenhouse_geisser, huynh_feldt) = if compute_sphericity && n_conditions >= 3 {
@@ -1403,7 +1403,7 @@ fn compute_sphericity_corrections(
         let chi_dist = ChiSquared::new(df_chi).map_err(|e| {
             StatError::InvalidParameter(format!("Failed to create chi-square distribution: {}", e))
         })?;
-        1.0 - chi_dist.cdf(chi_sq)
+        chi_dist.sf(chi_sq)
     } else {
         0.0
     };
@@ -1422,7 +1422,7 @@ fn compute_sphericity_corrections(
         let f_dist = FisherSnedecor::new(df_num_gg, df_den_gg).map_err(|e| {
             StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
         })?;
-        1.0 - f_dist.cdf(f_stat)
+        f_dist.sf(f_stat)
     } else {
         1.0
     };
@@ -1442,7 +1442,7 @@ fn compute_sphericity_corrections(
         let f_dist = FisherSnedecor::new(df_num_hf, df_den_hf).map_err(|e| {
             StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
         })?;
-        1.0 - f_dist.cdf(f_stat)
+        f_dist.sf(f_stat)
     } else {
         1.0
     };

@@ -109,8 +109,8 @@ pub fn prop_test_one(
     // p-value
     let normal = Normal::new(0.0, 1.0).unwrap();
     let p_value = match alternative {
-        Alternative::TwoSided => 2.0 * (1.0 - normal.cdf(z.abs())),
-        Alternative::Greater => 1.0 - normal.cdf(z),
+        Alternative::TwoSided => 2.0 * normal.sf(z.abs()),
+        Alternative::Greater => normal.sf(z),
         Alternative::Less => normal.cdf(z),
     };
 
@@ -207,8 +207,8 @@ pub fn prop_test_two(
     // p-value
     let normal = Normal::new(0.0, 1.0).unwrap();
     let p_value = match alternative {
-        Alternative::TwoSided => 2.0 * (1.0 - normal.cdf(z.abs())),
-        Alternative::Greater => 1.0 - normal.cdf(z),
+        Alternative::TwoSided => 2.0 * normal.sf(z.abs()),
+        Alternative::Greater => normal.sf(z),
         Alternative::Less => normal.cdf(z),
     };
 

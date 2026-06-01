@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-06-01
+
+### Fixed
+
+- **Numerical stability for extreme p-values** (#6): Replaced `1.0 - cdf(x)` with the
+  distribution's survival function (`sf`) throughout the library. The old form lost
+  all precision once `cdf` saturated at 1.0 (around |z| > 8.3 for the normal
+  distribution), causing p-values smaller than ~1.4e-14 to underflow to exactly 0.0.
+  Affected tests include Mann-Whitney U, Wilcoxon signed-rank, t-tests (one/two
+  sample, Welch, paired), Yuen's trimmed-mean test, ANOVA (one-way, two-way,
+  repeated-measures, Mauchly, Greenhouse-Geisser, Huynh-Feldt), Levene, Brunner-
+  Munzel, Kruskal-Wallis, chi-square (Pearson, G-test, McNemar's), Shapiro-Wilk,
+  D'Agostino, Pearson/Spearman/Kendall/partial correlation, ICC, one-/two-proportion
+  tests, Cohen's kappa, Diebold-Mariano, Clark-West, and all TOST variants.
+
 ## [0.4.0] - 2025-12-17
 
 ### Added

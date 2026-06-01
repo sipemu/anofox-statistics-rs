@@ -1,5 +1,6 @@
 use anofox_statistics::{
-    brown_forsythe, one_way_anova, t_test, yuen_test, Alternative, AnovaKind, TTestKind,
+    brown_forsythe, one_way_anova, repeated_measures_anova, t_test, two_way_anova, yuen_test,
+    Alternative, AnovaKind, AnovaTableRow, CorrectedResult, SphericityResult, TTestKind,
 };
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -271,6 +272,179 @@ pub fn js_one_way_anova(groups: js_sys::Array, kind: JsAnovaKind) -> Result<JsVa
         group_sizes: result.group_sizes,
         group_means: result.group_means,
         grand_mean: result.grand_mean,
+    };
+
+    serde_wasm_bindgen::to_value(&js_result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+#[derive(Serialize)]
+struct AnovaTableRowJs {
+    ss: f64,
+    df: f64,
+    ms: f64,
+    f_statistic: Option<f64>,
+    p_value: Option<f64>,
+}
+
+impl From<&AnovaTableRow> for AnovaTableRowJs {
+    fn from(row: &AnovaTableRow) -> Self {
+        AnovaTableRowJs {
+            ss: row.ss,
+            df: row.df,
+            ms: row.ms,
+            f_statistic: row.f_statistic,
+            p_value: row.p_value,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct TwoWayAnovaResultJs {
+    factor_a: AnovaTableRowJs,
+    factor_b: AnovaTableRowJs,
+    interaction: AnovaTableRowJs,
+    residual: AnovaTableRowJs,
+    total: AnovaTableRowJs,
+    levels_a: usize,
+    levels_b: usize,
+    n: usize,
+    grand_mean: f64,
+    cell_means: Vec<Vec<f64>>,
+    marginal_means_a: Vec<f64>,
+    marginal_means_b: Vec<f64>,
+}
+
+/// Two-way ANOVA with interaction.
+///
+/// All three input arrays must have the same length. `factorA` and `factorB`
+/// hold the factor-level index for each observation (0-based; the number of
+/// levels is inferred from the maximum index plus one).
+///
+/// @param values - Observations as Float64Array
+/// @param factorA - Factor A level index per observation as Uint32Array
+/// @param factorB - Factor B level index per observation as Uint32Array
+/// @returns Object with factor_a, factor_b, interaction, residual, total rows
+///   (each: ss, df, ms, f_statistic, p_value), plus levels_a, levels_b, n,
+///   grand_mean, cell_means, marginal_means_a, marginal_means_b.
+#[wasm_bindgen(js_name = twoWayAnova)]
+pub fn js_two_way_anova(
+    values: &[f64],
+    factor_a: &[u32],
+    factor_b: &[u32],
+) -> Result<JsValue, JsError> {
+    let factor_a_usize: Vec<usize> = factor_a.iter().map(|&v| v as usize).collect();
+    let factor_b_usize: Vec<usize> = factor_b.iter().map(|&v| v as usize).collect();
+
+    let result = two_way_anova(values, &factor_a_usize, &factor_b_usize)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+
+    let js_result = TwoWayAnovaResultJs {
+        factor_a: (&result.factor_a).into(),
+        factor_b: (&result.factor_b).into(),
+        interaction: (&result.interaction).into(),
+        residual: (&result.residual).into(),
+        total: (&result.total).into(),
+        levels_a: result.levels_a,
+        levels_b: result.levels_b,
+        n: result.n,
+        grand_mean: result.grand_mean,
+        cell_means: result.cell_means,
+        marginal_means_a: result.marginal_means_a,
+        marginal_means_b: result.marginal_means_b,
+    };
+
+    serde_wasm_bindgen::to_value(&js_result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+#[derive(Serialize)]
+struct SphericityResultJs {
+    w: f64,
+    chi_square: f64,
+    df: f64,
+    p_value: f64,
+}
+
+impl From<&SphericityResult> for SphericityResultJs {
+    fn from(s: &SphericityResult) -> Self {
+        SphericityResultJs {
+            w: s.w,
+            chi_square: s.chi_square,
+            df: s.df,
+            p_value: s.p_value,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct CorrectedResultJs {
+    epsilon: f64,
+    df_num_corrected: f64,
+    df_den_corrected: f64,
+    f_statistic: f64,
+    p_value: f64,
+}
+
+impl From<&CorrectedResult> for CorrectedResultJs {
+    fn from(c: &CorrectedResult) -> Self {
+        CorrectedResultJs {
+            epsilon: c.epsilon,
+            df_num_corrected: c.df_num_corrected,
+            df_den_corrected: c.df_den_corrected,
+            f_statistic: c.f_statistic,
+            p_value: c.p_value,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct RmAnovaResultJs {
+    within_subjects: AnovaTableRowJs,
+    subjects: AnovaTableRowJs,
+    error: AnovaTableRowJs,
+    total: AnovaTableRowJs,
+    sphericity: Option<SphericityResultJs>,
+    greenhouse_geisser: Option<CorrectedResultJs>,
+    huynh_feldt: Option<CorrectedResultJs>,
+    grand_mean: f64,
+    condition_means: Vec<f64>,
+    subject_means: Vec<f64>,
+}
+
+/// One-way repeated-measures ANOVA.
+///
+/// @param data - Array of subjects, each subject is a Float64Array whose
+///   entries are that subject's measurements across conditions. All inner
+///   arrays must have the same length.
+/// @param computeSphericity - If true, also compute Mauchly's test and
+///   Greenhouse-Geisser / Huynh-Feldt corrections (requires k >= 3 conditions).
+/// @returns Object with within_subjects, subjects, error, total rows; optional
+///   sphericity, greenhouse_geisser, huynh_feldt; grand_mean, condition_means,
+///   subject_means.
+#[wasm_bindgen(js_name = repeatedMeasuresAnova)]
+pub fn js_repeated_measures_anova(
+    data: js_sys::Array,
+    compute_sphericity: Option<bool>,
+) -> Result<JsValue, JsError> {
+    let subjects: Vec<Vec<f64>> = data
+        .iter()
+        .map(|s| js_sys::Float64Array::new(&s).to_vec())
+        .collect();
+    let subject_refs: Vec<&[f64]> = subjects.iter().map(|s| s.as_slice()).collect();
+
+    let result = repeated_measures_anova(&subject_refs, compute_sphericity.unwrap_or(true))
+        .map_err(|e| JsError::new(&e.to_string()))?;
+
+    let js_result = RmAnovaResultJs {
+        within_subjects: (&result.within_subjects).into(),
+        subjects: (&result.subjects).into(),
+        error: (&result.error).into(),
+        total: (&result.total).into(),
+        sphericity: result.sphericity.as_ref().map(Into::into),
+        greenhouse_geisser: result.greenhouse_geisser.as_ref().map(Into::into),
+        huynh_feldt: result.huynh_feldt.as_ref().map(Into::into),
+        grand_mean: result.grand_mean,
+        condition_means: result.condition_means,
+        subject_means: result.subject_means,
     };
 
     serde_wasm_bindgen::to_value(&js_result).map_err(|e| JsError::new(&e.to_string()))

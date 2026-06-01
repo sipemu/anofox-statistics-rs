@@ -111,7 +111,7 @@ pub fn tost_prop_one(
 
     // Lower test: H0: (p - p0) <= lower_bound
     let z_lower = (estimate - lower_bound) / se;
-    let p_lower = 1.0 - normal.cdf(z_lower);
+    let p_lower = normal.sf(z_lower);
 
     // Upper test: H0: (p - p0) >= upper_bound
     let z_upper = (estimate - upper_bound) / se;
@@ -258,7 +258,7 @@ pub fn tost_prop_two(
 
     // Lower test: H0: (p1 - p2) <= lower_bound
     let z_lower = (estimate - lower_bound) / se;
-    let p_lower = 1.0 - normal.cdf(z_lower);
+    let p_lower = normal.sf(z_lower);
 
     // Upper test: H0: (p1 - p2) >= upper_bound
     let z_upper = (estimate - upper_bound) / se;

@@ -15,12 +15,15 @@ fn tie_correction(tie_sizes: &[usize]) -> f64 {
 }
 
 /// Compute p-value from z-score using standard normal based on alternative hypothesis.
+///
+/// Uses the survival function (`sf`) directly instead of `1 - cdf(...)` so that
+/// extremely small p-values do not underflow to 0 for large |z|.
 fn compute_p_value(z: f64, alternative: &Alternative) -> f64 {
     let normal = Normal::new(0.0, 1.0).unwrap();
     match alternative {
-        Alternative::TwoSided => 2.0 * (1.0 - normal.cdf(z.abs())),
+        Alternative::TwoSided => 2.0 * normal.sf(z.abs()),
         Alternative::Less => normal.cdf(z),
-        Alternative::Greater => 1.0 - normal.cdf(z),
+        Alternative::Greater => normal.sf(z),
     }
 }
 

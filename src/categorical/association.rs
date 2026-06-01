@@ -354,7 +354,7 @@ pub fn cohen_kappa(table: &[Vec<usize>], weighted: bool) -> Result<KappaResult> 
     // Two-sided p-value
     let p_value = if z.is_finite() {
         let normal = Normal::new(0.0, 1.0).unwrap();
-        2.0 * (1.0 - normal.cdf(z.abs()))
+        2.0 * normal.sf(z.abs())
     } else {
         0.0
     };

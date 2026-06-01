@@ -74,7 +74,7 @@ pub fn pearson(x: &[f64], y: &[f64], conf_level: Option<f64>) -> Result<Correlat
         0.0
     } else {
         let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-        2.0 * (1.0 - t_dist.cdf(t_stat.abs()))
+        2.0 * t_dist.sf(t_stat.abs())
     };
 
     // Compute confidence interval using Fisher z-transformation

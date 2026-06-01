@@ -89,10 +89,10 @@ pub fn clark_west(e1: &[f64], e2: &[f64], h: usize) -> Result<CWResult> {
 
     // One-sided: P(Z > statistic) - tests if unrestricted model is better
     // Positive statistic means e1^2 > e2^2 adjusted, i.e., unrestricted is better
-    let p_value = 1.0 - normal.cdf(statistic);
+    let p_value = normal.sf(statistic);
 
     // Two-sided
-    let p_value_two_sided = 2.0 * (1.0 - normal.cdf(statistic.abs()));
+    let p_value_two_sided = 2.0 * normal.sf(statistic.abs());
 
     Ok(CWResult {
         statistic,

@@ -111,7 +111,7 @@ pub fn brown_forsythe(groups: &[&[f64]]) -> Result<LeveneResult> {
     // F-statistic and p-value
     let f_stat = ms_between / ms_within;
     let f_dist = FisherSnedecor::new(df1, df2).unwrap();
-    let p_value = 1.0 - f_dist.cdf(f_stat);
+    let p_value = f_dist.sf(f_stat);
 
     Ok(LeveneResult {
         statistic: f_stat,

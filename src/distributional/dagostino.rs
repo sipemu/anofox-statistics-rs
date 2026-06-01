@@ -82,7 +82,7 @@ pub fn dagostino_k_squared(data: &[f64]) -> Result<DAgostinoResult> {
 
     // p-value from chi-squared distribution with 2 df
     let chi2 = ChiSquared::new(2.0).unwrap();
-    let p_value = 1.0 - chi2.cdf(k_squared);
+    let p_value = chi2.sf(k_squared);
 
     Ok(DAgostinoResult {
         statistic: k_squared,

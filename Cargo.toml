@@ -3,7 +3,7 @@ members = [".", "crates/anofox-statistics-js"]
 
 [package]
 name = "anofox-statistics"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 authors = ["Simon Müller <code@santic.info>"]
 description = "A comprehensive statistical hypothesis testing library validated against R"

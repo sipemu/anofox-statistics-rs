@@ -160,7 +160,7 @@ pub fn icc(data: &[Vec<f64>], icc_type: ICCType) -> Result<ICCResult> {
     // Compute p-value
     let p_value = if f_value > 0.0 && df1 > 0.0 && df2 > 0.0 {
         let f_dist = FisherSnedecor::new(df1, df2).unwrap();
-        1.0 - f_dist.cdf(f_value)
+        f_dist.sf(f_value)
     } else {
         1.0
     };

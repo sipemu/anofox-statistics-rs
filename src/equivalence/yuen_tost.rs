@@ -96,7 +96,7 @@ pub fn tost_yuen(
 
     // Lower test: H0: estimate <= lower_bound
     let t_lower = (estimate - lower_bound) / se;
-    let p_lower = 1.0 - t_dist.cdf(t_lower);
+    let p_lower = t_dist.sf(t_lower);
 
     // Upper test: H0: estimate >= upper_bound
     let t_upper = (estimate - upper_bound) / se;

@@ -234,7 +234,7 @@ fn compute_kendall_significance(
         1.0
     } else {
         let normal = Normal::new(0.0, 1.0).unwrap();
-        2.0 * (1.0 - normal.cdf(z_stat.abs()))
+        2.0 * normal.sf(z_stat.abs())
     };
 
     (z_stat, p_value)

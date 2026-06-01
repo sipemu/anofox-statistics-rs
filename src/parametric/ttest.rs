@@ -252,15 +252,15 @@ fn compute_p_value(t_stat: f64, df: f64, alternative: Alternative) -> f64 {
     match alternative {
         Alternative::TwoSided => {
             // Two-tailed: P(|T| > |t|) = 2 * P(T > |t|)
-            2.0 * (1.0 - t_dist.cdf(t_stat.abs()))
+            2.0 * t_dist.sf(t_stat.abs())
         }
         Alternative::Less => {
             // Left-tailed: P(T < t)
             t_dist.cdf(t_stat)
         }
         Alternative::Greater => {
-            // Right-tailed: P(T > t) = 1 - P(T < t)
-            1.0 - t_dist.cdf(t_stat)
+            // Right-tailed: P(T > t)
+            t_dist.sf(t_stat)
         }
     }
 }

@@ -122,9 +122,9 @@ pub fn diebold_mariano(
     // Compute p-value based on alternative hypothesis
     let normal = Normal::new(0.0, 1.0).unwrap();
     let p_value = match alternative {
-        Alternative::TwoSided => 2.0 * (1.0 - normal.cdf(dm_stat.abs())),
+        Alternative::TwoSided => 2.0 * normal.sf(dm_stat.abs()),
         Alternative::Less => normal.cdf(dm_stat),
-        Alternative::Greater => 1.0 - normal.cdf(dm_stat),
+        Alternative::Greater => normal.sf(dm_stat),
     };
 
     Ok(DMResult {

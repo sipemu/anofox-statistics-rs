@@ -214,7 +214,7 @@ fn compute_p_value(w: f64, n: usize) -> f64 {
         let sigma = (0.4803 + 0.082676 * ln_n + 0.0030302 * ln_n * ln_n).exp();
 
         let z = (y - mu) / sigma;
-        1.0 - normal.cdf(z)
+        normal.sf(z)
     } else {
         // Log transformation for n >= 12
         let y = (1.0 - w).ln();
@@ -224,7 +224,7 @@ fn compute_p_value(w: f64, n: usize) -> f64 {
         let sigma = poly_sigma_large(ln_n).exp();
 
         let z = (y - mu) / sigma;
-        1.0 - normal.cdf(z)
+        normal.sf(z)
     };
 
     p.clamp(0.0, 1.0)

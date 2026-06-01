@@ -69,10 +69,10 @@ fn compute_bm_pvalue(statistic: f64, df: f64, alternative: Alternative) -> f64 {
 
     match alternative {
         Alternative::TwoSided => {
-            2.0 * (1.0 - t_dist.cdf(statistic.abs())).min(t_dist.cdf(statistic.abs()))
+            2.0 * t_dist.sf(statistic.abs()).min(t_dist.cdf(statistic.abs()))
         }
         Alternative::Greater => t_dist.cdf(statistic),
-        Alternative::Less => 1.0 - t_dist.cdf(statistic),
+        Alternative::Less => t_dist.sf(statistic),
     }
 }
 

@@ -98,7 +98,7 @@ pub fn kruskal_wallis(groups: &[&[f64]]) -> Result<KruskalResult> {
     // Degrees of freedom and p-value
     let df = (k - 1) as f64;
     let chi_sq = ChiSquared::new(df).unwrap();
-    let p_value = 1.0 - chi_sq.cdf(h);
+    let p_value = chi_sq.sf(h);
 
     Ok(KruskalResult {
         statistic: h,
