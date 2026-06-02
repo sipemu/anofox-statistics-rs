@@ -114,7 +114,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+
+      - name: Upgrade npm (OIDC trusted-publisher auth requires npm >= 11.5)
+        run: npm install -g npm@latest
 
       - name: Configure npm registry (no token; OIDC handles auth)
         run: |
