@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Shapiro-Wilk p-value for n <= 11**: `shapiro_wilk` now ports R's `swilk.c`
+  (Royston 1995, AS R94) line for line, including the small-sample (4 <= n <= 11)
+  gamma transform and the exact n <= 5 coefficient path. W and p agree with
+  `shapiro.test()` to ~1e-12 (previously p = 0.070 vs R's 0.161 for an n = 10 sample).
+- **Kendall tau test with ties**: the variance of S now uses the full tie-corrected
+  formula (R `cor.test(method = "kendall", exact = FALSE)`); previously an ad-hoc
+  scaling was used, giving wrong z / p-values whenever either variable had ties.
+- **Mann-Whitney / Wilcoxon continuity correction at z = 0**: like R
+  (`CORRECTION = sign(z) * 0.5`) no correction is applied when the statistic equals
+  its null expectation, so p = 1 instead of < 1. Mann-Whitney with every observation
+  tied (Var(U) = 0) now returns p = 1 instead of p = 0.
+- **Binomial test**: the Clopper-Pearson interval now uses the exact beta quantile
+  (the previous approximation was off by ~5e-3 and clamped to [0.001, 0.999]); the
+  two-sided p-value uses R's relative tolerance instead of an absolute 1e-10, which
+  floored p-values for large n. Intervals for one-sided alternatives are one-sided,
+  as in R `binom.test`.
+- **Proportion tests**: `prop_test_two` interval uses `qnorm` instead of the rounded
+  1.96 and includes R's continuity correction when `correction = true`;
+  one-sided alternatives give one-sided intervals (R `prop.test`). Same for the
+  Wilson interval of `prop_test_one`.
+- **Fisher's exact test**: Woolf interval uses `qnorm` instead of 1.96; the two-sided
+  p-value uses R's relative tolerance; log-factorials are exact (statrs) instead of a
+  Stirling approximation. Cohen's kappa CI uses `qnorm(0.975)`.
+
+### Added
+
+- `binom_test_with_conf_level`, `prop_test_one_with_conf_level`,
+  `prop_test_two_with_conf_level`, `fisher_exact_with_conf_level`: variants taking the
+  confidence level of the reported interval (the existing functions use 0.95).
+
 ## [0.4.2] - 2026-06-01
 
 ### Fixed
