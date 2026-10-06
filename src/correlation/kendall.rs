@@ -54,7 +54,7 @@ pub fn kendall(x: &[f64], y: &[f64], variant: KendallVariant) -> Result<Correlat
     let n = validate_correlation_input(x, y)?;
 
     // Count concordant, discordant, and tied pairs
-    let (concordant, discordant, ties_x, ties_y, ties_xy) = count_pairs(x, y);
+    let (concordant, discordant, ties_x, ties_y, _ties_xy) = count_pairs(x, y);
 
     // Total number of pairs
     let n_pairs = (n * (n - 1)) / 2;
@@ -101,9 +101,7 @@ pub fn kendall(x: &[f64], y: &[f64], variant: KendallVariant) -> Result<Correlat
     // var(tau) = (4n + 10) / (9n(n-1)) for no ties
     // With ties, use more complex formula
 
-    let (z_stat, p_value) = compute_kendall_significance(
-        tau, n, concordant, discordant, ties_x, ties_y, ties_xy, variant,
-    );
+    let (z_stat, p_value) = compute_kendall_significance(x, y, n, concordant, discordant, variant);
 
     Ok(CorrelationResult {
         estimate: tau,
@@ -169,58 +167,62 @@ fn count_unique(data: &[f64]) -> usize {
     sorted.len()
 }
 
+/// Sums over tie groups of size t: (sum t(t-1)(2t+5), sum t(t-1), sum t(t-1)(t-2)).
+fn tie_sums(data: &[f64]) -> (f64, f64, f64) {
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let (mut v, mut s1, mut s2) = (0.0, 0.0, 0.0);
+    let mut i = 0;
+    while i < sorted.len() {
+        let mut j = i + 1;
+        while j < sorted.len() && sorted[j] == sorted[i] {
+            j += 1;
+        }
+        let t = (j - i) as f64;
+        if t > 1.0 {
+            v += t * (t - 1.0) * (2.0 * t + 5.0);
+            s1 += t * (t - 1.0);
+            s2 += t * (t - 1.0) * (t - 2.0);
+        }
+        i = j;
+    }
+    (v, s1, s2)
+}
+
 /// Compute z-statistic and p-value for Kendall's tau using normal approximation.
 #[allow(clippy::too_many_arguments)]
 fn compute_kendall_significance(
-    _tau: f64,
+    x: &[f64],
+    y: &[f64],
     n: usize,
     concordant: usize,
     discordant: usize,
-    ties_x: usize,
-    ties_y: usize,
-    _ties_xy: usize,
     _variant: KendallVariant,
 ) -> (f64, f64) {
     let n_f = n as f64;
-    let n_pairs = (n * (n - 1)) / 2;
 
     // S = concordant - discordant
     let s = concordant as f64 - discordant as f64;
 
-    // Variance computation depends on ties
-    // For tau-b, R uses the following variance formula with tie correction:
-    // v0 = n(n-1)(2n+5)/18
-    // vt = sum over tie groups in x: t(t-1)(2t+5)/18
-    // vu = sum over tie groups in y: u(u-1)(2u+5)/18
-    // v1 = sum_t * sum_u / (9n(n-1)(n-2))
-    // v2 = sum_t2 * sum_u2 / (2n(n-1))
-    // var(S) = v0 - vt - vu + v1 + v2
-
-    let variance = if ties_x == 0 && ties_y == 0 {
-        // No ties: simple formula
-        n_f * (n_f - 1.0) * (2.0 * n_f + 5.0) / 18.0
-    } else {
-        // With ties: use approximation based on tie counts
-        // This is a simplified version; R uses group-based calculation
-        let t1 = ties_x as f64;
-        let t2 = ties_y as f64;
-        let n0 = n_pairs as f64;
-
-        // Effective denominators (for more accurate variance calculation)
-        let _n1 = n0 - t1;
-        let _n2 = n0 - t2;
-
-        // Approximate variance for tau-b
-        // Using formula: var(tau-b) ≈ (4/(n*(n-1))) * ((n0-concordant-discordant+1)/(n0-1))
-        // But R's actual formula is more complex
-
-        // Simplified variance formula that works reasonably well:
-        let v0 = n_f * (n_f - 1.0) * (2.0 * n_f + 5.0) / 18.0;
-
-        // Adjustment factors for ties (simplified)
-        let adj = 1.0 - (t1 + t2) / (2.0 * n0);
-        v0 * adj * adj
-    };
+    // Tie-corrected variance of S (Kendall 1970; identical to R's
+    // cor.test(method = "kendall", exact = FALSE)):
+    //   var(S) = (v0 - vt - vu) / 18
+    //          + v1 / (2 n (n-1))
+    //          + v2 / (9 n (n-1) (n-2))
+    // with, over tie groups of size t (in x) and u (in y):
+    //   v0 = n(n-1)(2n+5), vt = sum t(t-1)(2t+5), vu = sum u(u-1)(2u+5)
+    //   v1 = sum t(t-1) * sum u(u-1)
+    //   v2 = sum t(t-1)(t-2) * sum u(u-1)(u-2)
+    let (vt, sx1, sx2) = tie_sums(x);
+    let (vu, sy1, sy2) = tie_sums(y);
+    let v0 = n_f * (n_f - 1.0) * (2.0 * n_f + 5.0);
+    let mut variance = (v0 - vt - vu) / 18.0;
+    if n > 1 {
+        variance += sx1 * sy1 / (2.0 * n_f * (n_f - 1.0));
+    }
+    if n > 2 {
+        variance += sx2 * sy2 / (9.0 * n_f * (n_f - 1.0) * (n_f - 2.0));
+    }
 
     // Z-statistic
     let z_stat = if variance <= 0.0 {
@@ -241,6 +243,7 @@ fn compute_kendall_significance(
 }
 
 #[cfg(test)]
+#[allow(clippy::excessive_precision)]
 mod tests {
     use super::*;
 
@@ -301,5 +304,35 @@ mod tests {
 
         // Should be close to zero or small
         assert!(result.estimate.abs() < 0.5);
+    }
+
+    /// R: cor.test(x, y, method = "kendall", exact = FALSE) with ties in both variables.
+    #[test]
+    fn test_kendall_tie_corrected_variance_matches_r() {
+        let x = [1.0, 2.0, 2.0, 3.0, 4.0, 4.0, 4.0, 5.0, 6.0, 7.0, 8.0, 8.0];
+        let y = [2.0, 1.0, 3.0, 3.0, 5.0, 4.0, 6.0, 6.0, 5.0, 8.0, 7.0, 9.0];
+        let r = kendall(&x, &y, KendallVariant::TauB).unwrap();
+        assert!((r.estimate - 0.80655653082637868).abs() < 1e-12);
+        assert!((r.statistic - 3.4987518043922514).abs() < 1e-10);
+        assert!(
+            (r.p_value - 0.00046744148056981807).abs() < 1e-13,
+            "{}",
+            r.p_value
+        );
+
+        let x = [1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 4.0];
+        let y = [3.0, 1.0, 2.0, 2.0, 2.0, 5.0, 5.0];
+        let r = kendall(&x, &y, KendallVariant::TauB).unwrap();
+        assert!((r.estimate - 0.58823529411764708).abs() < 1e-12);
+        assert!(
+            (r.statistic - 1.6717604707611915).abs() < 1e-10,
+            "{}",
+            r.statistic
+        );
+        assert!(
+            (r.p_value - 0.094571564500939773).abs() < 1e-10,
+            "{}",
+            r.p_value
+        );
     }
 }
