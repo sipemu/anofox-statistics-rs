@@ -137,15 +137,25 @@ pub fn mann_whitney_u(
     let p_value = if exact && !has_ties {
         // Exact p-value using enumeration
         mann_whitney_exact_p(nx, ny, u1 as usize, &alternative)
+    } else if sigma_sq <= 0.0 {
+        // Every observation is tied: Var(U) = 0 and U equals its null
+        // expectation, so there is no evidence of a shift. R returns NaN here
+        // (0/0) for the two-sided test and 1 for one-sided tests;
+        // scipy.stats.mannwhitneyu returns 1. We return 1.
+        1.0
     } else {
         // Normal approximation with optional continuity correction
         let correction = if continuity_correction { 0.5 } else { 0.0 };
         let z = match alternative {
             Alternative::TwoSided => {
+                // R: CORRECTION = sign(z) * 0.5, i.e. no correction when the
+                // statistic equals its null expectation (z = 0, p = 1).
                 if u1 > mu {
                     (u1 - mu - correction) / sigma
-                } else {
+                } else if u1 < mu {
                     (u1 - mu + correction) / sigma
+                } else {
+                    0.0
                 }
             }
             Alternative::Less => (u1 - mu + correction) / sigma,
@@ -269,10 +279,14 @@ pub fn wilcoxon_signed_rank(
         let correction = if continuity_correction { 0.5 } else { 0.0 };
         let z = match alternative {
             Alternative::TwoSided => {
+                // R: CORRECTION = sign(z) * 0.5, i.e. no correction when the
+                // statistic equals its null expectation (z = 0, p = 1).
                 if v > mu {
                     (v - mu - correction) / sigma
-                } else {
+                } else if v < mu {
                     (v - mu + correction) / sigma
+                } else {
+                    0.0
                 }
             }
             Alternative::Less => (v - mu + correction) / sigma,
@@ -673,4 +687,57 @@ fn wilcoxon_ci_approx_k(n: usize, alpha: f64) -> (usize, usize) {
     let k_upper = ((mu + z * sigma).ceil() as usize + 1).min(n_walsh);
 
     (k_lower, k_upper)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mann_whitney_all_tied_p_is_one() {
+        // Var(U) = 0: scipy.stats.mannwhitneyu -> p = 1 (R: NaN two-sided, 1 one-sided)
+        let x = [5.0; 6];
+        let y = [5.0; 7];
+        for alt in [
+            Alternative::TwoSided,
+            Alternative::Less,
+            Alternative::Greater,
+        ] {
+            let r = mann_whitney_u(&x, &y, alt, true, false, None, None).unwrap();
+            assert_eq!(r.p_value, 1.0);
+            assert_eq!(r.statistic, 21.0);
+        }
+    }
+
+    #[test]
+    fn test_mann_whitney_u_at_null_expectation_no_correction() {
+        // R: wilcox.test(c(1, 4), c(2, 3), exact = FALSE)$p.value == 1
+        let r = mann_whitney_u(
+            &[1.0, 4.0],
+            &[2.0, 3.0],
+            Alternative::TwoSided,
+            true,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r.p_value, 1.0);
+    }
+
+    #[test]
+    fn test_wilcoxon_v_at_null_expectation_no_correction() {
+        // R: wilcox.test(c(1,2,3,4), c(4,3,2,1), paired = TRUE, exact = FALSE)$p.value == 1
+        let r = wilcoxon_signed_rank(
+            &[1.0, 2.0, 3.0, 4.0],
+            &[4.0, 3.0, 2.0, 1.0],
+            Alternative::TwoSided,
+            true,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r.p_value, 1.0);
+    }
 }
