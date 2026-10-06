@@ -45,10 +45,11 @@ pub use resampling::{
 };
 
 pub use categorical::{
-    binom_test, chisq_goodness_of_fit, chisq_test, cohen_kappa, contingency_coef, cramers_v,
-    fisher_exact, g_test, mcnemar_exact, mcnemar_test, phi_coefficient, prop_test_one,
-    prop_test_two, AssociationResult, BinomTestResult, ChiSquareResult, FisherResult, KappaResult,
-    McNemarkExactResult, McNemarkResult, PropTestResult,
+    binom_test, binom_test_with_conf_level, chisq_goodness_of_fit, chisq_test, cohen_kappa,
+    contingency_coef, cramers_v, fisher_exact, fisher_exact_with_conf_level, g_test, mcnemar_exact,
+    mcnemar_test, phi_coefficient, prop_test_one, prop_test_one_with_conf_level, prop_test_two,
+    prop_test_two_with_conf_level, AssociationResult, BinomTestResult, ChiSquareResult,
+    FisherResult, KappaResult, McNemarkExactResult, McNemarkResult, PropTestResult,
 };
 pub use equivalence::{
     tost_bootstrap, tost_correlation, tost_prop_one, tost_prop_two, tost_t_test_one_sample,

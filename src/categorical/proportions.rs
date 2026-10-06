@@ -2,7 +2,7 @@
 
 use crate::error::{Result, StatError};
 use crate::parametric::Alternative;
-use statrs::distribution::{Binomial, ContinuousCDF, Discrete, Normal};
+use statrs::distribution::{Beta, Binomial, ContinuousCDF, Discrete, DiscreteCDF, Normal};
 
 /// Result of a proportion test
 #[derive(Debug, Clone)]
@@ -81,6 +81,23 @@ pub fn prop_test_one(
     p0: f64,
     alternative: Alternative,
 ) -> Result<PropTestResult> {
+    prop_test_one_with_conf_level(successes, n, p0, alternative, 0.95)
+}
+
+/// One-sample proportion test with a configurable confidence level.
+///
+/// Same as [`prop_test_one`], but the Wilson score interval is computed at
+/// `conf_level`. As in R's `prop.test(correct = FALSE)`, the interval is
+/// two-sided for `TwoSided` and one-sided (`[0, U]` / `[L, 1]`, using
+/// `qnorm(conf_level)`) for `Less` / `Greater`.
+pub fn prop_test_one_with_conf_level(
+    successes: usize,
+    n: usize,
+    p0: f64,
+    alternative: Alternative,
+    conf_level: f64,
+) -> Result<PropTestResult> {
+    validate_conf_level(conf_level)?;
     if n == 0 {
         return Err(StatError::EmptyData);
     }
@@ -114,8 +131,8 @@ pub fn prop_test_one(
         Alternative::Less => normal.cdf(z),
     };
 
-    // Wilson score confidence interval
-    let (conf_int_lower, conf_int_upper) = wilson_ci(successes, n, 0.95);
+    // Wilson score confidence interval (R prop.test, correct = FALSE)
+    let (conf_int_lower, conf_int_upper) = wilson_ci(successes, n, conf_level, alternative);
 
     Ok(PropTestResult {
         estimate: vec![p_hat],
@@ -161,6 +178,24 @@ pub fn prop_test_two(
     alternative: Alternative,
     correction: bool,
 ) -> Result<PropTestResult> {
+    prop_test_two_with_conf_level(successes, totals, alternative, correction, 0.95)
+}
+
+/// Two-sample proportion test with a configurable confidence level.
+///
+/// Same as [`prop_test_two`], but the confidence interval for `p1 - p2` is
+/// computed at `conf_level`, exactly as R's `prop.test`: a Wald interval,
+/// widened by the continuity correction `min(0.5, |p1 - p2| / (1/n1 + 1/n2)) *
+/// (1/n1 + 1/n2)` when `correction` is true, two-sided for `TwoSided` and
+/// one-sided (`[-1, U]` / `[L, 1]`) otherwise, clipped to `[-1, 1]`.
+pub fn prop_test_two_with_conf_level(
+    successes: [usize; 2],
+    totals: [usize; 2],
+    alternative: Alternative,
+    correction: bool,
+    conf_level: f64,
+) -> Result<PropTestResult> {
+    validate_conf_level(conf_level)?;
     if totals[0] == 0 || totals[1] == 0 {
         return Err(StatError::EmptyData);
     }
@@ -212,11 +247,21 @@ pub fn prop_test_two(
         Alternative::Less => normal.cdf(z),
     };
 
-    // Confidence interval for difference in proportions
+    // Confidence interval for difference in proportions (R prop.test)
     let se_diff = (p1 * (1.0 - p1) / n1 + p2 * (1.0 - p2) / n2).sqrt();
-    let z_crit = 1.96;
-    let conf_int_lower = diff - z_crit * se_diff;
-    let conf_int_upper = diff + z_crit * se_diff;
+    let z_crit = normal_quantile_for(conf_level, alternative);
+    let inv_sum = 1.0 / n1 + 1.0 / n2;
+    let yates = if correction {
+        0.5_f64.min(diff.abs() / inv_sum)
+    } else {
+        0.0
+    };
+    let width = z_crit * se_diff + yates * inv_sum;
+    let (conf_int_lower, conf_int_upper) = match alternative {
+        Alternative::TwoSided => ((diff - width).max(-1.0), (diff + width).min(1.0)),
+        Alternative::Less => (-1.0, (diff + width).min(1.0)),
+        Alternative::Greater => ((diff - width).max(-1.0), 1.0),
+    };
 
     Ok(PropTestResult {
         estimate: vec![p1, p2],
@@ -267,6 +312,22 @@ pub fn binom_test(
     p0: f64,
     alternative: Alternative,
 ) -> Result<BinomTestResult> {
+    binom_test_with_conf_level(successes, n, p0, alternative, 0.95)
+}
+
+/// Exact binomial test with a configurable confidence level.
+///
+/// Same as [`binom_test`], but the Clopper-Pearson interval is computed at
+/// `conf_level`. As in R's `binom.test`, the interval is two-sided for
+/// `TwoSided` and one-sided (`[0, U]` / `[L, 1]`) for `Less` / `Greater`.
+pub fn binom_test_with_conf_level(
+    successes: usize,
+    n: usize,
+    p0: f64,
+    alternative: Alternative,
+    conf_level: f64,
+) -> Result<BinomTestResult> {
+    validate_conf_level(conf_level)?;
     if n == 0 {
         return Err(StatError::EmptyData);
     }
@@ -285,42 +346,12 @@ pub fn binom_test(
 
     let p_hat = successes as f64 / n as f64;
 
-    // Compute exact p-value using binomial distribution
-    let binom = Binomial::new(p0, n as u64).unwrap();
-    let observed_prob = binom.pmf(successes as u64);
-
-    let p_value = match alternative {
-        Alternative::TwoSided => {
-            // Sum probabilities of all outcomes as or less likely than observed
-            let mut p = 0.0;
-            for k in 0..=n {
-                let prob_k = binom.pmf(k as u64);
-                if prob_k <= observed_prob + 1e-10 {
-                    p += prob_k;
-                }
-            }
-            p.min(1.0)
-        }
-        Alternative::Greater => {
-            // P(X >= successes)
-            let mut p = 0.0;
-            for k in successes..=n {
-                p += binom.pmf(k as u64);
-            }
-            p
-        }
-        Alternative::Less => {
-            // P(X <= successes)
-            let mut p = 0.0;
-            for k in 0..=successes {
-                p += binom.pmf(k as u64);
-            }
-            p
-        }
-    };
+    // Exact p-value, following R's binom.test
+    let p_value = binom_p_value(successes, n, p0, alternative);
 
     // Clopper-Pearson exact confidence interval
-    let (conf_int_lower, conf_int_upper) = clopper_pearson_ci(successes, n, 0.95);
+    let (conf_int_lower, conf_int_upper) =
+        clopper_pearson_ci(successes, n, conf_level, alternative);
 
     Ok(BinomTestResult {
         estimate: p_hat,
@@ -335,231 +366,163 @@ pub fn binom_test(
     })
 }
 
-/// Wilson score confidence interval for a proportion.
-fn wilson_ci(successes: usize, n: usize, conf_level: f64) -> (f64, f64) {
+fn validate_conf_level(conf_level: f64) -> Result<()> {
+    if conf_level.is_finite() && conf_level > 0.0 && conf_level < 1.0 {
+        Ok(())
+    } else {
+        Err(StatError::InvalidParameter(format!(
+            "conf_level must be in (0, 1), got {}",
+            conf_level
+        )))
+    }
+}
+
+/// Normal quantile used by R's prop.test intervals:
+/// `qnorm((1 + conf_level) / 2)` two-sided, `qnorm(conf_level)` one-sided.
+fn normal_quantile_for(conf_level: f64, alternative: Alternative) -> f64 {
+    let normal = Normal::new(0.0, 1.0).unwrap();
+    match alternative {
+        Alternative::TwoSided => normal.inverse_cdf((1.0 + conf_level) / 2.0),
+        _ => normal.inverse_cdf(conf_level),
+    }
+}
+
+/// Wilson score confidence interval for a proportion (R `prop.test(correct = FALSE)`).
+fn wilson_ci(successes: usize, n: usize, conf_level: f64, alternative: Alternative) -> (f64, f64) {
     let p_hat = successes as f64 / n as f64;
     let n_f = n as f64;
 
-    let alpha = 1.0 - conf_level;
-    let normal = Normal::new(0.0, 1.0).unwrap();
-    let z = normal.inverse_cdf(1.0 - alpha / 2.0);
-    let z2 = z * z;
+    let z = normal_quantile_for(conf_level, alternative);
+    let z22n = z * z / (2.0 * n_f);
+    let half = z * (p_hat * (1.0 - p_hat) / n_f + z22n / (2.0 * n_f)).sqrt();
 
-    let denom = 1.0 + z2 / n_f;
-    let center = (p_hat + z2 / (2.0 * n_f)) / denom;
-    let margin = z * (p_hat * (1.0 - p_hat) / n_f + z2 / (4.0 * n_f * n_f)).sqrt() / denom;
-
-    let lower = (center - margin).max(0.0);
-    let upper = (center + margin).min(1.0);
-
-    (lower, upper)
-}
-
-/// Clopper-Pearson exact confidence interval for a proportion.
-fn clopper_pearson_ci(successes: usize, n: usize, conf_level: f64) -> (f64, f64) {
-    let alpha = 1.0 - conf_level;
-
-    // Lower bound: find p such that P(X >= successes | p) = alpha/2
-    // This is the alpha/2 quantile of Beta(successes, n - successes + 1)
-    let lower = if successes == 0 {
-        0.0
-    } else {
-        beta_quantile(alpha / 2.0, successes as f64, (n - successes + 1) as f64)
-    };
-
-    // Upper bound: find p such that P(X <= successes | p) = alpha/2
-    // This is the 1 - alpha/2 quantile of Beta(successes + 1, n - successes)
-    let upper = if successes == n {
+    let upper = if p_hat >= 1.0 {
         1.0
     } else {
-        beta_quantile(
-            1.0 - alpha / 2.0,
-            (successes + 1) as f64,
-            (n - successes) as f64,
-        )
+        ((p_hat + z22n + half) / (1.0 + 2.0 * z22n)).min(1.0)
+    };
+    let lower = if p_hat <= 0.0 {
+        0.0
+    } else {
+        ((p_hat + z22n - half) / (1.0 + 2.0 * z22n)).max(0.0)
     };
 
-    (lower, upper)
+    match alternative {
+        Alternative::TwoSided => (lower, upper),
+        Alternative::Less => (0.0, upper),
+        Alternative::Greater => (lower, 1.0),
+    }
 }
 
-/// Approximate beta quantile using Newton-Raphson iteration.
-fn beta_quantile(p: f64, a: f64, b: f64) -> f64 {
-    // Simple approximation using the normal approximation to beta
-    // Mean of Beta(a,b) = a/(a+b), Var = ab/((a+b)^2*(a+b+1))
-    let mean = a / (a + b);
-    let var = (a * b) / ((a + b).powi(2) * (a + b + 1.0));
-    let sd = var.sqrt();
-
-    // Normal approximation
-    let normal = Normal::new(0.0, 1.0).unwrap();
-    let z = normal.inverse_cdf(p);
-
-    // Initial guess
-    let mut x = mean + z * sd;
-    x = x.clamp(0.001, 0.999);
-
-    // Newton-Raphson refinement (a few iterations)
-    for _ in 0..10 {
-        let cdf = beta_cdf(x, a, b);
-        let pdf = beta_pdf(x, a, b);
-
-        if pdf.abs() < 1e-12 {
-            break;
+/// Exact binomial p-value, a port of R's `binom.test`.
+///
+/// The two-sided p-value sums the probabilities of all outcomes no more
+/// likely than the observed one, using R's relative tolerance `1 + 1e-7`
+/// (an absolute tolerance would include every outcome with probability below
+/// it and floor the p-value for large `n`). Tails use the binomial CDF/SF.
+fn binom_p_value(x: usize, n: usize, p0: f64, alternative: Alternative) -> f64 {
+    // P(X <= k)
+    let cdf = |binom: &Binomial, k: i64| -> f64 {
+        if k < 0 {
+            0.0
+        } else {
+            binom.cdf(k as u64)
         }
-
-        let delta = (cdf - p) / pdf;
-        x -= delta;
-        x = x.clamp(0.001, 0.999);
-
-        if delta.abs() < 1e-10 {
-            break;
-        }
-    }
-
-    x
-}
-
-/// Beta CDF using incomplete beta function approximation.
-fn beta_cdf(x: f64, a: f64, b: f64) -> f64 {
-    if x <= 0.0 {
-        return 0.0;
-    }
-    if x >= 1.0 {
-        return 1.0;
-    }
-
-    // Use regularized incomplete beta function
-    // I_x(a,b) = B(x;a,b) / B(a,b)
-    incomplete_beta(x, a, b)
-}
-
-/// Beta PDF
-fn beta_pdf(x: f64, a: f64, b: f64) -> f64 {
-    if x <= 0.0 || x >= 1.0 {
-        return 0.0;
-    }
-
-    // f(x) = x^(a-1) * (1-x)^(b-1) / B(a,b)
-    let log_b = log_beta(a, b);
-    let log_pdf = (a - 1.0) * x.ln() + (b - 1.0) * (1.0 - x).ln() - log_b;
-
-    log_pdf.exp()
-}
-
-/// Log of beta function: log(B(a,b)) = log(Gamma(a)) + log(Gamma(b)) - log(Gamma(a+b))
-fn log_beta(a: f64, b: f64) -> f64 {
-    log_gamma(a) + log_gamma(b) - log_gamma(a + b)
-}
-
-/// Log-gamma function using Lanczos approximation.
-fn log_gamma(x: f64) -> f64 {
-    if x <= 0.0 {
-        return f64::INFINITY;
-    }
-
-    // Lanczos approximation coefficients
-    #[allow(clippy::excessive_precision)]
-    let g = 7.0;
-    #[allow(clippy::excessive_precision)]
-    let c = [
-        0.99999999999980993,
-        676.5203681218851,
-        -1259.1392167224028,
-        771.32342877765313,
-        -176.61502916214059,
-        12.507343278686905,
-        -0.13857109526572012,
-        9.9843695780195716e-6,
-        1.5056327351493116e-7,
-    ];
-
-    let x = x - 1.0;
-    let mut y = c[0];
-    for (i, coef) in c.iter().enumerate().skip(1) {
-        y += coef / (x + i as f64);
-    }
-
-    let t = x + g + 0.5;
-    0.5 * (2.0 * std::f64::consts::PI).ln() + (x + 0.5) * t.ln() - t + y.ln()
-}
-
-/// Regularized incomplete beta function using continued fraction.
-fn incomplete_beta(x: f64, a: f64, b: f64) -> f64 {
-    if x <= 0.0 {
-        return 0.0;
-    }
-    if x >= 1.0 {
-        return 1.0;
-    }
-
-    // Use symmetry relation if needed for better convergence
-    if x > (a + 1.0) / (a + b + 2.0) {
-        return 1.0 - incomplete_beta(1.0 - x, b, a);
-    }
-
-    // Continued fraction representation
-    let bt = (a * x.ln() + b * (1.0 - x).ln() - log_beta(a, b)).exp();
-
-    // Lentz's algorithm for continued fraction
-    let mut f = 1.0;
-    let mut c = 1.0;
-    let mut d = 0.0;
-
-    for m in 0..200 {
-        let m_f = m as f64;
-
-        // Even term
-        let an = if m == 0 {
+    };
+    // P(X > k)
+    let sf = |binom: &Binomial, k: i64| -> f64 {
+        if k < 0 {
             1.0
         } else {
-            let num = (a + m_f - 1.0) * (a + b + m_f - 1.0) * m_f * (b - m_f) * x * x;
-            let den = (a + 2.0 * m_f - 1.0).powi(2);
-            num / den
-        };
-
-        d = 1.0 + an * d;
-        if d.abs() < 1e-30 {
-            d = 1e-30;
+            binom.sf(k as u64)
         }
-        d = 1.0 / d;
+    };
 
-        c = 1.0 + an / c;
-        if c.abs() < 1e-30 {
-            c = 1e-30;
+    let binom = Binomial::new(p0, n as u64).unwrap();
+    let xi = x as i64;
+    let ni = n as i64;
+    let p = match alternative {
+        Alternative::Less => cdf(&binom, xi),
+        Alternative::Greater => sf(&binom, xi - 1),
+        Alternative::TwoSided => {
+            if p0 == 0.0 {
+                if x == 0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            } else if p0 == 1.0 {
+                if x == n {
+                    1.0
+                } else {
+                    0.0
+                }
+            } else {
+                let rel_err = 1.0 + 1e-7;
+                let d = binom.pmf(x as u64);
+                let m = n as f64 * p0;
+                let xf = x as f64;
+                if xf == m {
+                    1.0
+                } else if xf < m {
+                    let start = m.ceil() as i64;
+                    let y = (start..=ni)
+                        .filter(|&i| binom.pmf(i as u64) <= d * rel_err)
+                        .count() as i64;
+                    cdf(&binom, xi) + sf(&binom, ni - y)
+                } else {
+                    let end = m.floor() as i64;
+                    let y = (0..=end)
+                        .filter(|&i| binom.pmf(i as u64) <= d * rel_err)
+                        .count() as i64;
+                    cdf(&binom, y - 1) + sf(&binom, xi - 1)
+                }
+            }
         }
+    };
+    p.clamp(0.0, 1.0)
+}
 
-        f *= d * c;
-
-        // Odd term
-        let an = {
-            let num = -(a + m_f) * (a + b + m_f) * (m_f + 1.0) * (b - m_f - 1.0) * x * x;
-            let den = (a + 2.0 * m_f + 1.0).powi(2);
-            num / den
-        };
-
-        d = 1.0 + an * d;
-        if d.abs() < 1e-30 {
-            d = 1e-30;
+/// Clopper-Pearson exact confidence interval for a proportion (R `binom.test`).
+fn clopper_pearson_ci(
+    successes: usize,
+    n: usize,
+    conf_level: f64,
+    alternative: Alternative,
+) -> (f64, f64) {
+    // p.L(alpha) = qbeta(alpha, x, n - x + 1), 0 when x == 0
+    let p_lower = |alpha: f64| -> f64 {
+        if successes == 0 {
+            0.0
+        } else {
+            Beta::new(successes as f64, (n - successes + 1) as f64)
+                .unwrap()
+                .inverse_cdf(alpha)
         }
-        d = 1.0 / d;
-
-        c = 1.0 + an / c;
-        if c.abs() < 1e-30 {
-            c = 1e-30;
+    };
+    // p.U(alpha) = qbeta(1 - alpha, x + 1, n - x), 1 when x == n
+    let p_upper = |alpha: f64| -> f64 {
+        if successes == n {
+            1.0
+        } else {
+            Beta::new((successes + 1) as f64, (n - successes) as f64)
+                .unwrap()
+                .inverse_cdf(1.0 - alpha)
         }
+    };
 
-        let delta = d * c;
-        f *= delta;
-
-        if (delta - 1.0).abs() < 1e-10 {
-            break;
+    match alternative {
+        Alternative::TwoSided => {
+            let alpha = (1.0 - conf_level) / 2.0;
+            (p_lower(alpha), p_upper(alpha))
         }
+        Alternative::Less => (0.0, p_upper(1.0 - conf_level)),
+        Alternative::Greater => (p_lower(1.0 - conf_level), 1.0),
     }
-
-    bt * f / a
 }
 
 #[cfg(test)]
+#[allow(clippy::excessive_precision)]
 mod tests {
     use super::*;
 
@@ -628,5 +591,80 @@ mod tests {
         // CI should be reasonable (0.2-0.4ish for 30/100)
         assert!(result.conf_int_lower > 0.15);
         assert!(result.conf_int_upper < 0.45);
+    }
+
+    fn close(a: f64, b: f64, tol: f64) {
+        assert!((a - b).abs() <= tol, "got {a}, expected {b}");
+    }
+
+    /// Reference values: R 4.x binom.test()
+    #[test]
+    fn test_binom_test_matches_r() {
+        let r = binom_test(13, 20, 0.5, Alternative::TwoSided).unwrap();
+        close(r.p_value, 0.26317596435546875, 1e-14);
+        close(r.conf_int_lower, 0.4078114654671719, 1e-12);
+        close(r.conf_int_upper, 0.84609079521545882, 1e-12);
+
+        let r = binom_test_with_conf_level(13, 20, 0.5, Alternative::Less, 0.9).unwrap();
+        close(r.p_value, 0.94234085083007812, 1e-14);
+        close(r.conf_int_lower, 0.0, 0.0);
+        close(r.conf_int_upper, 0.79333596671715334, 1e-12);
+
+        let r = binom_test_with_conf_level(13, 20, 0.5, Alternative::Greater, 0.8).unwrap();
+        close(r.p_value, 0.13158798217773438, 1e-14);
+        close(r.conf_int_lower, 0.53078479585500027, 1e-12);
+        close(r.conf_int_upper, 1.0, 0.0);
+
+        let r = binom_test(0, 10, 0.5, Alternative::TwoSided).unwrap();
+        close(r.p_value, 0.0019531250000000004, 1e-15);
+        close(r.conf_int_upper, 0.30849710781876083, 1e-12);
+        let r = binom_test(10, 10, 0.3, Alternative::TwoSided).unwrap();
+        close(r.p_value, 5.9048999999999915e-06, 1e-15);
+        close(r.conf_int_lower, 0.69150289218123917, 1e-12);
+    }
+
+    /// Large n: the two-sided p-value must not be floored by an absolute tolerance.
+    #[test]
+    fn test_binom_test_large_n_matches_r() {
+        let r = binom_test(5200, 10000, 0.5, Alternative::TwoSided).unwrap();
+        assert!((r.p_value / 6.593515598672462e-05 - 1.0).abs() < 1e-8);
+        close(r.conf_int_lower, 0.51015339471986465, 1e-10);
+        close(r.conf_int_upper, 0.52983495148605675, 1e-10);
+        let r = binom_test(4500, 10000, 0.5, Alternative::TwoSided).unwrap();
+        assert!(
+            (r.p_value / 1.5510640568246068e-23 - 1.0).abs() < 1e-6,
+            "{}",
+            r.p_value
+        );
+        let r = binom_test(30, 1000, 0.05, Alternative::TwoSided).unwrap();
+        assert!(
+            (r.p_value / 0.00281865528447252 - 1.0).abs() < 1e-8,
+            "{}",
+            r.p_value
+        );
+    }
+
+    /// Reference values: R prop.test()
+    #[test]
+    fn test_prop_test_ci_matches_r() {
+        let r = prop_test_one_with_conf_level(13, 20, 0.5, Alternative::TwoSided, 0.9).unwrap();
+        close(r.conf_int_lower, 0.46651268884847175, 1e-12);
+        close(r.conf_int_upper, 0.79773995994323899, 1e-12);
+        let r = prop_test_one(13, 20, 0.5, Alternative::Greater).unwrap();
+        close(r.conf_int_lower, 0.46651268884847175, 1e-12);
+        close(r.conf_int_upper, 1.0, 0.0);
+
+        // correct = TRUE (default in R)
+        let r = prop_test_two([18, 11], [30, 28], Alternative::TwoSided, true).unwrap();
+        close(r.conf_int_lower, -0.079284640161607245, 1e-12);
+        close(r.conf_int_upper, 0.4935703544473215, 1e-12);
+        let r =
+            prop_test_two_with_conf_level([18, 11], [30, 28], Alternative::TwoSided, false, 0.99)
+                .unwrap();
+        close(r.conf_int_lower, -0.12391470604482185, 1e-12);
+        close(r.conf_int_upper, 0.53820042033053617, 1e-12);
+        let r = prop_test_two([18, 11], [30, 28], Alternative::Less, true).unwrap();
+        close(r.conf_int_lower, -1.0, 0.0);
+        close(r.conf_int_upper, 0.45307090560001412, 1e-12);
     }
 }

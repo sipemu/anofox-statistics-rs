@@ -359,8 +359,8 @@ pub fn cohen_kappa(table: &[Vec<usize>], weighted: bool) -> Result<KappaResult> 
         0.0
     };
 
-    // 95% CI
-    let z_crit = 1.96;
+    // 95% CI (qnorm(0.975), not the rounded 1.96)
+    let z_crit = Normal::new(0.0, 1.0).unwrap().inverse_cdf(0.975);
     let conf_int_lower = kappa - z_crit * se;
     let conf_int_upper = kappa + z_crit * se;
 

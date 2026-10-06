@@ -2,6 +2,7 @@
 
 use crate::categorical::{validate_2x2_table, Alternative};
 use crate::error::Result;
+use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Result of Fisher's exact test
 #[derive(Debug, Clone)]
@@ -54,7 +55,23 @@ pub struct FisherResult {
 /// # R equivalent
 /// `fisher.test(matrix(c(a, c, b, d), nrow=2))`
 pub fn fisher_exact(table: &[[usize; 2]; 2], alternative: Alternative) -> Result<FisherResult> {
+    fisher_exact_with_conf_level(table, alternative, 0.95)
+}
+
+/// Fisher's exact test with a configurable confidence level for the
+/// (Woolf / logit) odds-ratio interval: `exp(log(OR) -/+ qnorm((1 + conf_level) / 2) * se)`.
+pub fn fisher_exact_with_conf_level(
+    table: &[[usize; 2]; 2],
+    alternative: Alternative,
+    conf_level: f64,
+) -> Result<FisherResult> {
     validate_2x2_table(table)?;
+    if !(conf_level.is_finite() && conf_level > 0.0 && conf_level < 1.0) {
+        return Err(crate::error::StatError::InvalidParameter(format!(
+            "conf_level must be in (0, 1), got {}",
+            conf_level
+        )));
+    }
 
     let a = table[0][0];
     let b = table[0][1];
@@ -88,14 +105,17 @@ pub fn fisher_exact(table: &[[usize; 2]; 2], alternative: Alternative) -> Result
 
     let p_value = match alternative {
         Alternative::TwoSided => {
-            // Sum probabilities of all tables as or more extreme than observed
+            // Sum probabilities of all tables no more likely than the observed
+            // one, with R's relative tolerance (an absolute tolerance floors the
+            // p-value for large tables).
+            let rel_err = 1.0 + 1e-7;
             let min_a = row1.saturating_sub(col2);
             let max_a = row1.min(col1);
 
             let mut p = 0.0;
             for k in min_a..=max_a {
                 let prob = hypergeometric_pmf(k, col1, n - col1, row1);
-                if prob <= observed_prob + 1e-10 {
+                if prob <= observed_prob * rel_err {
                     p += prob;
                 }
             }
@@ -123,7 +143,7 @@ pub fn fisher_exact(table: &[[usize; 2]; 2], alternative: Alternative) -> Result
 
     // Compute confidence interval for odds ratio
     // Using the mid-p exact method approximation
-    let (conf_int_lower, conf_int_upper) = odds_ratio_ci(a, b, c, d);
+    let (conf_int_lower, conf_int_upper) = odds_ratio_ci(a, b, c, d, conf_level);
 
     Ok(FisherResult {
         p_value,
@@ -171,29 +191,16 @@ fn log_binomial_coeff(n: usize, k: usize) -> f64 {
     log_factorial(n) - log_factorial(k) - log_factorial(n - k)
 }
 
-/// Compute log(n!) using Stirling's approximation for large n
+/// Compute log(n!) (statrs: exact table for n < 255, accurate ln-gamma above)
 fn log_factorial(n: usize) -> f64 {
-    if n <= 1 {
-        return 0.0;
-    }
-
-    // For small n, compute directly
-    if n <= 20 {
-        let mut result = 0.0;
-        for i in 2..=n {
-            result += (i as f64).ln();
-        }
-        return result;
-    }
-
-    // Stirling's approximation for larger n
-    let n_f = n as f64;
-    n_f * n_f.ln() - n_f + 0.5 * (2.0 * std::f64::consts::PI * n_f).ln() + 1.0 / (12.0 * n_f)
-        - 1.0 / (360.0 * n_f.powi(3))
+    statrs::function::factorial::ln_factorial(n as u64)
 }
 
 /// Compute confidence interval for odds ratio using Woolf's method (log method)
-fn odds_ratio_ci(a: usize, b: usize, c: usize, d: usize) -> (f64, f64) {
+fn odds_ratio_ci(a: usize, b: usize, c: usize, d: usize, conf_level: f64) -> (f64, f64) {
+    let z = Normal::new(0.0, 1.0)
+        .unwrap()
+        .inverse_cdf((1.0 + conf_level) / 2.0);
     // Handle zero cells
     if a == 0 || b == 0 || c == 0 || d == 0 {
         // Add 0.5 to each cell (Haldane-Anscombe correction)
@@ -205,7 +212,6 @@ fn odds_ratio_ci(a: usize, b: usize, c: usize, d: usize) -> (f64, f64) {
         let log_or = (a_adj * d_adj).ln() - (b_adj * c_adj).ln();
         let se_log_or = (1.0 / a_adj + 1.0 / b_adj + 1.0 / c_adj + 1.0 / d_adj).sqrt();
 
-        let z = 1.96; // 95% CI
         let lower = (log_or - z * se_log_or).exp();
         let upper = (log_or + z * se_log_or).exp();
 
@@ -220,7 +226,6 @@ fn odds_ratio_ci(a: usize, b: usize, c: usize, d: usize) -> (f64, f64) {
     let log_or = (a_f * d_f).ln() - (b_f * c_f).ln();
     let se_log_or = (1.0 / a_f + 1.0 / b_f + 1.0 / c_f + 1.0 / d_f).sqrt();
 
-    let z = 1.96; // 95% CI
     let lower = (log_or - z * se_log_or).exp();
     let upper = (log_or + z * se_log_or).exp();
 
@@ -228,6 +233,7 @@ fn odds_ratio_ci(a: usize, b: usize, c: usize, d: usize) -> (f64, f64) {
 }
 
 #[cfg(test)]
+#[allow(clippy::excessive_precision)]
 mod tests {
     use super::*;
 
@@ -297,5 +303,21 @@ mod tests {
         // C(5, 5) = 1
         let log_c5 = log_binomial_coeff(5, 5);
         assert!((log_c5.exp() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_fisher_conf_level_and_large_table_match_r() {
+        // Woolf interval at 90%: exp(log(OR) -/+ qnorm(0.95) * se)
+        let r =
+            fisher_exact_with_conf_level(&[[18, 7], [9, 16]], Alternative::TwoSided, 0.9).unwrap();
+        assert!((r.conf_int_lower - 1.6762644393608406).abs() < 1e-10);
+        assert!((r.conf_int_upper - 12.466982352523004).abs() < 1e-9);
+        // R: fisher.test(matrix(c(300, 200, 250, 260), 2))$p.value
+        let r = fisher_exact(&[[300, 250], [200, 260]], Alternative::TwoSided).unwrap();
+        assert!(
+            (r.p_value / 0.00050817575098994735 - 1.0).abs() < 1e-8,
+            "{}",
+            r.p_value
+        );
     }
 }
