@@ -545,6 +545,8 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | Rust Function | R Equivalent | Package |
 |---------------|--------------|---------|
 | `t_test()` | `t.test()` | stats |
+| `cohens_d()`, `cohens_d_one_sample()` | `cohens_d()` | effectsize |
+| `rank_biserial()`, `matched_pairs_rank_biserial()` | `rank_biserial()` (opposite sign) | effectsize |
 | `yuen_test()` | `yuen()` | WRS2 |
 | `brown_forsythe()` | `leveneTest(center=median)` | car |
 | `one_way_anova()` | `oneway.test()`, `aov()` | stats |
@@ -555,6 +557,7 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `brunner_munzel()` | `brunner.munzel.test()` | lawstat |
 | `shapiro_wilk()` | `shapiro.test()` | stats |
 | `dagostino_k_squared()` | `agostino.test()`, `anscombe.test()` | moments |
+| `jarque_bera()` | `jarque.bera.test()` | tseries |
 | `skewness()`, `kurtosis()` | `skewness()`, `kurtosis()` | e1071 |
 | `diebold_mariano()` | `dm.test()` | forecast |
 | `pearson()`, `spearman()` | `cor.test()` | stats |
@@ -564,7 +567,8 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `icc()` | `ICC()` | psych |
 | `chisq_test()` | `chisq.test()` | stats |
 | `chisq_goodness_of_fit()` | `chisq.test(p=...)` | stats |
-| `fisher_exact()` | `fisher.test()` | stats |
+| `fisher_exact()` | `fisher.test()$p.value` (sample OR, Woolf CI) | stats |
+| `fisher_exact_conditional()` | `fisher.test()` (conditional MLE, exact CI) | stats |
 | `g_test()` | `GTest()` | DescTools |
 | `mcnemar_test()` | `mcnemar.test()` | stats |
 | `cramers_v()` | `CramerV()` | DescTools |
