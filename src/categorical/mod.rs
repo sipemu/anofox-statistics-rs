@@ -18,7 +18,9 @@ pub use association::{
     cohen_kappa, contingency_coef, cramers_v, phi_coefficient, AssociationResult, KappaResult,
 };
 pub use chisq::{chisq_goodness_of_fit, chisq_test, g_test, ChiSquareResult};
-pub use fisher::{fisher_exact, fisher_exact_with_conf_level, FisherResult};
+pub use fisher::{
+    fisher_exact, fisher_exact_conditional, fisher_exact_with_conf_level, FisherResult,
+};
 pub use mcnemar::{mcnemar_exact, mcnemar_test, McNemarkExactResult, McNemarkResult};
 pub use proportions::{
     binom_test, binom_test_with_conf_level, prop_test_one, prop_test_one_with_conf_level,
