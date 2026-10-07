@@ -137,15 +137,25 @@ pub fn mann_whitney_u(
     let p_value = if exact && !has_ties {
         // Exact p-value using enumeration
         mann_whitney_exact_p(nx, ny, u1 as usize, &alternative)
+    } else if sigma_sq <= 0.0 {
+        // Every observation is tied: Var(U) = 0 and U equals its null
+        // expectation, so there is no evidence of a shift. R returns NaN here
+        // (0/0) for the two-sided test and 1 for one-sided tests;
+        // scipy.stats.mannwhitneyu returns 1. We return 1.
+        1.0
     } else {
         // Normal approximation with optional continuity correction
         let correction = if continuity_correction { 0.5 } else { 0.0 };
         let z = match alternative {
             Alternative::TwoSided => {
+                // R: CORRECTION = sign(z) * 0.5, i.e. no correction when the
+                // statistic equals its null expectation (z = 0, p = 1).
                 if u1 > mu {
                     (u1 - mu - correction) / sigma
-                } else {
+                } else if u1 < mu {
                     (u1 - mu + correction) / sigma
+                } else {
+                    0.0
                 }
             }
             Alternative::Less => (u1 - mu + correction) / sigma,
@@ -269,10 +279,14 @@ pub fn wilcoxon_signed_rank(
         let correction = if continuity_correction { 0.5 } else { 0.0 };
         let z = match alternative {
             Alternative::TwoSided => {
+                // R: CORRECTION = sign(z) * 0.5, i.e. no correction when the
+                // statistic equals its null expectation (z = 0, p = 1).
                 if v > mu {
                     (v - mu - correction) / sigma
-                } else {
+                } else if v < mu {
                     (v - mu + correction) / sigma
+                } else {
+                    0.0
                 }
             }
             Alternative::Less => (v - mu + correction) / sigma,
@@ -315,12 +329,15 @@ fn mann_whitney_exact_p(n1: usize, n2: usize, u: usize, alternative: &Alternativ
 
     match alternative {
         Alternative::TwoSided => {
-            // Two-sided: P(U <= u) + P(U >= n1*n2 - u)
-            let p_lower = mann_whitney_count_le(n1, n2, u) as f64 / total as f64;
-            let u_upper = n1 * n2 - u;
-            let p_upper = mann_whitney_count_ge(n1, n2, u_upper) as f64 / total as f64;
-            // Take min to avoid p > 1 due to symmetry
-            2.0 * p_lower.min(p_upper).min(0.5)
+            // R wilcox.test: use the tail on the side of the observed U
+            // (P(U >= u) above the centre n1*n2/2, P(U <= u) otherwise),
+            // double it and cap at 1.
+            let p = if 2 * u > n1 * n2 {
+                mann_whitney_count_ge(n1, n2, u) as f64 / total as f64
+            } else {
+                mann_whitney_count_le(n1, n2, u) as f64 / total as f64
+            };
+            (2.0 * p).min(1.0)
         }
         Alternative::Less => {
             // P(U <= u)
@@ -673,4 +690,225 @@ fn wilcoxon_ci_approx_k(n: usize, alpha: f64) -> (usize, usize) {
     let k_upper = ((mu + z * sigma).ceil() as usize + 1).min(n_walsh);
 
     (k_lower, k_upper)
+}
+
+// ============================================
+// Rank-biserial effect sizes
+// ============================================
+
+/// Rank-biserial correlation from a Mann-Whitney U statistic:
+/// `r = 1 - 2 * u1 / (n1 * n2)`.
+///
+/// `u1` is the U statistic of the first sample, i.e.
+/// [`MannWhitneyResult::statistic`] (R's `W`), which counts the pairs with
+/// `x > y` (ties count 0.5). Equivalently `r = P(y > x) - P(x > y)`.
+///
+/// **Sign convention:** `r > 0` when the second sample tends to be *larger*,
+/// `r < 0` when the first sample tends to be larger; `r` lies in `[-1, 1]`.
+/// R's `effectsize::rank_biserial(x, y)` uses the opposite sign
+/// (`2 * u1 / (n1 * n2) - 1`).
+///
+/// Returns NaN when `n1 * n2 == 0`.
+pub fn rank_biserial_from_u(u1: f64, n1: usize, n2: usize) -> f64 {
+    let nn = n1 as f64 * n2 as f64;
+    if nn == 0.0 {
+        return f64::NAN;
+    }
+    1.0 - 2.0 * u1 / nn
+}
+
+/// Rank-biserial correlation effect size for the Mann-Whitney U test,
+/// `r = 1 - 2 * U1 / (n1 * n2)` (see [`rank_biserial_from_u`] for the sign
+/// convention: positive when `y` tends to be larger than `x`).
+///
+/// `mu` shifts `y` exactly as in [`mann_whitney_u`] (the location shift under
+/// the null), so the result is consistent with that test's statistic.
+///
+/// # Examples
+/// ```
+/// use anofox_statistics::rank_biserial;
+///
+/// let x = [5.1, 4.9, 6.2, 5.8, 6.05, 5.5, 5.3, 6.1];
+/// let y = [6.5, 7.1, 6.8, 7.4, 6.0, 7.9, 6.6, 7.2, 6.9, 7.05];
+/// // R: 1 - 2 * wilcox.test(x, y)$statistic / (8 * 10)
+/// assert!((rank_biserial(&x, &y, None).unwrap() - 0.925).abs() < 1e-12);
+/// ```
+pub fn rank_biserial(x: &[f64], y: &[f64], mu: Option<f64>) -> Result<f64> {
+    if x.is_empty() || y.is_empty() {
+        return Err(StatError::EmptyData);
+    }
+    let shift = mu.unwrap_or(0.0);
+    let mut u1 = 0.0;
+    for &xi in x {
+        for &yj in y {
+            let yj = yj + shift;
+            if xi > yj {
+                u1 += 1.0;
+            } else if xi == yj {
+                u1 += 0.5;
+            }
+        }
+    }
+    Ok(rank_biserial_from_u(u1, x.len(), y.len()))
+}
+
+/// Matched-pairs rank-biserial correlation for the Wilcoxon signed-rank test:
+/// `r = (T- - T+) / (T+ + T-)`, where `T+` / `T-` are the sums of the ranks of
+/// `|d|` for positive / negative differences `d = x - y - mu` (zero differences
+/// dropped, average ranks for ties, as in [`wilcoxon_signed_rank`]).
+///
+/// The sign convention matches [`rank_biserial`]: `r > 0` when `y` tends to be
+/// larger than `x`. R's `effectsize::rank_biserial(x, y, paired = TRUE)` uses
+/// the opposite sign (`(T+ - T-) / (T+ + T-)`).
+///
+/// Returns `Ok(NaN)` when every difference is zero.
+pub fn matched_pairs_rank_biserial(x: &[f64], y: &[f64], mu: Option<f64>) -> Result<f64> {
+    if x.is_empty() {
+        return Err(StatError::EmptyData);
+    }
+    if x.len() != y.len() {
+        return Err(StatError::InvalidParameter(format!(
+            "paired samples must have equal length, got {} and {}",
+            x.len(),
+            y.len()
+        )));
+    }
+    let shift = mu.unwrap_or(0.0);
+    let diffs: Vec<f64> = x
+        .iter()
+        .zip(y)
+        .map(|(a, b)| a - b - shift)
+        .filter(|&d| d != 0.0)
+        .collect();
+    if diffs.is_empty() {
+        return Ok(f64::NAN);
+    }
+    let abs: Vec<f64> = diffs.iter().map(|d| d.abs()).collect();
+    let (ranks, _) = rank_with_ties(&abs)?;
+    let (mut t_pos, mut t_neg) = (0.0, 0.0);
+    for (d, r) in diffs.iter().zip(&ranks) {
+        if *d > 0.0 {
+            t_pos += r;
+        } else {
+            t_neg += r;
+        }
+    }
+    Ok((t_neg - t_pos) / (t_pos + t_neg))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[allow(clippy::excessive_precision, clippy::approx_constant)]
+    fn test_mann_whitney_exact_two_sided_both_orders() {
+        // R: wilcox.test(x, y, exact = TRUE): W = 58, p = 0.3153781203316808
+        let x = [1.83, 0.50, 1.62, 2.48, 1.68, 1.88, 1.55, 3.06, 1.30];
+        let y = [0.878, 0.647, 0.598, 2.05, 1.06, 1.29, 1.07, 3.14, 1.28, 4.1];
+        let r = mann_whitney_u(&x, &y, Alternative::TwoSided, true, true, None, None).unwrap();
+        assert_eq!(r.statistic, 58.0);
+        assert!(
+            (r.p_value - 0.31537812033168078).abs() < 1e-12,
+            "{}",
+            r.p_value
+        );
+        let r = mann_whitney_u(&y, &x, Alternative::TwoSided, true, true, None, None).unwrap();
+        assert_eq!(r.statistic, 32.0);
+        assert!(
+            (r.p_value - 0.31537812033168078).abs() < 1e-12,
+            "{}",
+            r.p_value
+        );
+        // centre of the distribution: p capped at 1
+        let r = mann_whitney_u(
+            &[1.0, 4.0],
+            &[2.0, 3.0],
+            Alternative::TwoSided,
+            true,
+            true,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r.p_value, 1.0);
+    }
+
+    #[test]
+    fn test_rank_biserial() {
+        let x = [5.1, 4.9, 6.2, 5.8, 6.05, 5.5, 5.3, 6.1];
+        let y = [6.5, 7.1, 6.8, 7.4, 6.0, 7.9, 6.6, 7.2, 6.9, 7.05];
+        // R: W <- wilcox.test(x, y, exact = FALSE)$statistic; 1 - 2*W/(8*10)
+        let r = rank_biserial(&x, &y, None).unwrap();
+        assert!((r - 0.925).abs() < 1e-12);
+        assert!((rank_biserial(&y, &x, None).unwrap() + 0.925).abs() < 1e-12);
+        // consistent with the test statistic, also with ties and a shift
+        let mw =
+            mann_whitney_u(&x, &y, Alternative::TwoSided, true, false, None, Some(-1.0)).unwrap();
+        let r = rank_biserial(&x, &y, Some(-1.0)).unwrap();
+        assert!((r - rank_biserial_from_u(mw.statistic, 8, 10)).abs() < 1e-12);
+        assert_eq!(rank_biserial(&[1.0, 1.0], &[1.0], None).unwrap(), 0.0);
+        assert!(rank_biserial(&[], &[1.0], None).is_err());
+    }
+
+    #[test]
+    #[allow(clippy::excessive_precision)]
+    fn test_matched_pairs_rank_biserial() {
+        let x = [5.1, 4.9, 6.2, 5.8, 6.05, 5.5, 5.3, 6.1];
+        let y = [6.5, 7.1, 6.8, 7.4, 6.0, 7.9, 6.6, 7.2];
+        // R: d <- x - y; d <- d[d != 0]; r <- rank(abs(d));
+        //    (sum(r[d < 0]) - sum(r[d > 0])) / sum(r)
+        let r = matched_pairs_rank_biserial(&x, &y, None).unwrap();
+        assert!((r - 0.94444444444444442).abs() < 1e-12, "{r}");
+        assert!(matched_pairs_rank_biserial(&x, &x, None).unwrap().is_nan());
+        assert!(matched_pairs_rank_biserial(&x, &y[..7], None).is_err());
+    }
+
+    #[test]
+    fn test_mann_whitney_all_tied_p_is_one() {
+        // Var(U) = 0: scipy.stats.mannwhitneyu -> p = 1 (R: NaN two-sided, 1 one-sided)
+        let x = [5.0; 6];
+        let y = [5.0; 7];
+        for alt in [
+            Alternative::TwoSided,
+            Alternative::Less,
+            Alternative::Greater,
+        ] {
+            let r = mann_whitney_u(&x, &y, alt, true, false, None, None).unwrap();
+            assert_eq!(r.p_value, 1.0);
+            assert_eq!(r.statistic, 21.0);
+        }
+    }
+
+    #[test]
+    fn test_mann_whitney_u_at_null_expectation_no_correction() {
+        // R: wilcox.test(c(1, 4), c(2, 3), exact = FALSE)$p.value == 1
+        let r = mann_whitney_u(
+            &[1.0, 4.0],
+            &[2.0, 3.0],
+            Alternative::TwoSided,
+            true,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r.p_value, 1.0);
+    }
+
+    #[test]
+    fn test_wilcoxon_v_at_null_expectation_no_correction() {
+        // R: wilcox.test(c(1,2,3,4), c(4,3,2,1), paired = TRUE, exact = FALSE)$p.value == 1
+        let r = wilcoxon_signed_rank(
+            &[1.0, 2.0, 3.0, 4.0],
+            &[4.0, 3.0, 2.0, 1.0],
+            Alternative::TwoSided,
+            true,
+            false,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r.p_value, 1.0);
+    }
 }

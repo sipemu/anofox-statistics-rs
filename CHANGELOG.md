@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.4.3] - 2026-10-07
+
+### Fixed
+
+- **Shapiro-Wilk p-value for n <= 11** (#7): `shapiro_wilk` now ports R's `swilk.c`
+  (Royston 1995, AS R94) line for line, including the small-sample (4 <= n <= 11)
+  gamma transform and the exact n <= 5 coefficient path. W and p agree with
+  `shapiro.test()` to ~1e-12 (previously p = 0.070 vs R's 0.161 for an n = 10 sample).
+- **Kendall tau test with ties** (#8): the variance of S now uses the full tie-corrected
+  formula (R `cor.test(method = "kendall", exact = FALSE)`); previously an ad-hoc
+  scaling was used, giving wrong z / p-values whenever either variable had ties.
+- **Mann-Whitney / Wilcoxon continuity correction at z = 0** (#13): like R
+  (`CORRECTION = sign(z) * 0.5`) no correction is applied when the statistic equals
+  its null expectation, so p = 1 instead of < 1. Mann-Whitney with every observation
+  tied (Var(U) = 0) now returns p = 1 instead of p = 0.
+- **Binomial test** (#9): the Clopper-Pearson interval now uses the exact beta quantile
+  (the previous approximation was off by ~5e-3 and clamped to [0.001, 0.999]); the
+  two-sided p-value uses R's relative tolerance instead of an absolute 1e-10, which
+  floored p-values for large n. Intervals for one-sided alternatives are one-sided,
+  as in R `binom.test`.
+- **Proportion tests** (#10): `prop_test_two` interval uses `qnorm` instead of the rounded
+  1.96 and includes R's continuity correction when `correction = true`;
+  one-sided alternatives give one-sided intervals (R `prop.test`). Same for the
+  Wilson interval of `prop_test_one`.
+- **Fisher's exact test** (#11): Woolf interval uses `qnorm` instead of 1.96; the two-sided
+  p-value uses R's relative tolerance; log-factorials are exact (statrs) instead of a
+  Stirling approximation. Cohen's kappa CI uses `qnorm(0.975)`.
+- **Exact two-sided Mann-Whitney p-value** (#12): `mann_whitney_u(.., exact = true)`
+  returned p = 1 whenever U was above its mean n1*n2/2 (the "upper" tail mirrored back
+  onto the lower one). It now follows R `wilcox.test`: the tail on the side of the
+  observed U, doubled and capped at 1 (W = 58: p = 0.3153781203 instead of 1).
+- **Pearson correlation on a constant variable** (#14): `pearson` panicked inside
+  statrs (`XOutOfRange`); it now returns NaN estimate / statistic / p-value and no
+  interval (R: `NA`, scipy: `nan`). `t_test`, `one_way_anova` (Fisher),
+  `brown_forsythe` and `yuen_test` likewise return a NaN p-value instead of panicking
+  when the statistic is 0/0 (constant samples).
+
+### Added
+
+- `binom_test_with_conf_level`, `prop_test_one_with_conf_level`,
+  `prop_test_two_with_conf_level`, `fisher_exact_with_conf_level`: variants taking the
+  confidence level of the reported interval (the existing functions use 0.95).
+- `fisher_exact_conditional(table, alternative, conf_level)` (#11): R `fisher.test`
+  semantics, i.e. the conditional maximum-likelihood odds ratio and the exact
+  conditional confidence interval (one-sided for one-sided alternatives).
+  `fisher_exact` keeps reporting the sample odds ratio with a Woolf interval
+  (now documented as such).
+- Effect sizes (#15): `cohens_d(x, y, kind, mu)` (Student: pooled SD; Welch:
+  average-variance standardiser; Paired: d_z) and `cohens_d_one_sample(x, mu)`;
+  `rank_biserial(x, y, mu)` / `rank_biserial_from_u(u1, n1, n2)` for Mann-Whitney
+  (`r = 1 - 2 U1 / (n1 n2)`, positive when `y` tends to be larger) and
+  `matched_pairs_rank_biserial(x, y, mu)` for the signed-rank test.
+- `jarque_bera(data)`: Jarque-Bera normality test (R `tseries::jarque.bera.test`).
+- `bootstrap_ci(data, statistic, n_bootstrap, conf_level, seed)` and
+  `bootstrap_mean_ci(data, n_bootstrap, conf_level, block_length, seed)`: percentile
+  bootstrap confidence intervals (IID, or stationary / circular block bootstrap for the
+  mean).
+
+These additions move method code out of the DuckDB extension
+[anofox-statistics](https://github.com/DataZooDE/anofox-statistics), which now only
+needs to delegate to the crate.
+
 ## [0.4.2] - 2026-06-01
 
 ### Fixed

@@ -54,188 +54,185 @@ pub fn shapiro_wilk(data: &[f64]) -> Result<ShapiroWilkResult> {
     })
 }
 
-/// Implementation of SWILK algorithm (AS R94)
+/// Implementation of the SWILK algorithm (Royston 1995, AS R94), ported
+/// line-for-line from R's `src/library/stats/src/swilk.c` so that both the
+/// W statistic and the p-value (including the small-sample branch for
+/// 4 <= n <= 11) agree with `shapiro.test()` / `scipy.stats.shapiro`.
+///
+/// `x` must be sorted ascending and have non-zero range.
 fn swilk(x: &[f64]) -> (f64, f64) {
     let n = x.len();
-    let n_f = n as f64;
-
-    // Compute mean and sum of squares about mean
-    let mean: f64 = x.iter().sum::<f64>() / n_f;
-    let ss: f64 = x.iter().map(|xi| (xi - mean).powi(2)).sum();
-
-    if ss < 1e-30 {
-        return (1.0, 1.0);
-    }
-
-    // Compute Shapiro-Wilk coefficients
-    let a = compute_coefficients(n);
-
-    // Calculate W statistic
-    // W = (sum of a[i] * (x[n-1-i] - x[i]))^2 / SS
+    let an = n as f64;
     let nn2 = n / 2;
-    let mut w_num = 0.0;
-    for i in 0..nn2 {
-        w_num += a[i] * (x[n - 1 - i] - x[i]);
-    }
-    let w = (w_num * w_num) / ss;
-
-    // Clamp W to valid range
-    let w = w.clamp(0.0, 1.0);
-
-    // Compute p-value using Royston (1992) approximation
-    let p_value = compute_p_value(w, n);
-
-    (w, p_value)
-}
-
-/// Compute expected values of normal order statistics (m values).
-fn compute_order_statistics(n: usize) -> Vec<f64> {
-    let n_f = n as f64;
     let normal = Normal::new(0.0, 1.0).unwrap();
 
-    (0..n)
-        .map(|i| {
-            let p = (i as f64 + 1.0 - 0.375) / (n_f + 0.25);
-            normal.inverse_cdf(p)
-        })
-        .collect()
-}
+    // Polynomial coefficients (ascending powers), as in swilk.c
+    const G: [f64; 2] = [-2.273, 0.459];
+    const C1: [f64; 6] = [0.0, 0.221157, -0.147981, -2.07119, 4.434685, -2.706056];
+    const C2: [f64; 6] = [0.0, 0.042981, -0.293762, -1.752461, 5.682633, -3.582633];
+    const C3: [f64; 4] = [0.544, -0.39978, 0.025054, -6.714e-4];
+    const C4: [f64; 4] = [1.3822, -0.77857, 0.062767, -0.0020322];
+    const C5: [f64; 4] = [-1.5861, -0.31082, -0.083751, 0.0038915];
+    const C6: [f64; 3] = [-0.4803, -0.082676, 0.0030302];
 
-/// Normalize coefficients so that sum(a^2) * 2 = 1.
-fn normalize_coefficients(a: &mut [f64]) {
-    let a_sum_sq: f64 = a.iter().map(|x| x * x).sum();
-    if a_sum_sq > 1e-10 {
-        let target = 0.5;
-        let scale = (target / a_sum_sq).sqrt();
-        for ai in a.iter_mut() {
-            *ai *= scale;
+    // a is 1-based like the C code: a[1..=nn2]
+    let mut a = vec![0.0; nn2 + 1];
+    if n == 3 {
+        a[1] = std::f64::consts::FRAC_1_SQRT_2;
+    } else {
+        let an25 = an + 0.25;
+        let mut summ2 = 0.0;
+        for (i, ai) in a.iter_mut().enumerate().skip(1) {
+            *ai = normal.inverse_cdf((i as f64 - 0.375) / an25);
+            summ2 += *ai * *ai;
+        }
+        summ2 *= 2.0;
+        let ssumm2 = summ2.sqrt();
+        let rsn = 1.0 / an.sqrt();
+        let a1 = poly(&C1, rsn) - a[1] / ssumm2;
+
+        let (i1, fac) = if n > 5 {
+            let a2 = -a[2] / ssumm2 + poly(&C2, rsn);
+            let fac = ((summ2 - 2.0 * a[1] * a[1] - 2.0 * a[2] * a[2])
+                / (1.0 - 2.0 * a1 * a1 - 2.0 * a2 * a2))
+                .sqrt();
+            a[2] = a2;
+            (3, fac)
+        } else {
+            let fac = ((summ2 - 2.0 * a[1] * a[1]) / (1.0 - 2.0 * a1 * a1)).sqrt();
+            (2, fac)
+        };
+        a[1] = a1;
+        for ai in a.iter_mut().take(nn2 + 1).skip(i1) {
+            *ai /= -fac;
         }
     }
-}
 
-/// Compute coefficients for small samples (n <= 5).
-fn compute_coefficients_small(m: &[f64], n: usize, nn2: usize) -> Vec<f64> {
-    let mut a = vec![0.0; nn2];
-    for i in 0..nn2 {
-        a[i] = m[n - 1 - i] - m[i];
-    }
-    normalize_coefficients(&mut a);
-    a
-}
+    let range = x[n - 1] - x[0];
 
-/// Compute first two coefficients for large samples using Royston's polynomials.
-fn compute_first_two_coefficients(m: &[f64], sqrt_m2: f64, n: usize) -> (f64, f64) {
-    let sqrtn = (n as f64).sqrt();
-
-    let c1 = [
-        -2.706056, 4.434685, -2.07119, -0.147981, 0.221157, -0.0006714,
-    ];
-    let an = m[n - 1] / sqrt_m2 + poly_eval(&c1, 1.0 / sqrtn);
-
-    let c2 = [-3.582633, 5.682633, -1.752461, -0.293762, 0.042981, 0.0];
-    let an1 = if n > 6 {
-        m[n - 2] / sqrt_m2 + poly_eval(&c2, 1.0 / sqrtn)
-    } else {
-        m[n - 2] / sqrt_m2
+    // Full antisymmetric coefficient vector: coef(i) = sign(i - j) * a[1 + min(i, j)],
+    // j = n - 1 - i (0 for the middle element of odd n).
+    let coef = |i: usize| -> f64 {
+        let j = n - 1 - i;
+        match i.cmp(&j) {
+            std::cmp::Ordering::Less => -a[1 + i],
+            std::cmp::Ordering::Greater => a[1 + j],
+            std::cmp::Ordering::Equal => 0.0,
+        }
     };
 
-    (an, an1)
-}
-
-/// Compute coefficients for large samples (n > 5).
-fn compute_coefficients_large(m: &[f64], m2: f64, n: usize, nn2: usize) -> Vec<f64> {
-    let sqrt_m2 = m2.sqrt();
-    let (an, an1) = compute_first_two_coefficients(m, sqrt_m2, n);
-
-    // Compute phi for middle coefficients
-    let sum_first_two_sq = 2.0 * (an * an + an1 * an1);
-    let sum_middle_m_sq = m2 - 2.0 * m[n - 1].powi(2) - 2.0 * m[n - 2].powi(2);
-    let phi_sq = sum_middle_m_sq / (1.0 - sum_first_two_sq);
-    let phi = if phi_sq > 0.0 { phi_sq.sqrt() } else { 1.0 };
-
-    // Build coefficient array
-    let mut a = vec![0.0; nn2];
-    a[0] = an;
-    if nn2 > 1 {
-        a[1] = an1;
-    }
-    for i in 2..nn2 {
-        a[i] = m[n - 1 - i] / phi;
+    // W as squared correlation between data (range-scaled) and coefficients
+    let sa: f64 = (0..n).map(coef).sum::<f64>() / an;
+    let sx: f64 = x.iter().map(|xi| xi / range).sum::<f64>() / an;
+    let (mut ssa, mut ssx, mut sax) = (0.0, 0.0, 0.0);
+    for (i, xi) in x.iter().enumerate() {
+        let asa = coef(i) - sa;
+        let xsx = xi / range - sx;
+        ssa += asa * asa;
+        ssx += xsx * xsx;
+        sax += asa * xsx;
     }
 
-    normalize_coefficients(&mut a);
-    a
-}
+    // w1 = 1 - W, computed to avoid rounding error for W near 1
+    let ssassx = (ssa * ssx).sqrt();
+    let w1 = (ssassx - sax) * (ssassx + sax) / (ssa * ssx);
+    let w = 1.0 - w1;
 
-/// Compute Shapiro-Wilk coefficients using Royston's algorithm (AS R94).
-fn compute_coefficients(n: usize) -> Vec<f64> {
-    let nn2 = n / 2;
-    let m = compute_order_statistics(n);
-    let m2: f64 = m.iter().map(|x| x * x).sum();
+    // Significance level for W
+    if n == 3 {
+        // 6/pi and asin(sqrt(3/4)) = pi/3
+        let pi6 = 6.0 / std::f64::consts::PI;
+        let stqr = std::f64::consts::FRAC_PI_3;
+        let pw = pi6 * (w.sqrt().asin() - stqr);
+        return (w, pw.clamp(0.0, 1.0));
+    }
 
-    if n <= 5 {
-        compute_coefficients_small(&m, n, nn2)
+    let mut y = w1.ln();
+    let xx = an.ln();
+    let (m, s) = if n <= 11 {
+        let gamma = poly(&G, an);
+        if y >= gamma {
+            return (w, 1e-99);
+        }
+        y = -(gamma - y).ln();
+        (poly(&C3, an), poly(&C4, an).exp())
     } else {
-        compute_coefficients_large(&m, m2, n, nn2)
-    }
-}
-
-/// Evaluate polynomial c[0]*u^5 + c[1]*u^4 + c[2]*u^3 + c[3]*u^2 + c[4]*u + c[5]
-fn poly_eval(c: &[f64; 6], u: f64) -> f64 {
-    c[0] * u.powi(5) + c[1] * u.powi(4) + c[2] * u.powi(3) + c[3] * u.powi(2) + c[4] * u + c[5]
-}
-
-/// Compute p-value using Royston (1992) approximation
-fn compute_p_value(w: f64, n: usize) -> f64 {
-    let n_f = n as f64;
-    let normal = Normal::new(0.0, 1.0).unwrap();
-
-    let p = if n == 3 {
-        // Exact formula for n=3
-        let pi = std::f64::consts::PI;
-        let p = 6.0 / pi * (w.sqrt().asin() - (3.0_f64 / 4.0).sqrt().asin());
-        p.clamp(0.0, 1.0)
-    } else if n <= 11 {
-        // Small sample approximation (4 <= n <= 11)
-        // Use log transformation with adjusted polynomial coefficients
-        let y = if w >= 1.0 - 1e-10 {
-            // W very close to 1 means nearly perfect normality
-            return 1.0;
-        } else {
-            (1.0 - w).ln()
-        };
-
-        // For small n, adjust the coefficients based on n
-        // Using empirical adjustments that better match R's output
-        let ln_n = n_f.ln();
-
-        // Small-n adjusted polynomials (derived from fitting R's output)
-        let mu = -1.2725 - 1.0521 * ln_n - 0.26758 * ln_n * ln_n;
-        let sigma = (0.4803 + 0.082676 * ln_n + 0.0030302 * ln_n * ln_n).exp();
-
-        let z = (y - mu) / sigma;
-        normal.sf(z)
-    } else {
-        // Log transformation for n >= 12
-        let y = (1.0 - w).ln();
-        let ln_n = n_f.ln();
-
-        let mu = poly_mu_large(ln_n);
-        let sigma = poly_sigma_large(ln_n).exp();
-
-        let z = (y - mu) / sigma;
-        normal.sf(z)
+        (poly(&C5, xx), poly(&C6, xx).exp())
     };
 
-    p.clamp(0.0, 1.0)
+    let z = (y - m) / s;
+    (w, normal.sf(z).clamp(0.0, 1.0))
 }
 
-// Polynomial approximations for p-value calculation (n >= 12)
-
-fn poly_mu_large(ln_n: f64) -> f64 {
-    0.0038915 * ln_n.powi(3) - 0.083751 * ln_n.powi(2) - 0.31082 * ln_n - 1.5861
+/// Evaluate a polynomial with ascending coefficients: c[0] + c[1]*x + c[2]*x^2 + ...
+fn poly(c: &[f64], x: f64) -> f64 {
+    c.iter().rev().fold(0.0, |acc, &ci| acc * x + ci)
 }
 
-fn poly_sigma_large(ln_n: f64) -> f64 {
-    0.0030302 * ln_n.powi(2) - 0.082676 * ln_n - 0.4803
+#[cfg(test)]
+#[allow(clippy::excessive_precision)]
+mod tests {
+    use super::*;
+
+    /// Reference values from R 4.x `shapiro.test()` (scipy.stats.shapiro agrees).
+    fn check(data: &[f64], w_ref: f64, p_ref: f64) {
+        let r = shapiro_wilk(data).unwrap();
+        assert!(
+            (r.statistic - w_ref).abs() < 1e-10,
+            "W: got {}, R {}",
+            r.statistic,
+            w_ref
+        );
+        assert!(
+            (r.p_value - p_ref).abs() < 1e-10,
+            "p: got {}, R {}",
+            r.p_value,
+            p_ref
+        );
+    }
+
+    #[test]
+    fn matches_r_n3_exact() {
+        check(&[1.0, 2.0, 4.0], 0.96428571428571419, 0.6368868450289632);
+    }
+
+    #[test]
+    fn matches_r_n4_n5_small_coefficients() {
+        check(
+            &[1.2, 3.4, 2.2, 5.9],
+            0.95422076646118381,
+            0.74255791273476768,
+        );
+        check(
+            &[1.2, 3.4, 2.2, 5.9, 2.0],
+            0.89215500173725426,
+            0.36805560604568577,
+        );
+    }
+
+    #[test]
+    fn matches_r_small_sample_branch() {
+        check(
+            &[3.1, 2.7, 4.4, 1.9, 5.6, 3.3, 2.8],
+            0.9246674424398178,
+            0.50651413318800143,
+        );
+        check(
+            &[4.1, 5.3, 3.8, 6.9, 5.0, 4.4, 9.2, 5.7, 4.9, 6.1],
+            0.88790406283629908,
+            0.16058545199963783,
+        );
+    }
+
+    #[test]
+    fn matches_r_large_sample_branch() {
+        check(
+            &[
+                2.31, 3.85, 1.97, 4.42, 3.10, 2.76, 5.94, 3.33, 2.05, 4.88, 3.61, 2.49, 7.12, 3.02,
+                2.88, 4.15, 3.47, 1.64, 5.21, 2.95,
+            ],
+            0.93325039684015909,
+            0.1783034135065848,
+        );
+    }
 }

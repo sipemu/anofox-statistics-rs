@@ -113,11 +113,16 @@ pub fn yuen_test(
     let df = (dx + dy).powi(2) / (dx.powi(2) / (hx_f - 1.0) + dy.powi(2) / (hy_f - 1.0));
 
     // Compute p-value based on alternative hypothesis
-    let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-    let p_value = match alternative {
-        Alternative::TwoSided => 2.0 * t_dist.sf(t_stat.abs()),
-        Alternative::Less => t_dist.cdf(t_stat),
-        Alternative::Greater => t_dist.sf(t_stat),
+    // NaN when t or df is undefined (0/0 for constant samples) instead of
+    // panicking inside statrs
+    let t_dist = StudentsT::new(0.0, 1.0, df).ok();
+    let p_value = match &t_dist {
+        Some(t_dist) if !t_stat.is_nan() => match alternative {
+            Alternative::TwoSided => 2.0 * t_dist.sf(t_stat.abs()),
+            Alternative::Less => t_dist.cdf(t_stat),
+            Alternative::Greater => t_dist.sf(t_stat),
+        },
+        _ => f64::NAN,
     };
 
     // Compute confidence interval if requested
@@ -128,7 +133,9 @@ pub fn yuen_test(
             ));
         }
         let alpha = 1.0 - level;
-        let t_crit = t_dist.inverse_cdf(1.0 - alpha / 2.0);
+        let t_crit = t_dist
+            .as_ref()
+            .map_or(f64::NAN, |t| t.inverse_cdf(1.0 - alpha / 2.0));
         let margin = t_crit * se;
         Some(YuenConfInt {
             lower: diff - margin,

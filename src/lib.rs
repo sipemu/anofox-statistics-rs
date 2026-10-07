@@ -18,7 +18,10 @@ pub use correlation::{
     spearman, CorrelationConfInt, CorrelationMethod, CorrelationResult, DistanceCorResult,
     ICCResult, ICCType, KendallVariant, PartialCorResult,
 };
-pub use distributional::{dagostino_k_squared, shapiro_wilk, DAgostinoResult, ShapiroWilkResult};
+pub use distributional::{
+    dagostino_k_squared, jarque_bera, shapiro_wilk, DAgostinoResult, JarqueBeraResult,
+    ShapiroWilkResult,
+};
 pub use error::{Result, StatError};
 pub use forecast::{
     clark_west, diebold_mariano, model_confidence_set, mspe_adjusted_spa, spa_test, CWResult,
@@ -30,24 +33,27 @@ pub use modern::{
     Kernel, MMDResult,
 };
 pub use nonparametric::{
-    brunner_munzel, kruskal_wallis, mann_whitney_u, rank, wilcoxon_signed_rank,
-    BrunnerMunzelResult, KruskalResult, MannWhitneyResult, WilcoxonResult,
+    brunner_munzel, kruskal_wallis, mann_whitney_u, matched_pairs_rank_biserial, rank,
+    rank_biserial, rank_biserial_from_u, wilcoxon_signed_rank, BrunnerMunzelResult, KruskalResult,
+    MannWhitneyResult, WilcoxonResult,
 };
 pub use parametric::{
-    brown_forsythe, one_way_anova, repeated_measures_anova, t_test, two_way_anova, yuen_test,
-    Alternative, AnovaKind, AnovaTableRow, CorrectedResult, LeveneResult, OneWayAnovaResult,
-    RmAnovaResult, SphericityResult, TTestKind, TTestResult, TwoWayAnovaResult, YuenConfInt,
-    YuenResult,
+    brown_forsythe, cohens_d, cohens_d_one_sample, one_way_anova, repeated_measures_anova, t_test,
+    two_way_anova, yuen_test, Alternative, AnovaKind, AnovaTableRow, CorrectedResult, LeveneResult,
+    OneWayAnovaResult, RmAnovaResult, SphericityResult, TTestKind, TTestResult, TwoWayAnovaResult,
+    YuenConfInt, YuenResult,
 };
 pub use resampling::{
-    permutation_t_test, CircularBlockBootstrap, PermutationEngine, PermutationResult,
-    StationaryBootstrap,
+    bootstrap_ci, bootstrap_mean_ci, permutation_t_test, BootstrapCIResult, CircularBlockBootstrap,
+    PermutationEngine, PermutationResult, StationaryBootstrap,
 };
 
 pub use categorical::{
-    binom_test, chisq_goodness_of_fit, chisq_test, cohen_kappa, contingency_coef, cramers_v,
-    fisher_exact, g_test, mcnemar_exact, mcnemar_test, phi_coefficient, prop_test_one,
-    prop_test_two, AssociationResult, BinomTestResult, ChiSquareResult, FisherResult, KappaResult,
+    binom_test, binom_test_with_conf_level, chisq_goodness_of_fit, chisq_test, cohen_kappa,
+    contingency_coef, cramers_v, fisher_exact, fisher_exact_conditional,
+    fisher_exact_with_conf_level, g_test, mcnemar_exact, mcnemar_test, phi_coefficient,
+    prop_test_one, prop_test_one_with_conf_level, prop_test_two, prop_test_two_with_conf_level,
+    AssociationResult, BinomTestResult, ChiSquareResult, FisherResult, KappaResult,
     McNemarkExactResult, McNemarkResult, PropTestResult,
 };
 pub use equivalence::{
