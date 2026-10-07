@@ -110,8 +110,11 @@ pub fn brown_forsythe(groups: &[&[f64]]) -> Result<LeveneResult> {
 
     // F-statistic and p-value
     let f_stat = ms_between / ms_within;
-    let f_dist = FisherSnedecor::new(df1, df2).unwrap();
-    let p_value = f_dist.sf(f_stat);
+    // NaN when F is undefined (0/0 for constant groups) instead of panicking
+    let p_value = match FisherSnedecor::new(df1, df2) {
+        Ok(f_dist) if !f_stat.is_nan() => f_dist.sf(f_stat),
+        _ => f64::NAN,
+    };
 
     Ok(LeveneResult {
         statistic: f_stat,

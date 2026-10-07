@@ -33,6 +33,10 @@ use statrs::distribution::{ContinuousCDF, Normal, StudentsT};
 /// println!("p-value = {:.4}", result.p_value);
 /// ```
 ///
+/// If `x` or `y` is constant (zero variance) the correlation is undefined and
+/// `estimate`, `statistic` and `p_value` are NaN with `conf_int = None`
+/// (R returns `NA`, scipy `NaN`).
+///
 /// # R equivalent
 /// `cor.test(x, y, method = "pearson")`
 pub fn pearson(x: &[f64], y: &[f64], conf_level: Option<f64>) -> Result<CorrelationResult> {
@@ -45,6 +49,21 @@ pub fn pearson(x: &[f64], y: &[f64], conf_level: Option<f64>) -> Result<Correlat
     // Compute standard deviations
     let sd_x = std_dev(x, mean_x);
     let sd_y = std_dev(y, mean_y);
+
+    // A constant variable has an undefined correlation (R: NA with a
+    // warning, scipy: NaN). Return NaN instead of feeding NaN into the
+    // t distribution (which panics inside statrs).
+    if !(sd_x > 0.0 && sd_y > 0.0 && sd_x.is_finite() && sd_y.is_finite()) {
+        return Ok(CorrelationResult {
+            estimate: f64::NAN,
+            statistic: f64::NAN,
+            df: Some((n - 2) as f64),
+            p_value: f64::NAN,
+            conf_int: None,
+            method: CorrelationMethod::Pearson,
+            n,
+        });
+    }
 
     // Compute Pearson correlation coefficient
     let mut sum_xy = 0.0;
@@ -72,6 +91,8 @@ pub fn pearson(x: &[f64], y: &[f64], conf_level: Option<f64>) -> Result<Correlat
     // Compute two-sided p-value using t-distribution
     let p_value = if t_stat.is_infinite() {
         0.0
+    } else if t_stat.is_nan() {
+        f64::NAN
     } else {
         let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
         2.0 * t_dist.sf(t_stat.abs())
@@ -136,6 +157,24 @@ fn fisher_z_confidence_interval(r: f64, n: usize, conf_level: f64) -> Correlatio
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_pearson_constant_column_is_nan_not_panic() {
+        // R: cor.test(1:5, rep(5, 5)) -> estimate NA; scipy -> (nan, nan)
+        for (x, y) in [
+            (vec![1.0, 2.0, 3.0, 4.0, 5.0], vec![5.0; 5]),
+            (vec![5.0; 5], vec![1.0, 2.0, 3.0, 4.0, 5.0]),
+            (vec![2.0; 5], vec![5.0; 5]),
+        ] {
+            for cl in [None, Some(0.95)] {
+                let r = pearson(&x, &y, cl).unwrap();
+                assert!(r.estimate.is_nan());
+                assert!(r.statistic.is_nan());
+                assert!(r.p_value.is_nan());
+                assert!(r.conf_int.is_none());
+            }
+        }
+    }
 
     #[test]
     fn test_pearson_basic() {

@@ -246,8 +246,16 @@ fn paired_t_test(
 }
 
 /// Compute p-value from t-statistic and degrees of freedom
+///
+/// Returns NaN when the statistic or the degrees of freedom are undefined
+/// (e.g. constant samples give `0/0`), instead of panicking inside statrs.
 fn compute_p_value(t_stat: f64, df: f64, alternative: Alternative) -> f64 {
-    let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
+    if t_stat.is_nan() {
+        return f64::NAN;
+    }
+    let Ok(t_dist) = StudentsT::new(0.0, 1.0, df) else {
+        return f64::NAN;
+    };
 
     match alternative {
         Alternative::TwoSided => {
@@ -279,9 +287,11 @@ fn compute_conf_int(
                     "conf_level must be between 0 and 1".to_string(),
                 ));
             }
-            let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
             let alpha = 1.0 - level;
-            let t_crit = t_dist.inverse_cdf(1.0 - alpha / 2.0);
+            let t_crit = match StudentsT::new(0.0, 1.0, df) {
+                Ok(t_dist) => t_dist.inverse_cdf(1.0 - alpha / 2.0),
+                Err(_) => f64::NAN,
+            };
             let margin = t_crit * se;
             Ok(Some(TTestConfInt {
                 lower: estimate - margin,

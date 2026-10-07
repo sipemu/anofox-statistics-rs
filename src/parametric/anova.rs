@@ -139,11 +139,16 @@ fn fisher_anova(
     // F-statistic
     let f_stat = ms_between / ms_within;
 
-    // P-value from F-distribution
+    // P-value from F-distribution (NaN when F is undefined, e.g. 0/0 for
+    // constant data, instead of panicking inside statrs)
     let f_dist = FisherSnedecor::new(df_between, df_within).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_value = f_dist.sf(f_stat);
+    let p_value = if f_stat.is_nan() {
+        f64::NAN
+    } else {
+        f_dist.sf(f_stat)
+    };
 
     Ok(OneWayAnovaResult {
         statistic: f_stat,
