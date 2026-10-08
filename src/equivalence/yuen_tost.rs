@@ -5,7 +5,9 @@
 
 use crate::equivalence::{EquivalenceBounds, OneSidedTestResult, TostResult};
 use crate::error::{Result, StatError};
-use statrs::distribution::{ContinuousCDF, StudentsT};
+use crate::utils::dist::{cdf_or_nan, inv_or_nan, sf_or_nan};
+use crate::utils::finite::ensure_no_nan;
+use statrs::distribution::StudentsT;
 
 /// Perform robust TOST using Yuen's trimmed means test.
 ///
@@ -96,17 +98,17 @@ pub fn tost_yuen(
 
     // Lower test: H0: estimate <= lower_bound
     let t_lower = (estimate - lower_bound) / se;
-    let p_lower = t_dist.sf(t_lower);
+    let p_lower = sf_or_nan(&t_dist, t_lower);
 
     // Upper test: H0: estimate >= upper_bound
     let t_upper = (estimate - upper_bound) / se;
-    let p_upper = t_dist.cdf(t_upper);
+    let p_upper = cdf_or_nan(&t_dist, t_upper);
 
     // TOST p-value
     let tost_p = p_lower.max(p_upper);
 
     // (1 - 2*alpha) confidence interval
-    let t_crit = t_dist.inverse_cdf(1.0 - alpha);
+    let t_crit = inv_or_nan(&t_dist, 1.0 - alpha);
     let margin = t_crit * se;
     let ci = (estimate - margin, estimate + margin);
 
@@ -141,7 +143,7 @@ pub fn tost_yuen(
 /// Compute trimmed mean by removing g observations from each tail.
 fn trimmed_mean(data: &[f64], g: usize) -> f64 {
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let n = sorted.len();
     let trimmed = &sorted[g..n - g];
@@ -154,7 +156,7 @@ fn trimmed_mean(data: &[f64], g: usize) -> f64 {
 /// Replace the g largest values with the (n-g)th largest.
 fn winsorized_variance(data: &[f64], g: usize) -> f64 {
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let n = sorted.len();
 
@@ -181,6 +183,9 @@ fn validate_inputs(x: &[f64], y: &[f64], alpha: f64, trim: f64) -> Result<()> {
     if x.is_empty() || y.is_empty() {
         return Err(StatError::EmptyData);
     }
+    // ±Inf can be trimmed away; NaN cannot be ordered.
+    ensure_no_nan("x", x)?;
+    ensure_no_nan("y", y)?;
 
     if !(0.0 < alpha && alpha < 1.0) {
         return Err(StatError::InvalidParameter(format!(

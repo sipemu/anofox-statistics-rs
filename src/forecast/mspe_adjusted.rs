@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::forecast::spa_common::{
     compute_means, compute_spa_pvalues, compute_standardized, compute_variances, find_best_model,
-    validate_model_data,
+    validate_finite_data, validate_model_data,
 };
 
 /// Result of the MSPE-Adjusted SPA test
@@ -60,6 +60,7 @@ pub fn mspe_adjusted_spa(
 
     // Validate inputs
     validate_model_data(t, model_errors, "alternative model")?;
+    validate_finite_data(benchmark_errors, model_errors, "alternative model")?;
 
     // Compute Clark-West adjusted differentials
     let f = compute_clark_west_differentials(benchmark_errors, model_errors);

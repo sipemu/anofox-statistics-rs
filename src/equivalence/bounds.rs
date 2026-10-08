@@ -37,7 +37,7 @@ pub enum EquivalenceBounds {
 impl EquivalenceBounds {
     /// Create symmetric raw bounds.
     pub fn symmetric(delta: f64) -> Result<Self> {
-        if delta <= 0.0 {
+        if delta.is_nan() || delta <= 0.0 {
             return Err(StatError::InvalidParameter(
                 "delta must be positive".to_string(),
             ));
@@ -47,7 +47,7 @@ impl EquivalenceBounds {
 
     /// Create asymmetric raw bounds.
     pub fn raw(lower: f64, upper: f64) -> Result<Self> {
-        if lower >= upper {
+        if lower.is_nan() || upper.is_nan() || lower >= upper {
             return Err(StatError::InvalidParameter(format!(
                 "lower bound ({}) must be less than upper bound ({})",
                 lower, upper
@@ -58,7 +58,7 @@ impl EquivalenceBounds {
 
     /// Create Cohen's d based bounds.
     pub fn cohen_d(d: f64) -> Result<Self> {
-        if d <= 0.0 {
+        if d.is_nan() || d <= 0.0 {
             return Err(StatError::InvalidParameter(
                 "Cohen's d must be positive".to_string(),
             ));
@@ -71,6 +71,7 @@ impl EquivalenceBounds {
     /// For Cohen's d bounds, requires the pooled standard deviation.
     /// For correlation bounds, sd is ignored.
     pub fn to_raw(&self, sd: Option<f64>) -> Result<(f64, f64)> {
+        self.validate()?;
         match self {
             Self::Raw { lower, upper } => Ok((*lower, *upper)),
             Self::Symmetric { delta } => Ok((-*delta, *delta)),
@@ -80,7 +81,7 @@ impl EquivalenceBounds {
                         "Standard deviation required for Cohen's d bounds".to_string(),
                     )
                 })?;
-                if sd <= 0.0 {
+                if sd.is_nan() || sd <= 0.0 {
                     return Err(StatError::InvalidParameter(
                         "Standard deviation must be positive".to_string(),
                     ));
@@ -95,7 +96,7 @@ impl EquivalenceBounds {
     pub fn validate(&self) -> Result<()> {
         match self {
             Self::Raw { lower, upper } => {
-                if *lower >= *upper {
+                if lower.is_nan() || upper.is_nan() || *lower >= *upper {
                     return Err(StatError::InvalidParameter(format!(
                         "lower bound ({}) must be less than upper bound ({})",
                         lower, upper
@@ -103,14 +104,14 @@ impl EquivalenceBounds {
                 }
             }
             Self::Symmetric { delta } => {
-                if *delta <= 0.0 {
+                if delta.is_nan() || *delta <= 0.0 {
                     return Err(StatError::InvalidParameter(
                         "delta must be positive".to_string(),
                     ));
                 }
             }
             Self::CohenD { d } => {
-                if *d <= 0.0 {
+                if d.is_nan() || *d <= 0.0 {
                     return Err(StatError::InvalidParameter(
                         "Cohen's d must be positive".to_string(),
                     ));

@@ -7,8 +7,9 @@
 #![allow(clippy::needless_range_loop)]
 
 use crate::error::{Result, StatError};
+use crate::utils::dist::sf_or_nan;
 use crate::utils::math::{mean, variance};
-use statrs::distribution::{ChiSquared, ContinuousCDF, FisherSnedecor};
+use statrs::distribution::{ChiSquared, FisherSnedecor};
 
 /// Type alias for validated ANOVA group statistics: (sizes, means, variances, total_n).
 type GroupStats = (Vec<usize>, Vec<f64>, Vec<f64>, usize);
@@ -147,7 +148,7 @@ fn fisher_anova(
     let p_value = if f_stat.is_nan() {
         f64::NAN
     } else {
-        f_dist.sf(f_stat)
+        sf_or_nan(&f_dist, f_stat)
     };
 
     Ok(OneWayAnovaResult {
@@ -244,7 +245,7 @@ fn welch_anova(
     let f_dist = FisherSnedecor::new(df_between, df_within).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_value = f_dist.sf(f_stat);
+    let p_value = sf_or_nan(&f_dist, f_stat);
 
     Ok(OneWayAnovaResult {
         statistic: f_stat,
@@ -989,17 +990,17 @@ pub fn two_way_anova(
     let f_dist_a = FisherSnedecor::new(df_a, df_error).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_a = f_dist_a.sf(f_a);
+    let p_a = sf_or_nan(&f_dist_a, f_a);
 
     let f_dist_b = FisherSnedecor::new(df_b, df_error).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_b = f_dist_b.sf(f_b);
+    let p_b = sf_or_nan(&f_dist_b, f_b);
 
     let f_dist_ab = FisherSnedecor::new(df_ab, df_error).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_ab = f_dist_ab.sf(f_ab);
+    let p_ab = sf_or_nan(&f_dist_ab, f_ab);
 
     Ok(TwoWayAnovaResult {
         factor_a: AnovaTableRow {
@@ -1253,7 +1254,7 @@ pub fn repeated_measures_anova(data: &[&[f64]], compute_sphericity: bool) -> Res
     let f_dist = FisherSnedecor::new(df_conditions, df_error).map_err(|e| {
         StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
     })?;
-    let p_value = f_dist.sf(f_stat);
+    let p_value = sf_or_nan(&f_dist, f_stat);
 
     // Sphericity test and corrections (only for k >= 3)
     let (sphericity, greenhouse_geisser, huynh_feldt) = if compute_sphericity && n_conditions >= 3 {
@@ -1408,7 +1409,7 @@ fn compute_sphericity_corrections(
         let chi_dist = ChiSquared::new(df_chi).map_err(|e| {
             StatError::InvalidParameter(format!("Failed to create chi-square distribution: {}", e))
         })?;
-        chi_dist.sf(chi_sq)
+        sf_or_nan(&chi_dist, chi_sq)
     } else {
         0.0
     };
@@ -1427,7 +1428,9 @@ fn compute_sphericity_corrections(
         let f_dist = FisherSnedecor::new(df_num_gg, df_den_gg).map_err(|e| {
             StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
         })?;
-        f_dist.sf(f_stat)
+        sf_or_nan(&f_dist, f_stat)
+    } else if f_stat.is_nan() || df_num_gg.is_nan() || df_den_gg.is_nan() {
+        f64::NAN
     } else {
         1.0
     };
@@ -1447,7 +1450,9 @@ fn compute_sphericity_corrections(
         let f_dist = FisherSnedecor::new(df_num_hf, df_den_hf).map_err(|e| {
             StatError::InvalidParameter(format!("Failed to create F-distribution: {}", e))
         })?;
-        f_dist.sf(f_stat)
+        sf_or_nan(&f_dist, f_stat)
+    } else if f_stat.is_nan() || df_num_hf.is_nan() || df_den_hf.is_nan() {
+        f64::NAN
     } else {
         1.0
     };

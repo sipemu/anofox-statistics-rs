@@ -185,6 +185,13 @@ pub fn chisq_goodness_of_fit(
             )));
         }
 
+        if let Some(p) = props.iter().find(|p| !p.is_finite() || **p < 0.0) {
+            return Err(StatError::InvalidParameter(format!(
+                "Expected proportions must be finite and non-negative, got {}",
+                p
+            )));
+        }
+
         // Validate proportions sum to 1
         let sum: f64 = props.iter().sum();
         if (sum - 1.0).abs() > 1e-6 {

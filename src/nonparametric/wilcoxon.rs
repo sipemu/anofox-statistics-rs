@@ -1,6 +1,7 @@
 use crate::error::{Result, StatError};
 use crate::nonparametric::ranks::rank_with_ties;
 use crate::parametric::Alternative;
+use crate::utils::finite::{ensure_finite_param, ensure_no_nan};
 use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Compute tie correction factor: sum(t^3 - t) for all tie groups.
@@ -95,6 +96,12 @@ pub fn mann_whitney_u(
     }
     if y.is_empty() {
         return Err(StatError::EmptyData);
+    }
+    // ±Inf ranks as an extreme value (as in R); NaN cannot be ranked.
+    ensure_no_nan("x", x)?;
+    ensure_no_nan("y", y)?;
+    if let Some(m) = mu {
+        ensure_finite_param("mu", m)?;
     }
 
     let nx = x.len();
@@ -222,16 +229,28 @@ pub fn wilcoxon_signed_rank(
         )));
     }
 
+    // ±Inf ranks as an extreme value (as in R); NaN cannot be ranked.
+    ensure_no_nan("x", x)?;
+    ensure_no_nan("y", y)?;
+    if let Some(m) = mu {
+        ensure_finite_param("mu", m)?;
+    }
+
     // Apply mu shift if specified (null hypothesis: median difference = mu)
     let mu_shift = mu.unwrap_or(0.0);
 
-    // Compute differences and filter out zeros
-    let diffs: Vec<f64> = x
+    // Compute differences. Like R, drop undefined differences (Inf - Inf =
+    // NaN) and then the zeros.
+    let defined: Vec<f64> = x
         .iter()
         .zip(y.iter())
         .map(|(xi, yi)| xi - yi - mu_shift)
-        .filter(|&d| d != 0.0)
+        .filter(|d| !d.is_nan())
         .collect();
+    if defined.is_empty() {
+        return Err(StatError::InsufficientData { needed: 1, got: 0 });
+    }
+    let diffs: Vec<f64> = defined.into_iter().filter(|&d| d != 0.0).collect();
 
     let n_nonzero = diffs.len();
 
@@ -484,6 +503,19 @@ fn binomial(n: usize, k: usize) -> u64 {
 // Hodges-Lehmann estimates and confidence intervals
 // ============================================
 
+/// NaN estimate and interval, used when +Inf and -Inf make the pairwise
+/// differences or Walsh averages undefined.
+fn undefined_estimate_ci(conf_level: f64) -> (f64, ConfidenceInterval) {
+    (
+        f64::NAN,
+        ConfidenceInterval {
+            lower: f64::NAN,
+            upper: f64::NAN,
+            conf_level,
+        },
+    )
+}
+
 /// Compute Hodges-Lehmann estimate and confidence interval for Mann-Whitney U test.
 ///
 /// The estimate is the median of all pairwise differences (y_j - x_i).
@@ -505,7 +537,11 @@ fn mann_whitney_estimate_ci(
             diffs.push(xi - yi);
         }
     }
-    diffs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    if diffs.iter().any(|d| d.is_nan()) {
+        // Inf - Inf: the order statistics are undefined.
+        return Ok(undefined_estimate_ci(conf_level));
+    }
+    diffs.sort_by(|a, b| a.total_cmp(b));
 
     // Hodges-Lehmann estimate: median of pairwise differences
     let estimate = if n_pairs % 2 == 0 {
@@ -609,7 +645,11 @@ fn wilcoxon_estimate_ci(
             walsh.push((diffs[i] + diffs[j]) / 2.0);
         }
     }
-    walsh.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    if walsh.iter().any(|w| w.is_nan()) {
+        // (Inf + -Inf) / 2: the order statistics are undefined.
+        return Ok(undefined_estimate_ci(conf_level));
+    }
+    walsh.sort_by(|a, b| a.total_cmp(b));
 
     // Hodges-Lehmann estimate: median of Walsh averages
     let estimate = if n_walsh % 2 == 0 {
@@ -737,6 +777,11 @@ pub fn rank_biserial(x: &[f64], y: &[f64], mu: Option<f64>) -> Result<f64> {
     if x.is_empty() || y.is_empty() {
         return Err(StatError::EmptyData);
     }
+    ensure_no_nan("x", x)?;
+    ensure_no_nan("y", y)?;
+    if let Some(m) = mu {
+        ensure_finite_param("mu", m)?;
+    }
     let shift = mu.unwrap_or(0.0);
     let mut u1 = 0.0;
     for &xi in x {
@@ -773,12 +818,18 @@ pub fn matched_pairs_rank_biserial(x: &[f64], y: &[f64], mu: Option<f64>) -> Res
             y.len()
         )));
     }
+    ensure_no_nan("x", x)?;
+    ensure_no_nan("y", y)?;
+    if let Some(m) = mu {
+        ensure_finite_param("mu", m)?;
+    }
     let shift = mu.unwrap_or(0.0);
+    // As in wilcoxon_signed_rank: drop undefined (Inf - Inf) and zero differences.
     let diffs: Vec<f64> = x
         .iter()
         .zip(y)
         .map(|(a, b)| a - b - shift)
-        .filter(|&d| d != 0.0)
+        .filter(|&d| d != 0.0 && !d.is_nan())
         .collect();
     if diffs.is_empty() {
         return Ok(f64::NAN);

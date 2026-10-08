@@ -3,6 +3,7 @@
 //! ICC measures the reliability of ratings or measurements.
 
 use crate::error::{Result, StatError};
+use crate::utils::dist::f_sf;
 use statrs::distribution::{ContinuousCDF, FisherSnedecor};
 
 /// Type of ICC to compute
@@ -159,8 +160,10 @@ pub fn icc(data: &[Vec<f64>], icc_type: ICCType) -> Result<ICCResult> {
 
     // Compute p-value
     let p_value = if f_value > 0.0 && df1 > 0.0 && df2 > 0.0 {
-        let f_dist = FisherSnedecor::new(df1, df2).unwrap();
-        f_dist.sf(f_value)
+        f_sf(f_value, df1, df2)
+    } else if f_value.is_nan() {
+        // 0/0 for degenerate (constant) data
+        f64::NAN
     } else {
         1.0
     };
@@ -307,7 +310,9 @@ fn compute_icc_ci(
     }
 
     let alpha = 0.05;
-    let f_dist = FisherSnedecor::new(df1, df2).unwrap();
+    let Ok(f_dist) = FisherSnedecor::new(df1, df2) else {
+        return (f64::NAN, f64::NAN);
+    };
     let f_lower = f_dist.inverse_cdf(alpha / 2.0);
     let f_upper = f_dist.inverse_cdf(1.0 - alpha / 2.0);
 

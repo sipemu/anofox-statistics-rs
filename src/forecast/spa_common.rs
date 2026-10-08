@@ -5,6 +5,7 @@
 
 use crate::error::{Result, StatError};
 use crate::resampling::bootstrap::StationaryBootstrap;
+use crate::utils::finite::ensure_finite;
 
 /// Validate that model data has consistent dimensions.
 pub fn validate_model_data(
@@ -34,6 +35,19 @@ pub fn validate_model_data(
         }
     }
 
+    Ok(())
+}
+
+/// Validate that benchmark and model data contain no NaN or ±Inf.
+pub fn validate_finite_data(
+    benchmark: &[f64],
+    model_data: &[Vec<f64>],
+    data_name: &str,
+) -> Result<()> {
+    ensure_finite("benchmark", benchmark)?;
+    for (i, data) in model_data.iter().enumerate() {
+        ensure_finite(&format!("{} {}", data_name, i), data)?;
+    }
     Ok(())
 }
 
@@ -81,7 +95,7 @@ pub fn find_best_model(standardized: &[f64]) -> Option<usize> {
     standardized
         .iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+        .max_by(|(_, a), (_, b)| a.total_cmp(b))
         .map(|(i, _)| i)
 }
 

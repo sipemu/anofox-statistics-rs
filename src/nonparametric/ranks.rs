@@ -1,9 +1,10 @@
 use crate::error::{Result, StatError};
+use crate::utils::finite::ensure_no_nan;
 
 /// Sort data by value and return index-value pairs.
 fn sort_indexed(data: &[f64]) -> Vec<(usize, f64)> {
     let mut indexed: Vec<(usize, f64)> = data.iter().cloned().enumerate().collect();
-    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
     indexed
 }
 
@@ -42,12 +43,15 @@ fn assign_tie_group_ranks(
 /// # Arguments
 /// * `data` - The data to rank
 ///
+/// `±Inf` ranks as the smallest/largest value; `NaN` returns an error.
+///
 /// # Returns
 /// * Vector of ranks (1-indexed, ties get average rank)
 pub fn rank(data: &[f64]) -> Result<Vec<f64>> {
     if data.is_empty() {
         return Err(StatError::EmptyData);
     }
+    ensure_no_nan("data", data)?;
 
     let indexed = sort_indexed(data);
     let mut ranks = vec![0.0; data.len()];
@@ -67,6 +71,7 @@ pub(crate) fn rank_with_ties(data: &[f64]) -> Result<(Vec<f64>, Vec<usize>)> {
     if data.is_empty() {
         return Err(StatError::EmptyData);
     }
+    ensure_no_nan("data", data)?;
 
     let indexed = sort_indexed(data);
     let mut ranks = vec![0.0; data.len()];

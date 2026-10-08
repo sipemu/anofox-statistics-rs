@@ -1,8 +1,9 @@
 use crate::error::{Result, StatError};
+use crate::utils::finite::ensure_finite;
 
 /// Validate MCS numeric parameters.
 pub(super) fn validate_mcs_parameters(alpha: f64, n_bootstrap: usize) -> Result<()> {
-    if alpha <= 0.0 || alpha >= 1.0 {
+    if !(alpha > 0.0 && alpha < 1.0) {
         return Err(StatError::InvalidParameter(
             "alpha must be in (0, 1)".to_string(),
         ));
@@ -23,6 +24,7 @@ pub(super) fn validate_model_dimensions(losses: &[Vec<f64>]) -> Result<()> {
     }
 
     for (i, model_losses) in losses.iter().enumerate() {
+        ensure_finite(&format!("model {} losses", i), model_losses)?;
         if model_losses.len() != t {
             return Err(StatError::InvalidParameter(format!(
                 "Model {} has {} observations, expected {}",

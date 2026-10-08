@@ -1,4 +1,5 @@
 use crate::error::{Result, StatError};
+use crate::utils::finite::{ensure_finite, ensure_finite_param};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -153,6 +154,7 @@ pub fn mmd_test(
 ) -> Result<MMDResult> {
     // Validate inputs
     validate_mmd_inputs(x, y)?;
+    validate_kernel(&kernel)?;
 
     // Convert to slices
     let x_slices: Vec<&[f64]> = x.iter().map(|v| v.as_slice()).collect();
@@ -211,7 +213,27 @@ fn validate_dimensions(x: &[Vec<f64>], y: &[Vec<f64>]) -> Result<()> {
 /// Validate MMD test inputs.
 fn validate_mmd_inputs(x: &[Vec<f64>], y: &[Vec<f64>]) -> Result<()> {
     validate_sample_sizes(x, y)?;
+    for (i, v) in x.iter().enumerate() {
+        ensure_finite(&format!("x[{}]", i), v)?;
+    }
+    for (i, v) in y.iter().enumerate() {
+        ensure_finite(&format!("y[{}]", i), v)?;
+    }
     validate_dimensions(x, y)
+}
+
+/// Validate kernel parameters (NaN/±Inf would make every kernel value NaN).
+fn validate_kernel(kernel: &Kernel) -> Result<()> {
+    match *kernel {
+        Kernel::Gaussian { bandwidth } | Kernel::Laplacian { bandwidth } => {
+            ensure_finite_param("bandwidth", bandwidth)
+        }
+        Kernel::Polynomial { scale, offset, .. } => {
+            ensure_finite_param("scale", scale)?;
+            ensure_finite_param("offset", offset)
+        }
+        Kernel::Linear => Ok(()),
+    }
 }
 
 /// Run the permutation test for MMD.
@@ -268,6 +290,8 @@ pub fn mmd_test_1d(
     if x.is_empty() || y.is_empty() {
         return Err(StatError::EmptyData);
     }
+    ensure_finite("x", x)?;
+    ensure_finite("y", y)?;
 
     // Median heuristic for bandwidth selection
     let combined: Vec<f64> = x.iter().chain(y.iter()).cloned().collect();
@@ -301,7 +325,7 @@ fn median_heuristic_1d(data: &[f64]) -> f64 {
     }
 
     // Find median
-    distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    distances.sort_by(|a, b| a.total_cmp(b));
     let mid = distances.len() / 2;
     if distances.len() % 2 == 0 {
         (distances[mid - 1] + distances[mid]) / 2.0

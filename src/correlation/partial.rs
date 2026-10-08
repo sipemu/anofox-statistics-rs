@@ -2,7 +2,7 @@
 
 use crate::correlation::{mean, validate_correlation_input};
 use crate::error::{Result, StatError};
-use statrs::distribution::{ContinuousCDF, StudentsT};
+use crate::utils::dist::t_sf;
 
 /// Result of a partial correlation analysis
 #[derive(Debug, Clone)]
@@ -137,8 +137,7 @@ pub fn partial_cor(x: &[f64], y: &[f64], z: &[&[f64]]) -> Result<PartialCorResul
     let p_value = if t_stat.is_infinite() {
         0.0
     } else if df > 0.0 {
-        let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-        2.0 * t_dist.sf(t_stat.abs())
+        2.0 * t_sf(t_stat.abs(), df)
     } else {
         1.0
     };
@@ -189,8 +188,7 @@ fn compute_simple_correlation(x: &[f64], y: &[f64], n: usize) -> Result<PartialC
     let p_value = if t_stat.is_infinite() {
         0.0
     } else {
-        let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-        2.0 * t_dist.sf(t_stat.abs())
+        2.0 * t_sf(t_stat.abs(), df)
     };
 
     Ok(PartialCorResult {
@@ -293,8 +291,7 @@ pub fn semi_partial_cor(x: &[f64], y: &[f64], z: &[&[f64]]) -> Result<PartialCor
     let p_value = if t_stat.is_infinite() {
         0.0
     } else if df > 0.0 {
-        let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-        2.0 * t_dist.sf(t_stat.abs())
+        2.0 * t_sf(t_stat.abs(), df)
     } else {
         1.0
     };

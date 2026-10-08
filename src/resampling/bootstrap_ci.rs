@@ -50,6 +50,10 @@ fn validate(data: &[f64], n_bootstrap: usize, conf_level: f64) -> Result<()> {
 /// `(lower, upper, se)` with `lower = R[floor(alpha/2 * B)]` and
 /// `upper = R[min(ceil((1 - alpha/2) * B), B - 1)]` (0-based, `alpha = 1 - conf_level`).
 fn percentile_interval(mut reps: Vec<f64>, conf_level: f64) -> (f64, f64, f64) {
+    if reps.iter().any(|r| r.is_nan()) {
+        // An undefined replicate makes the percentiles undefined.
+        return (f64::NAN, f64::NAN, f64::NAN);
+    }
     reps.sort_by(|a, b| a.total_cmp(b));
     let b = reps.len();
     let alpha = 1.0 - conf_level;

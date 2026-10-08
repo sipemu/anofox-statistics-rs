@@ -1,6 +1,7 @@
 use crate::error::{Result, StatError};
 use crate::nonparametric::ranks::rank_with_ties;
-use statrs::distribution::{ChiSquared, ContinuousCDF};
+use crate::utils::dist::chisq_sf;
+use crate::utils::finite::ensure_no_nan;
 
 /// Result of Kruskal-Wallis test
 #[derive(Debug, Clone)]
@@ -31,6 +32,8 @@ fn validate_groups(groups: &[&[f64]]) -> Result<(Vec<usize>, usize)> {
                 i + 1
             )));
         }
+        // ±Inf ranks as an extreme value; NaN cannot be ranked.
+        ensure_no_nan(&format!("group {}", i + 1), group)?;
         group_sizes.push(group.len());
         n_total += group.len();
     }
@@ -97,8 +100,7 @@ pub fn kruskal_wallis(groups: &[&[f64]]) -> Result<KruskalResult> {
 
     // Degrees of freedom and p-value
     let df = (k - 1) as f64;
-    let chi_sq = ChiSquared::new(df).unwrap();
-    let p_value = chi_sq.sf(h);
+    let p_value = chisq_sf(h, df);
 
     Ok(KruskalResult {
         statistic: h,

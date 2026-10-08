@@ -1,5 +1,6 @@
 use crate::error::{Result, StatError};
 use crate::parametric::Alternative;
+use crate::utils::finite::ensure_finite;
 use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Loss function for Diebold-Mariano test
@@ -81,6 +82,8 @@ pub fn diebold_mariano(
     if n < 3 {
         return Err(StatError::InsufficientData { needed: 3, got: n });
     }
+    ensure_finite("e1", e1)?;
+    ensure_finite("e2", e2)?;
 
     // Compute loss differentials: d_t = g(e1_t) - g(e2_t)
     let d: Vec<f64> = e1

@@ -237,3 +237,91 @@ fn issue_14_constant_inputs_do_not_panic() {
     .expect("yuen_test panicked");
     assert!(r.p_value.is_nan());
 }
+
+/// #17: rank-based tests rank ±Inf like R and drop Inf - Inf pairs instead of
+/// panicking. Reference: R 4.6.1 wilcox.test / kruskal.test.
+#[test]
+fn issue_17_rank_tests_accept_infinite_values_like_r() {
+    let inf = f64::INFINITY;
+    // wilcox.test(c(Inf,1,2,3,4), c(Inf,2,1,5,6), paired=TRUE, exact=FALSE)
+    // The Inf - Inf pair is dropped: V = 1.5, p = 0.265205392591508
+    let x = [inf, 1.0, 2.0, 3.0, 4.0];
+    let y = [inf, 2.0, 1.0, 5.0, 6.0];
+    let r = wilcoxon_signed_rank(&x, &y, Alternative::TwoSided, true, false, None, None).unwrap();
+    assert!(close(r.statistic, 1.5, 1e-12), "{}", r.statistic);
+    assert!(close(r.p_value, 0.265205392591508, 1e-9), "{}", r.p_value);
+    // The original repro (exact + conf.int) must not panic.
+    assert!(
+        wilcoxon_signed_rank(&x, &y, Alternative::TwoSided, true, false, Some(0.95), None).is_ok()
+    );
+    assert!(
+        wilcoxon_signed_rank(&x, &y, Alternative::TwoSided, true, true, Some(0.95), None).is_ok()
+    );
+
+    // wilcox.test(c(Inf,1,2,3,4), c(-Inf,2,1,5,6), paired=TRUE, exact=FALSE)
+    // Inf difference ranks largest: V = 6.5, p = 0.891755853506794
+    let y2 = [-inf, 2.0, 1.0, 5.0, 6.0];
+    let r = wilcoxon_signed_rank(&x, &y2, Alternative::TwoSided, true, false, None, None).unwrap();
+    assert!(close(r.statistic, 6.5, 1e-12), "{}", r.statistic);
+    assert!(close(r.p_value, 0.891755853506794, 1e-9), "{}", r.p_value);
+
+    // wilcox.test(c(Inf,1,2,3,4,7)): V = 21, exact p = 0.03125,
+    // normal approx with correction p = 0.0360316862182335
+    let x1 = [inf, 1.0, 2.0, 3.0, 4.0, 7.0];
+    let zeros = [0.0; 6];
+    let r =
+        wilcoxon_signed_rank(&x1, &zeros, Alternative::TwoSided, true, true, None, None).unwrap();
+    assert!(close(r.statistic, 21.0, 1e-12), "{}", r.statistic);
+    assert!(close(r.p_value, 0.03125, 1e-12), "{}", r.p_value);
+    let r =
+        wilcoxon_signed_rank(&x1, &zeros, Alternative::TwoSided, true, false, None, None).unwrap();
+    assert!(close(r.p_value, 0.0360316862182335, 1e-9), "{}", r.p_value);
+
+    // wilcox.test(c(Inf,1.5,2,3,4), c(-Inf,2.5,1,5,6)): W = 15,
+    // exact p = 0.69047619047619, normal approx p = 0.676103314023147
+    let a = [inf, 1.5, 2.0, 3.0, 4.0];
+    let b = [-inf, 2.5, 1.0, 5.0, 6.0];
+    let r = mann_whitney_u(&a, &b, Alternative::TwoSided, true, true, None, None).unwrap();
+    assert!(close(r.statistic, 15.0, 1e-12), "{}", r.statistic);
+    assert!(close(r.p_value, 0.69047619047619, 1e-12), "{}", r.p_value);
+    let r = mann_whitney_u(&a, &b, Alternative::TwoSided, true, false, None, None).unwrap();
+    assert!(close(r.p_value, 0.676103314023147, 1e-9), "{}", r.p_value);
+    // +Inf in both samples: Inf - Inf makes the Hodges-Lehmann estimate undefined.
+    let r = mann_whitney_u(&x, &y, Alternative::TwoSided, true, false, Some(0.95), None).unwrap();
+    assert!(r.estimate.unwrap().is_nan());
+
+    // kruskal.test(list(c(Inf,1,2), c(-Inf,3,4), c(5,6,7))):
+    // H = 2.75555555555555, p = 0.252138238153004
+    let g1 = [inf, 1.0, 2.0];
+    let g2 = [-inf, 3.0, 4.0];
+    let g3 = [5.0, 6.0, 7.0];
+    let r = kruskal_wallis(&[&g1, &g2, &g3]).unwrap();
+    assert!(
+        close(r.statistic, 2.75555555555555, 1e-9),
+        "{}",
+        r.statistic
+    );
+    assert!(close(r.p_value, 0.252138238153004, 1e-9), "{}", r.p_value);
+
+    // NaN cannot be ranked: the crate's non-finite error instead of a panic.
+    let nan = [f64::NAN, 1.0, 2.0, 3.0, 4.0];
+    for res in [
+        wilcoxon_signed_rank(&nan, &y, Alternative::TwoSided, true, false, None, None).err(),
+        mann_whitney_u(&nan, &y, Alternative::TwoSided, true, false, None, None).err(),
+    ] {
+        let msg = res.expect("NaN input must be rejected").to_string();
+        assert!(msg.contains("non-finite"), "{msg}");
+    }
+    assert!(rank(&nan).is_err());
+    // All pairs Inf - Inf: nothing left to test.
+    assert!(wilcoxon_signed_rank(
+        &[inf; 3],
+        &[inf; 3],
+        Alternative::TwoSided,
+        true,
+        false,
+        None,
+        None
+    )
+    .is_err());
+}

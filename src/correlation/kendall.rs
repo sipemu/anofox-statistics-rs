@@ -162,7 +162,7 @@ fn count_pairs(x: &[f64], y: &[f64]) -> (usize, usize, usize, usize, usize) {
 /// Count unique values in a slice
 fn count_unique(data: &[f64]) -> usize {
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
     sorted.dedup();
     sorted.len()
 }
@@ -170,7 +170,7 @@ fn count_unique(data: &[f64]) -> usize {
 /// Sums over tie groups of size t: (sum t(t-1)(2t+5), sum t(t-1), sum t(t-1)(t-2)).
 fn tie_sums(data: &[f64]) -> (f64, f64, f64) {
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
     let (mut v, mut s1, mut s2) = (0.0, 0.0, 0.0);
     let mut i = 0;
     while i < sorted.len() {

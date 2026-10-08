@@ -1,7 +1,8 @@
 use crate::error::{Result, StatError};
 use crate::nonparametric::ranks::rank;
 use crate::parametric::Alternative;
-use statrs::distribution::{ContinuousCDF, StudentsT};
+use crate::utils::dist::{t_cdf, t_inv, t_sf};
+use crate::utils::finite::ensure_no_nan;
 
 /// Confidence interval for Brunner-Munzel estimate
 #[derive(Debug, Clone)]
@@ -65,12 +66,10 @@ fn compute_bm_variance(
 
 /// Compute p-value from t-distribution based on alternative hypothesis.
 fn compute_bm_pvalue(statistic: f64, df: f64, alternative: Alternative) -> f64 {
-    let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-
     match alternative {
-        Alternative::TwoSided => 2.0 * t_dist.sf(statistic.abs()).min(t_dist.cdf(statistic.abs())),
-        Alternative::Greater => t_dist.cdf(statistic),
-        Alternative::Less => t_dist.sf(statistic),
+        Alternative::TwoSided => 2.0 * t_sf(statistic.abs(), df).min(t_cdf(statistic.abs(), df)),
+        Alternative::Greater => t_cdf(statistic, df),
+        Alternative::Less => t_sf(statistic, df),
     }
 }
 
@@ -102,6 +101,9 @@ pub fn brunner_munzel(
     let n2 = y.len();
 
     validate_bm_inputs(n1, n2)?;
+    // ±Inf ranks as an extreme value; NaN cannot be ranked.
+    ensure_no_nan("x", x)?;
+    ensure_no_nan("y", y)?;
 
     let n1_f = n1 as f64;
     let n2_f = n2 as f64;
@@ -156,8 +158,7 @@ pub fn brunner_munzel(
                 "alpha must be between 0 and 1".to_string(),
             ));
         }
-        let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-        let t_crit = t_dist.inverse_cdf(1.0 - a / 2.0);
+        let t_crit = t_inv(1.0 - a / 2.0, df);
         let se = (v1 / (n1_f * n2_f * n2_f) + v2 / (n2_f * n1_f * n1_f)).sqrt();
         let lower = pst - t_crit * se;
         let upper = pst + t_crit * se;

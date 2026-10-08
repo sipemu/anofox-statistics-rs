@@ -1,4 +1,5 @@
 use crate::error::{Result, StatError};
+use crate::utils::finite::ensure_no_nan;
 use crate::Alternative;
 use statrs::distribution::{ContinuousCDF, StudentsT};
 
@@ -67,6 +68,9 @@ pub fn yuen_test(
     if y.is_empty() {
         return Err(StatError::EmptyData);
     }
+    // ±Inf can be trimmed away; NaN cannot be ordered.
+    ensure_no_nan("x", x)?;
+    ensure_no_nan("y", y)?;
 
     let nx = x.len();
     let ny = y.len();
@@ -160,7 +164,7 @@ pub fn yuen_test(
 /// Compute trimmed mean by removing g observations from each tail
 fn trimmed_mean(data: &[f64], g: usize) -> f64 {
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let n = sorted.len();
     let trimmed = &sorted[g..n - g];
@@ -173,7 +177,7 @@ fn trimmed_mean(data: &[f64], g: usize) -> f64 {
 /// Replace the g largest values with the (n-g)th largest
 fn winsorized_variance(data: &[f64], g: usize) -> f64 {
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let n = sorted.len();
 
