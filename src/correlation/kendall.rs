@@ -50,6 +50,10 @@ pub enum KendallVariant {
 ///
 /// # R equivalent
 /// `cor.test(x, y, method = "kendall")` (uses tau-b)
+///
+/// # Complexity
+/// O(n log n) time and O(n) memory: concordant/discordant/tied pair counts
+/// use Knight's (1966) merge-sort algorithm, exact with ties.
 pub fn kendall(x: &[f64], y: &[f64], variant: KendallVariant) -> Result<CorrelationResult> {
     let n = validate_correlation_input(x, y)?;
 
@@ -114,49 +118,118 @@ pub fn kendall(x: &[f64], y: &[f64], variant: KendallVariant) -> Result<Correlat
     })
 }
 
+/// Number of unordered pairs among `t` items: t(t-1)/2.
+#[inline]
+fn pairs(t: usize) -> usize {
+    t * t.saturating_sub(1) / 2
+}
+
 /// Count concordant, discordant, and tied pairs.
 ///
 /// Returns (concordant, discordant, ties_in_x, ties_in_y, ties_in_both)
 /// Note: ties_in_x includes all pairs tied in x (including those also tied in y)
 /// Same for ties_in_y. This is needed for the tau-b denominator.
+///
+/// Uses Knight's (1966) algorithm: sort the pairs lexicographically by
+/// (x, y), count the tie groups in x and in (x, y), then count the
+/// discordant pairs as the number of strict inversions of the y sequence with
+/// a merge sort, and finally the tie groups in y from the merged (sorted) y.
+/// All counts are exact integers, so the result is identical to the naive
+/// O(n^2) pair enumeration.
+///
+/// Complexity: O(n log n) time, O(n) memory.
 fn count_pairs(x: &[f64], y: &[f64]) -> (usize, usize, usize, usize, usize) {
     let n = x.len();
-    let mut concordant = 0usize;
-    let mut discordant = 0usize;
-    let mut ties_x = 0usize; // All pairs tied in x
-    let mut ties_y = 0usize; // All pairs tied in y
-    let mut ties_xy = 0usize; // Tied in both
+    // Inputs are validated finite, so `partial_cmp` is total here and treats
+    // -0.0 == 0.0 exactly like the `==` used for tie detection.
+    let cmp = |a: f64, b: f64| a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal);
 
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let dx = x[i] - x[j];
-            let dy = y[i] - y[j];
+    let mut idx: Vec<usize> = (0..n).collect();
+    idx.sort_unstable_by(|&i, &j| cmp(x[i], x[j]).then_with(|| cmp(y[i], y[j])));
 
-            let tied_x = dx == 0.0;
-            let tied_y = dy == 0.0;
-
-            if tied_x {
-                ties_x += 1;
-            }
-            if tied_y {
-                ties_y += 1;
-            }
-            if tied_x && tied_y {
-                ties_xy += 1;
-            }
-
-            // For concordant/discordant, only count pairs not tied in either
-            if !tied_x && !tied_y {
-                if (dx > 0.0 && dy > 0.0) || (dx < 0.0 && dy < 0.0) {
-                    concordant += 1;
-                } else {
-                    discordant += 1;
-                }
-            }
+    // Ties in x and joint ties in (x, y) from the lexicographic order.
+    let mut ties_x = 0usize;
+    let mut ties_xy = 0usize;
+    let mut i = 0;
+    while i < n {
+        let mut j = i + 1;
+        while j < n && x[idx[j]] == x[idx[i]] {
+            j += 1;
         }
+        ties_x += pairs(j - i);
+        let mut k = i;
+        while k < j {
+            let mut l = k + 1;
+            while l < j && y[idx[l]] == y[idx[k]] {
+                l += 1;
+            }
+            ties_xy += pairs(l - k);
+            k = l;
+        }
+        i = j;
     }
 
+    // Discordant pairs = strict inversions of y in (x, y)-sorted order.
+    let mut ys: Vec<f64> = idx.iter().map(|&k| y[k]).collect();
+    drop(idx);
+    let discordant = merge_sort_inversions(&mut ys);
+
+    // Ties in y from the now sorted y sequence.
+    let mut ties_y = 0usize;
+    let mut i = 0;
+    while i < n {
+        let mut j = i + 1;
+        while j < n && ys[j] == ys[i] {
+            j += 1;
+        }
+        ties_y += pairs(j - i);
+        i = j;
+    }
+
+    let n_pairs = pairs(n);
+    let concordant = n_pairs + ties_xy - ties_x - ties_y - discordant;
+
     (concordant, discordant, ties_x, ties_y, ties_xy)
+}
+
+/// Sort `v` ascending (bottom-up, stable merge sort) and return the number of
+/// strict inversions, i.e. pairs `i < j` with `v[i] > v[j]` (equal values are
+/// not inversions).
+///
+/// Complexity: O(n log n) time, O(n) memory.
+fn merge_sort_inversions(v: &mut [f64]) -> usize {
+    let n = v.len();
+    let mut buf = vec![0.0; n];
+    let mut inversions = 0usize;
+    let mut width = 1;
+    while width < n {
+        let mut lo = 0;
+        while lo < n {
+            let mid = (lo + width).min(n);
+            let hi = (lo + 2 * width).min(n);
+            if mid < hi {
+                let (mut i, mut j, mut k) = (lo, mid, lo);
+                while i < mid && j < hi {
+                    if v[i] <= v[j] {
+                        buf[k] = v[i];
+                        i += 1;
+                    } else {
+                        buf[k] = v[j];
+                        j += 1;
+                        inversions += mid - i;
+                    }
+                    k += 1;
+                }
+                buf[k..k + (mid - i)].copy_from_slice(&v[i..mid]);
+                k += mid - i;
+                buf[k..k + (hi - j)].copy_from_slice(&v[j..hi]);
+                v[lo..hi].copy_from_slice(&buf[lo..hi]);
+            }
+            lo = hi;
+        }
+        width *= 2;
+    }
+    inversions
 }
 
 /// Count unique values in a slice
@@ -246,6 +319,86 @@ fn compute_kendall_significance(
 #[allow(clippy::excessive_precision)]
 mod tests {
     use super::*;
+
+    /// Naive O(n^2) reference for `count_pairs`.
+    fn count_pairs_naive(x: &[f64], y: &[f64]) -> (usize, usize, usize, usize, usize) {
+        let n = x.len();
+        let (mut c, mut d, mut tx, mut ty, mut txy) = (0, 0, 0, 0, 0);
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let dx = x[i] - x[j];
+                let dy = y[i] - y[j];
+                let (a, b) = (dx == 0.0, dy == 0.0);
+                tx += a as usize;
+                ty += b as usize;
+                txy += (a && b) as usize;
+                if !a && !b {
+                    if (dx > 0.0) == (dy > 0.0) {
+                        c += 1;
+                    } else {
+                        d += 1;
+                    }
+                }
+            }
+        }
+        (c, d, tx, ty, txy)
+    }
+
+    /// Deterministic LCG in [0, 1).
+    fn lcg(state: &mut u64) -> f64 {
+        *state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (*state >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    #[test]
+    fn test_count_pairs_matches_naive() {
+        let mut s = 7u64;
+        for &n in &[3usize, 4, 5, 10, 37, 200, 513] {
+            for &levels in &[0usize, 2, 5, 20] {
+                let draw = |s: &mut u64| {
+                    let u = lcg(s);
+                    if levels == 0 {
+                        u * 10.0 - 5.0
+                    } else {
+                        (u * levels as f64).floor() - 1.0
+                    }
+                };
+                let x: Vec<f64> = (0..n).map(|_| draw(&mut s)).collect();
+                let y: Vec<f64> = x.iter().map(|&xi| 0.5 * xi + draw(&mut s)).collect();
+                assert_eq!(
+                    count_pairs(&x, &y),
+                    count_pairs_naive(&x, &y),
+                    "n={n} l={levels}"
+                );
+                for v in [
+                    KendallVariant::TauA,
+                    KendallVariant::TauB,
+                    KendallVariant::TauC,
+                ] {
+                    let r = kendall(&x, &y, v).unwrap();
+                    assert!(r.estimate.is_finite() && r.p_value.is_finite());
+                }
+            }
+        }
+        // Signed zeros are ties, as with `==`.
+        let x = [0.0, -0.0, 1.0, 2.0];
+        let y = [-0.0, 0.0, 3.0, 1.0];
+        assert_eq!(count_pairs(&x, &y), count_pairs_naive(&x, &y));
+    }
+
+    /// n = 100_000 must finish quickly (the old O(n^2) loop took ~5e9 steps).
+    #[test]
+    #[ignore]
+    fn test_kendall_large_n() {
+        let mut s = 11u64;
+        let n = 100_000;
+        let x: Vec<f64> = (0..n).map(|_| (lcg(&mut s) * 1000.0).floor()).collect();
+        let y: Vec<f64> = x.iter().map(|&xi| xi + lcg(&mut s) * 500.0).collect();
+        let r = kendall(&x, &y, KendallVariant::TauB).unwrap();
+        assert!(r.estimate > 0.5 && r.estimate < 1.0);
+    }
 
     #[test]
     fn test_kendall_basic() {

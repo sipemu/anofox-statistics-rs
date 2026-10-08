@@ -1,7 +1,9 @@
 pub mod brunner_munzel;
+mod hodges_lehmann;
 pub mod kruskal;
 pub mod ranks;
 pub mod wilcoxon;
+mod wilcoxon_dist;
 
 pub use brunner_munzel::{brunner_munzel, BrunnerMunzelResult};
 pub use kruskal::{kruskal_wallis, KruskalResult};

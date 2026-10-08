@@ -7,6 +7,7 @@ use crate::equivalence::{EquivalenceBounds, OneSidedTestResult, TostResult};
 use crate::error::{Result, StatError};
 use crate::nonparametric::ranks::rank_with_ties;
 use crate::utils::finite::ensure_finite;
+use crate::utils::select::{kth_pairwise_difference, kth_walsh_average, median_by};
 use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Perform TOST for paired samples using Wilcoxon signed-rank test.
@@ -37,6 +38,11 @@ use statrs::distribution::{ContinuousCDF, Normal};
 ///
 /// # R equivalent
 /// `TOSTER::wilcox_TOST(x, y, paired = TRUE, low_eqbound, high_eqbound)`
+///
+/// # Complexity
+/// O(n log^2 n) expected time and O(n) memory: the Hodges-Lehmann estimate
+/// and CI select order statistics of the n(n+1)/2 Walsh averages without
+/// materialising them.
 pub fn tost_wilcoxon_paired(
     x: &[f64],
     y: &[f64],
@@ -127,6 +133,11 @@ pub fn tost_wilcoxon_paired(
 ///
 /// # R equivalent
 /// `TOSTER::wilcox_TOST(x, y, paired = FALSE, low_eqbound, high_eqbound)`
+///
+/// # Complexity
+/// O(N log^2 N) expected time and O(N) memory for `N = nx + ny`: the
+/// Hodges-Lehmann estimate and CI select order statistics of the nx*ny
+/// pairwise differences without materialising them.
 pub fn tost_wilcoxon_two_sample(
     x: &[f64],
     y: &[f64],
@@ -187,51 +198,47 @@ pub fn tost_wilcoxon_two_sample(
     })
 }
 
+/// Ascending sorted copy.
+fn sorted_asc(data: &[f64]) -> Vec<f64> {
+    let mut v = data.to_vec();
+    v.sort_by(|a, b| a.total_cmp(b));
+    v
+}
+
+/// Descending sorted copy.
+fn sorted_desc(data: &[f64]) -> Vec<f64> {
+    let mut v = data.to_vec();
+    v.sort_by(|a, b| b.total_cmp(a));
+    v
+}
+
 /// Compute Hodges-Lehmann estimator for one sample (pseudo-median).
 /// This is the median of all Walsh averages (xi + xj) / 2 for i <= j.
+///
+/// The Walsh averages are not materialised: order statistics are selected
+/// in a sorted-rows matrix. O(n log^2 n) expected time, O(n) memory.
 fn hodges_lehmann_one_sample(data: &[f64]) -> f64 {
     let n = data.len();
-    let mut walsh: Vec<f64> = Vec::with_capacity(n * (n + 1) / 2);
-
-    for i in 0..n {
-        for j in i..n {
-            walsh.push((data[i] + data[j]) / 2.0);
-        }
-    }
-
-    walsh.sort_by(|a, b| a.total_cmp(b));
-    median_sorted(&walsh)
+    let s = sorted_asc(data);
+    median_by(n * (n + 1) / 2, |k| kth_walsh_average(&s, k))
 }
 
 /// Compute Hodges-Lehmann estimator for two samples.
 /// This is the median of all pairwise differences (xi - yj).
+///
+/// O((nx + ny) log^2) expected time, O(nx + ny) memory (no nx*ny buffer).
 fn hodges_lehmann_two_sample(x: &[f64], y: &[f64]) -> f64 {
-    let mut diffs: Vec<f64> = Vec::with_capacity(x.len() * y.len());
-
-    for xi in x {
-        for yi in y {
-            diffs.push(xi - yi);
-        }
-    }
-
-    diffs.sort_by(|a, b| a.total_cmp(b));
-    median_sorted(&diffs)
+    let yd = sorted_desc(y);
+    median_by(x.len() * y.len(), |k| kth_pairwise_difference(x, &yd, k))
 }
 
 /// Compute confidence interval for Hodges-Lehmann estimator (one sample).
+///
+/// O(n log^2 n) expected time, O(n) memory.
 fn hodges_lehmann_ci(data: &[f64], alpha: f64) -> Result<(f64, f64)> {
     let n = data.len();
-
-    // Compute all Walsh averages
-    let mut walsh: Vec<f64> = Vec::with_capacity(n * (n + 1) / 2);
-    for i in 0..n {
-        for j in i..n {
-            walsh.push((data[i] + data[j]) / 2.0);
-        }
-    }
-    walsh.sort_by(|a, b| a.total_cmp(b));
-
-    let n_walsh = walsh.len();
+    let s = sorted_asc(data);
+    let n_walsh = n * (n + 1) / 2;
 
     // Use normal approximation for CI indices
     let n_f = n as f64;
@@ -244,27 +251,24 @@ fn hodges_lehmann_ci(data: &[f64], alpha: f64) -> Result<(f64, f64)> {
     // For (1-2*alpha) CI
     let z = normal.inverse_cdf(1.0 - alpha);
 
-    let k_lower = (mu - z * sigma).floor() as usize;
+    let k_lower = ((mu - z * sigma).floor() as usize).min(n_walsh - 1);
     let k_upper = ((mu + z * sigma).ceil() as usize).min(n_walsh - 1);
 
-    Ok((walsh[k_lower], walsh[k_upper]))
+    Ok((
+        kth_walsh_average(&s, k_lower),
+        kth_walsh_average(&s, k_upper),
+    ))
 }
 
 /// Compute confidence interval for Hodges-Lehmann estimator (two samples).
+///
+/// O((nx + ny) log^2) expected time, O(nx + ny) memory.
 fn hodges_lehmann_ci_two_sample(x: &[f64], y: &[f64], alpha: f64) -> Result<(f64, f64)> {
     let nx = x.len();
     let ny = y.len();
+    let yd = sorted_desc(y);
 
-    // Compute all pairwise differences
-    let mut diffs: Vec<f64> = Vec::with_capacity(nx * ny);
-    for xi in x {
-        for yi in y {
-            diffs.push(xi - yi);
-        }
-    }
-    diffs.sort_by(|a, b| a.total_cmp(b));
-
-    let n_diffs = diffs.len();
+    let n_diffs = nx * ny;
     let nx_f = nx as f64;
     let ny_f = ny as f64;
 
@@ -278,10 +282,13 @@ fn hodges_lehmann_ci_two_sample(x: &[f64], y: &[f64], alpha: f64) -> Result<(f64
     // For (1-2*alpha) CI
     let z = normal.inverse_cdf(1.0 - alpha);
 
-    let k_lower = (mu - z * sigma).floor() as usize;
+    let k_lower = ((mu - z * sigma).floor() as usize).min(n_diffs - 1);
     let k_upper = ((mu + z * sigma).ceil() as usize).min(n_diffs - 1);
 
-    Ok((diffs[k_lower], diffs[k_upper]))
+    Ok((
+        kth_pairwise_difference(x, &yd, k_lower),
+        kth_pairwise_difference(x, &yd, k_upper),
+    ))
 }
 
 /// Perform Wilcoxon signed-rank test (one-sided).
@@ -392,19 +399,6 @@ fn mann_whitney_test(x: &[f64], y: &[f64], greater: bool) -> Result<(f64, f64)> 
     Ok((u1, p))
 }
 
-/// Compute median of a sorted array.
-fn median_sorted(sorted: &[f64]) -> f64 {
-    let n = sorted.len();
-    if n == 0 {
-        return f64::NAN;
-    }
-    if n % 2 == 0 {
-        (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
-    } else {
-        sorted[n / 2]
-    }
-}
-
 /// Convert bounds for non-parametric tests.
 fn bounds_for_nonparametric(bounds: &EquivalenceBounds) -> Result<(f64, f64)> {
     match bounds {
@@ -491,6 +485,108 @@ fn validate_inputs_two_sample(x: &[f64], y: &[f64], alpha: f64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sorted(mut v: Vec<f64>) -> Vec<f64> {
+        v.sort_by(|a, b| a.total_cmp(b));
+        v
+    }
+
+    fn naive_median(v: &[f64]) -> f64 {
+        let n = v.len();
+        if n % 2 == 0 {
+            (v[n / 2 - 1] + v[n / 2]) / 2.0
+        } else {
+            v[n / 2]
+        }
+    }
+
+    fn naive_walsh(d: &[f64]) -> Vec<f64> {
+        let mut w = Vec::new();
+        for i in 0..d.len() {
+            for j in i..d.len() {
+                w.push((d[i] + d[j]) / 2.0);
+            }
+        }
+        sorted(w)
+    }
+
+    fn naive_diffs(x: &[f64], y: &[f64]) -> Vec<f64> {
+        sorted(
+            x.iter()
+                .flat_map(|a| y.iter().map(move |b| a - b))
+                .collect(),
+        )
+    }
+
+    fn naive_ci(sorted_vals: &[f64], mu: f64, sigma: f64, alpha: f64) -> (f64, f64) {
+        let z = Normal::new(0.0, 1.0).unwrap().inverse_cdf(1.0 - alpha);
+        let m = sorted_vals.len() - 1;
+        let kl = ((mu - z * sigma).floor() as usize).min(m);
+        let ku = ((mu + z * sigma).ceil() as usize).min(m);
+        (sorted_vals[kl], sorted_vals[ku])
+    }
+
+    fn lcg(state: &mut u64) -> f64 {
+        *state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (*state >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    #[test]
+    fn test_hodges_lehmann_matches_naive() {
+        let mut s = 31u64;
+        for &n in &[3usize, 8, 31, 120] {
+            for &levels in &[0usize, 4] {
+                let mut draw = || {
+                    let u = lcg(&mut s);
+                    if levels == 0 {
+                        u * 3.0
+                    } else {
+                        (u * levels as f64).floor() * 0.25
+                    }
+                };
+                let x: Vec<f64> = (0..n).map(|_| draw()).collect();
+                let y: Vec<f64> = (0..n + 3).map(|_| draw()).collect();
+
+                let w = naive_walsh(&x);
+                assert_eq!(hodges_lehmann_one_sample(&x), naive_median(&w));
+                let nf = n as f64;
+                let mu = nf * (nf + 1.0) / 4.0;
+                let sd = (nf * (nf + 1.0) * (2.0 * nf + 1.0) / 24.0).sqrt();
+                assert_eq!(
+                    hodges_lehmann_ci(&x, 0.05).unwrap(),
+                    naive_ci(&w, mu, sd, 0.05)
+                );
+
+                let d = naive_diffs(&x, &y);
+                assert_eq!(hodges_lehmann_two_sample(&x, &y), naive_median(&d));
+                let (a, b) = (n as f64, (n + 3) as f64);
+                let sd2 = (a * b * (a + b + 1.0) / 12.0).sqrt();
+                assert_eq!(
+                    hodges_lehmann_ci_two_sample(&x, &y, 0.05).unwrap(),
+                    naive_ci(&d, a * b / 2.0, sd2, 0.05)
+                );
+            }
+        }
+    }
+
+    /// n = 100_000 per group (5e9 Walsh averages / 1e10 differences, 40-80 GB
+    /// when materialised).
+    #[test]
+    #[ignore]
+    fn test_wilcoxon_tost_large_n() {
+        let mut s = 77u64;
+        let n = 100_000;
+        let x: Vec<f64> = (0..n).map(|_| lcg(&mut s) * 10.0).collect();
+        let y: Vec<f64> = (0..n).map(|_| lcg(&mut s) * 10.0 + 0.01).collect();
+        let bounds = EquivalenceBounds::Symmetric { delta: 0.5 };
+        let p = tost_wilcoxon_paired(&x, &y, &bounds, 0.05).unwrap();
+        assert!(p.ci.0 <= p.estimate && p.estimate <= p.ci.1);
+        let t = tost_wilcoxon_two_sample(&x, &y, &bounds, 0.05).unwrap();
+        assert!(t.ci.0 <= t.estimate && t.estimate <= t.ci.1);
+        assert!(t.equivalent);
+    }
 
     #[test]
     fn test_wilcoxon_paired_equivalent() {

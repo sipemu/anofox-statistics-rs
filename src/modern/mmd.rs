@@ -1,5 +1,6 @@
 use crate::error::{Result, StatError};
 use crate::utils::finite::{ensure_finite, ensure_finite_param};
+use crate::utils::select::{kth_abs_difference, median_by};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -145,6 +146,11 @@ fn mmd_squared(x: &[&[f64]], y: &[&[f64]], kernel: Kernel) -> f64 {
 ///
 /// # References
 /// * Gretton, A. et al. (2012). "A Kernel Two-Sample Test"
+///
+/// # Complexity
+/// The statistic is inherently quadratic: O((B + 1) N^2 d) time for
+/// `N = m + n` points of dimension `d` and `B = n_permutations`. Kernel sums
+/// are streamed, so memory is O(N d) (no kernel matrix is stored).
 pub fn mmd_test(
     x: &[Vec<f64>],
     y: &[Vec<f64>],
@@ -280,7 +286,12 @@ fn run_mmd_permutation_test(
 
 /// Convenience function for univariate MMD test with Gaussian kernel.
 ///
-/// The bandwidth is automatically selected using the median heuristic.
+/// The bandwidth is automatically selected using the median heuristic
+/// (median of all absolute pairwise differences, selected in O(N log^2 N)
+/// expected time and O(N) memory without materialising them).
+///
+/// # Complexity
+/// O((B + 1) N^2) time (see [`mmd_test`]), O(N) memory for `N = m + n`.
 pub fn mmd_test_1d(
     x: &[f64],
     y: &[f64],
@@ -309,35 +320,81 @@ pub fn mmd_test_1d(
     )
 }
 
-/// Compute median heuristic bandwidth for 1D data.
+/// Compute median heuristic bandwidth for 1D data: the median of the
+/// n(n-1)/2 absolute pairwise differences (floored at 0.01).
+///
+/// The differences are not materialised (that took O(n^2) memory, 40 GB at
+/// n = 100k): their order statistics are selected from the sorted sample.
+/// O(n log^2 n) expected time, O(n) memory.
 fn median_heuristic_1d(data: &[f64]) -> f64 {
     let n = data.len();
     if n < 2 {
         return 1.0;
     }
-
-    // Compute all pairwise distances
-    let mut distances: Vec<f64> = Vec::with_capacity(n * (n - 1) / 2);
-    for i in 0..n {
-        for j in (i + 1)..n {
-            distances.push((data[i] - data[j]).abs());
-        }
-    }
-
-    // Find median
-    distances.sort_by(|a, b| a.total_cmp(b));
-    let mid = distances.len() / 2;
-    if distances.len() % 2 == 0 {
-        (distances[mid - 1] + distances[mid]) / 2.0
-    } else {
-        distances[mid]
-    }
-    .max(0.01) // Ensure non-zero bandwidth
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.total_cmp(b));
+    median_by(n * (n - 1) / 2, |k| kth_abs_difference(&sorted, k)).max(0.01) // Ensure non-zero bandwidth
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Naive O(n^2)-memory median heuristic (the previous implementation).
+    fn median_heuristic_naive(data: &[f64]) -> f64 {
+        let n = data.len();
+        let mut d = Vec::new();
+        for i in 0..n {
+            for j in (i + 1)..n {
+                d.push((data[i] - data[j]).abs());
+            }
+        }
+        d.sort_by(|a, b| a.total_cmp(b));
+        let mid = d.len() / 2;
+        if d.len() % 2 == 0 {
+            (d[mid - 1] + d[mid]) / 2.0
+        } else {
+            d[mid]
+        }
+        .max(0.01)
+    }
+
+    fn lcg(state: &mut u64) -> f64 {
+        *state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (*state >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    #[test]
+    fn test_median_heuristic_matches_naive() {
+        let mut s = 99u64;
+        for &n in &[2usize, 3, 4, 17, 100, 333] {
+            for &levels in &[0usize, 2, 9] {
+                let v: Vec<f64> = (0..n)
+                    .map(|_| {
+                        let u = lcg(&mut s);
+                        if levels == 0 {
+                            u * 8.0 - 1.0
+                        } else {
+                            (u * levels as f64).floor()
+                        }
+                    })
+                    .collect();
+                assert_eq!(median_heuristic_1d(&v), median_heuristic_naive(&v), "n={n}");
+            }
+        }
+    }
+
+    /// n = 100_000: 5e9 pairwise distances (40 GB) were materialised before.
+    #[test]
+    #[ignore]
+    fn test_median_heuristic_large_n() {
+        let mut s = 5u64;
+        let v: Vec<f64> = (0..100_000).map(|_| lcg(&mut s)).collect();
+        let h = median_heuristic_1d(&v);
+        assert!((h - (1.0 - 0.5f64.sqrt())).abs() < 0.01, "{h}");
+    }
 
     #[test]
     fn test_mmd_different_distributions() {
