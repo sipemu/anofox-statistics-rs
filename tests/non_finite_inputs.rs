@@ -70,7 +70,7 @@ fn fixed_cases() -> Vec<(Vec<f64>, Vec<f64>)> {
 fn random_cases(count: usize) -> Vec<(Vec<f64>, Vec<f64>)> {
     let mut rng = ChaCha8Rng::seed_from_u64(17);
     let specials = [NAN, INF, NINF, 0.0, 1e308, -1e308, 5e-324];
-    let mut gen = |rng: &mut ChaCha8Rng, n: usize| -> Vec<f64> {
+    let sample = |rng: &mut ChaCha8Rng, n: usize| -> Vec<f64> {
         (0..n)
             .map(|_| {
                 if rng.gen::<f64>() < 0.25 {
@@ -86,8 +86,8 @@ fn random_cases(count: usize) -> Vec<(Vec<f64>, Vec<f64>)> {
             let n = rng.gen_range(0..16);
             let paired = rng.gen::<bool>();
             let m = if paired { n } else { rng.gen_range(0..16) };
-            let x = gen(&mut rng, n);
-            let y = gen(&mut rng, m);
+            let x = sample(&mut rng, n);
+            let y = sample(&mut rng, m);
             (x, y)
         })
         .collect()
@@ -523,4 +523,92 @@ fn issue_17_no_panic_on_non_finite_scalar_parameters() {
         failures.extend(run_scalars(s));
     }
     assert!(failures.is_empty(), "panics:\n{}", failures.join("\n"));
+}
+
+/// Functions that would otherwise return a misleading finite p-value for
+/// non-finite data must reject it with the "non-finite value" error.
+#[test]
+fn issue_17_non_finite_data_is_rejected_not_misreported() {
+    let mut x = base(12, 0.0);
+    let y = base(12, 1.0);
+    let z = base(12, 2.0);
+    for s in [NAN, INF] {
+        x[3] = s;
+        let xv: Vec<Vec<f64>> = x.iter().map(|&v| vec![v]).collect();
+        let yv: Vec<Vec<f64>> = y.iter().map(|&v| vec![v]).collect();
+        let b = EquivalenceBounds::symmetric(0.5).unwrap();
+        let errors = [
+            (
+                "permutation_t_test",
+                permutation_t_test(&x, &y, Alternative::TwoSided, 50, Some(1)).err(),
+            ),
+            (
+                "energy_distance_test_1d",
+                energy_distance_test_1d(&x, &y, 30, Some(1)).err(),
+            ),
+            (
+                "energy_distance_test",
+                energy_distance_test(&xv, &yv, 30, Some(1)).err(),
+            ),
+            ("mmd_test_1d", mmd_test_1d(&x, &y, 30, Some(1)).err()),
+            (
+                "mmd_test",
+                mmd_test(&xv, &yv, Kernel::Linear, 30, Some(1)).err(),
+            ),
+            ("clark_west", clark_west(&x, &y, 1).err()),
+            (
+                "diebold_mariano",
+                diebold_mariano(
+                    &x,
+                    &y,
+                    LossFunction::SquaredError,
+                    1,
+                    Alternative::TwoSided,
+                    VarEstimator::Acf,
+                )
+                .err(),
+            ),
+            (
+                "spa_test",
+                spa_test(&x, &[y.clone(), z.clone()], 30, 2.0, Some(1)).err(),
+            ),
+            (
+                "mspe_adjusted_spa",
+                mspe_adjusted_spa(&x, std::slice::from_ref(&y), 30, 2.0, Some(1)).err(),
+            ),
+            (
+                "model_confidence_set",
+                model_confidence_set(
+                    &[x.clone(), y.clone(), z.clone()],
+                    0.1,
+                    MCSStatistic::Range,
+                    30,
+                    2.0,
+                    Some(1),
+                )
+                .err(),
+            ),
+            (
+                "tost_wilcoxon_paired",
+                tost_wilcoxon_paired(&x, &y, &b, 0.05).err(),
+            ),
+            (
+                "tost_wilcoxon_two_sample",
+                tost_wilcoxon_two_sample(&x, &y, &b, 0.05).err(),
+            ),
+        ];
+        for (name, err) in errors {
+            let msg = err
+                .unwrap_or_else(|| panic!("{name} accepted {s}"))
+                .to_string();
+            assert!(msg.contains("non-finite"), "{name}: {msg}");
+        }
+    }
+    // NaN cannot be ordered: rejected by the sort-based functions that allow ±Inf.
+    x[3] = NAN;
+    assert!(yuen_test(&x, &y, 0.2, Alternative::TwoSided, None).is_err());
+    assert!(math::median(&x).is_err());
+    assert!(math::trimmed_mean(&x, 0.2).is_err());
+    assert!(kruskal_wallis(&[&x, &y]).is_err());
+    assert!(brunner_munzel(&x, &y, Alternative::TwoSided, None).is_err());
 }

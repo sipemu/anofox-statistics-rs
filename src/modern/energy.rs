@@ -1,4 +1,5 @@
 use crate::error::{Result, StatError};
+use crate::utils::finite::ensure_finite;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -81,6 +82,13 @@ fn validate_energy_inputs(x: &[Vec<f64>], y: &[Vec<f64>]) -> Result<()> {
         return Err(StatError::InvalidParameter(
             "Data points must have at least one dimension".to_string(),
         ));
+    }
+
+    for (i, v) in x.iter().enumerate() {
+        ensure_finite(&format!("x[{}]", i), v)?;
+    }
+    for (i, v) in y.iter().enumerate() {
+        ensure_finite(&format!("y[{}]", i), v)?;
     }
 
     let all_same_dim = x.iter().chain(y.iter()).all(|v| v.len() == dim);

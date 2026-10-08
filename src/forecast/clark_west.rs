@@ -1,4 +1,5 @@
 use crate::error::{Result, StatError};
+use crate::utils::finite::ensure_finite;
 use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Result of Clark-West test for nested model comparison
@@ -54,6 +55,8 @@ pub fn clark_west(e1: &[f64], e2: &[f64], h: usize) -> Result<CWResult> {
     if n < 3 {
         return Err(StatError::InsufficientData { needed: 3, got: n });
     }
+    ensure_finite("e1", e1)?;
+    ensure_finite("e2", e2)?;
 
     // Compute Clark-West adjusted loss differential:
     // d_t = e1_t^2 - e2_t^2 + (e1_t - e2_t)^2

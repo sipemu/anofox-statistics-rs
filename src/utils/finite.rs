@@ -39,18 +39,6 @@ pub(crate) fn ensure_finite_param(name: &str, value: f64) -> Result<()> {
     }
 }
 
-/// Error unless `0 < value < 1` (rejects NaN).
-pub(crate) fn ensure_open_unit(name: &str, value: f64) -> Result<()> {
-    if value > 0.0 && value < 1.0 {
-        Ok(())
-    } else {
-        Err(StatError::InvalidParameter(format!(
-            "{} must be between 0 and 1, got {}",
-            name, value
-        )))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,7 +51,5 @@ mod tests {
         assert!(ensure_no_nan("x", &[f64::INFINITY, f64::NEG_INFINITY]).is_ok());
         assert!(ensure_no_nan("x", &[1.0, f64::NAN]).is_err());
         assert!(ensure_finite_param("mu", f64::NAN).is_err());
-        assert!(ensure_open_unit("conf_level", f64::NAN).is_err());
-        assert!(ensure_open_unit("conf_level", 0.95).is_ok());
     }
 }

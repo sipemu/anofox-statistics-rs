@@ -5,7 +5,34 @@
 //! probability outside `[0, 1]`. A NaN statistic can come from degenerate data
 //! (zero variance), so these wrappers return NaN instead of panicking.
 
-use statrs::distribution::{ChiSquared, ContinuousCDF, FisherSnedecor, Normal, StudentsT};
+use statrs::distribution::{ChiSquared, ContinuousCDF, FisherSnedecor, StudentsT};
+
+/// `dist.sf(x)`, or NaN for a NaN statistic.
+pub(crate) fn sf_or_nan<D: ContinuousCDF<f64, f64>>(dist: &D, x: f64) -> f64 {
+    if x.is_nan() {
+        f64::NAN
+    } else {
+        dist.sf(x)
+    }
+}
+
+/// `dist.cdf(x)`, or NaN for a NaN statistic.
+pub(crate) fn cdf_or_nan<D: ContinuousCDF<f64, f64>>(dist: &D, x: f64) -> f64 {
+    if x.is_nan() {
+        f64::NAN
+    } else {
+        dist.cdf(x)
+    }
+}
+
+/// `dist.inverse_cdf(p)`, or NaN for p outside [0, 1].
+pub(crate) fn inv_or_nan<D: ContinuousCDF<f64, f64>>(dist: &D, p: f64) -> f64 {
+    if (0.0..=1.0).contains(&p) {
+        dist.inverse_cdf(p)
+    } else {
+        f64::NAN
+    }
+}
 
 fn t_dist(df: f64) -> Option<StudentsT> {
     StudentsT::new(0.0, 1.0, df).ok()
@@ -51,15 +78,6 @@ pub(crate) fn chisq_sf(x: f64, df: f64) -> f64 {
     }
 }
 
-/// Standard normal quantile; NaN for p outside [0, 1].
-pub(crate) fn norm_inv(p: f64) -> f64 {
-    if (0.0..=1.0).contains(&p) {
-        Normal::new(0.0, 1.0).unwrap().inverse_cdf(p)
-    } else {
-        f64::NAN
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,7 +91,6 @@ mod tests {
         assert!(f_sf(f64::NAN, 2.0, 10.0).is_nan());
         assert!(f_sf(1.0, 0.0, 10.0).is_nan());
         assert!(chisq_sf(f64::NAN, 2.0).is_nan());
-        assert!(norm_inv(f64::NAN).is_nan());
         assert_eq!(t_sf(f64::INFINITY, 5.0), 0.0);
         assert!((t_sf(0.0, 5.0) - 0.5).abs() < 1e-12);
     }

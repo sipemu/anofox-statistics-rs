@@ -5,7 +5,8 @@ use crate::correlation::{
     CorrelationResult,
 };
 use crate::error::Result;
-use statrs::distribution::{ContinuousCDF, Normal, StudentsT};
+use crate::utils::dist::t_sf;
+use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Compute Pearson's product-moment correlation coefficient with significance test.
 ///
@@ -94,8 +95,7 @@ pub fn pearson(x: &[f64], y: &[f64], conf_level: Option<f64>) -> Result<Correlat
     } else if t_stat.is_nan() {
         f64::NAN
     } else {
-        let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-        2.0 * t_dist.sf(t_stat.abs())
+        2.0 * t_sf(t_stat.abs(), df)
     };
 
     // Compute confidence interval using Fisher z-transformation

@@ -1,4 +1,5 @@
 use crate::error::{Result, StatError};
+use crate::utils::finite::ensure_no_nan;
 
 /// Calculate the arithmetic mean of a slice.
 /// Returns `StatError::EmptyData` if the slice is empty.
@@ -86,6 +87,7 @@ pub fn median(data: &[f64]) -> Result<f64> {
         return Err(StatError::EmptyData);
     }
 
+    ensure_no_nan("data", data)?;
     let mut sorted = data.to_vec();
     sorted.sort_by(|a, b| a.total_cmp(b));
 
@@ -115,6 +117,7 @@ pub fn trimmed_mean(data: &[f64], trim: f64) -> Result<f64> {
         return Err(StatError::EmptyData);
     }
 
+    ensure_no_nan("data", data)?;
     let mut sorted = data.to_vec();
     sorted.sort_by(|a, b| a.total_cmp(b));
 

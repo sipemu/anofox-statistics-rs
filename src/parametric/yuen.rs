@@ -1,4 +1,5 @@
 use crate::error::{Result, StatError};
+use crate::utils::finite::ensure_no_nan;
 use crate::Alternative;
 use statrs::distribution::{ContinuousCDF, StudentsT};
 
@@ -67,6 +68,9 @@ pub fn yuen_test(
     if y.is_empty() {
         return Err(StatError::EmptyData);
     }
+    // ±Inf can be trimmed away; NaN cannot be ordered.
+    ensure_no_nan("x", x)?;
+    ensure_no_nan("y", y)?;
 
     let nx = x.len();
     let ny = y.len();

@@ -5,7 +5,8 @@ use crate::correlation::{
 };
 use crate::error::Result;
 use crate::nonparametric::rank;
-use statrs::distribution::{ContinuousCDF, Normal, StudentsT};
+use crate::utils::dist::t_sf;
+use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Compute Spearman's rank correlation coefficient with significance test.
 ///
@@ -85,8 +86,7 @@ pub fn spearman(x: &[f64], y: &[f64], conf_level: Option<f64>) -> Result<Correla
     let p_value = if t_stat.is_infinite() {
         0.0
     } else {
-        let t_dist = StudentsT::new(0.0, 1.0, df).unwrap();
-        2.0 * t_dist.sf(t_stat.abs())
+        2.0 * t_sf(t_stat.abs(), df)
     };
 
     // Compute confidence interval using Fisher z-transformation

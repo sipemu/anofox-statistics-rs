@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::forecast::spa_common::{
     compute_means, compute_spa_pvalues, compute_standardized, compute_variances, find_best_model,
-    validate_model_data,
+    validate_finite_data, validate_model_data,
 };
 
 /// Result of the Superior Predictive Ability (SPA) test
@@ -49,6 +49,7 @@ pub fn spa_test(
 
     // Validate inputs
     validate_model_data(t, model_losses, "competing model")?;
+    validate_finite_data(benchmark_losses, model_losses, "competing model")?;
 
     // Compute loss differentials: d_ki = L_benchmark - L_model_k
     // Positive values mean the model outperforms the benchmark

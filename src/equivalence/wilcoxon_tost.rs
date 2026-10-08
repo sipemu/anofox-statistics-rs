@@ -6,6 +6,7 @@
 use crate::equivalence::{EquivalenceBounds, OneSidedTestResult, TostResult};
 use crate::error::{Result, StatError};
 use crate::nonparametric::ranks::rank_with_ties;
+use crate::utils::finite::ensure_finite;
 use statrs::distribution::{ContinuousCDF, Normal};
 
 /// Perform TOST for paired samples using Wilcoxon signed-rank test.
@@ -444,6 +445,11 @@ fn validate_inputs_paired(x: &[f64], y: &[f64], alpha: f64) -> Result<()> {
         )));
     }
 
+    // Equivalence bounds are in data units: ±Inf makes the shifted tests and
+    // the Hodges-Lehmann interval meaningless.
+    ensure_finite("x", x)?;
+    ensure_finite("y", y)?;
+
     Ok(())
 }
 
@@ -473,6 +479,11 @@ fn validate_inputs_two_sample(x: &[f64], y: &[f64], alpha: f64) -> Result<()> {
             alpha
         )));
     }
+
+    // Equivalence bounds are in data units: ±Inf makes the shifted tests and
+    // the Hodges-Lehmann interval meaningless.
+    ensure_finite("x", x)?;
+    ensure_finite("y", y)?;
 
     Ok(())
 }

@@ -4,8 +4,9 @@
 
 use crate::equivalence::{EquivalenceBounds, OneSidedTestResult, TostResult};
 use crate::error::{Result, StatError};
+use crate::utils::dist::{cdf_or_nan, inv_or_nan, sf_or_nan};
 use crate::utils::math::{mean, variance};
-use statrs::distribution::{ContinuousCDF, StudentsT};
+use statrs::distribution::StudentsT;
 
 /// Perform one-sample TOST to test if a mean is equivalent to a specified value.
 ///
@@ -67,18 +68,18 @@ pub fn tost_t_test_one_sample(
     // Lower test: H0: estimate <= lower_bound (effect too negative)
     // Reject if estimate significantly greater than lower_bound
     let t_lower = (estimate - lower_bound) / se;
-    let p_lower = t_dist.sf(t_lower);
+    let p_lower = sf_or_nan(&t_dist, t_lower);
 
     // Upper test: H0: estimate >= upper_bound (effect too positive)
     // Reject if estimate significantly less than upper_bound
     let t_upper = (estimate - upper_bound) / se;
-    let p_upper = t_dist.cdf(t_upper);
+    let p_upper = cdf_or_nan(&t_dist, t_upper);
 
     // TOST p-value is the maximum of the two one-sided p-values
     let tost_p = p_lower.max(p_upper);
 
     // Confidence interval at (1 - 2*alpha) level for TOST
-    let t_crit = t_dist.inverse_cdf(1.0 - alpha);
+    let t_crit = inv_or_nan(&t_dist, 1.0 - alpha);
     let margin = t_crit * se;
     let ci = (estimate - margin, estimate + margin);
 
@@ -202,17 +203,17 @@ pub fn tost_t_test_two_sample(
 
     // Lower test: H0: estimate <= lower_bound
     let t_lower = (estimate - lower_bound) / se;
-    let p_lower = t_dist.sf(t_lower);
+    let p_lower = sf_or_nan(&t_dist, t_lower);
 
     // Upper test: H0: estimate >= upper_bound
     let t_upper = (estimate - upper_bound) / se;
-    let p_upper = t_dist.cdf(t_upper);
+    let p_upper = cdf_or_nan(&t_dist, t_upper);
 
     // TOST p-value
     let tost_p = p_lower.max(p_upper);
 
     // (1 - 2*alpha) confidence interval
-    let t_crit = t_dist.inverse_cdf(1.0 - alpha);
+    let t_crit = inv_or_nan(&t_dist, 1.0 - alpha);
     let margin = t_crit * se;
     let ci = (estimate - margin, estimate + margin);
 
@@ -318,17 +319,17 @@ pub fn tost_t_test_paired(
 
     // Lower test: H0: estimate <= lower_bound
     let t_lower = (estimate - lower_bound) / se;
-    let p_lower = t_dist.sf(t_lower);
+    let p_lower = sf_or_nan(&t_dist, t_lower);
 
     // Upper test: H0: estimate >= upper_bound
     let t_upper = (estimate - upper_bound) / se;
-    let p_upper = t_dist.cdf(t_upper);
+    let p_upper = cdf_or_nan(&t_dist, t_upper);
 
     // TOST p-value
     let tost_p = p_lower.max(p_upper);
 
     // (1 - 2*alpha) confidence interval
-    let t_crit = t_dist.inverse_cdf(1.0 - alpha);
+    let t_crit = inv_or_nan(&t_dist, 1.0 - alpha);
     let margin = t_crit * se;
     let ci = (estimate - margin, estimate + margin);
 

@@ -1,5 +1,6 @@
 use crate::error::{Result, StatError};
 use crate::parametric::Alternative;
+use crate::utils::finite::ensure_finite;
 use crate::utils::math::{mean, variance};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
@@ -49,6 +50,8 @@ fn validate_permutation_inputs(x: &[f64], y: &[f64]) -> Result<()> {
             got: y.len(),
         });
     }
+    ensure_finite("x", x)?;
+    ensure_finite("y", y)?;
     Ok(())
 }
 
