@@ -143,9 +143,8 @@ pub fn mcnemar_exact(table: &[[usize; 2]; 2]) -> Result<McNemarkExactResult> {
         1.0
     } else {
         let k = b.min(c) as u64;
-        let binom = Binomial::new(0.5, n as u64).map_err(|e| {
-            crate::error::StatError::InvalidParameter(format!("binomial distribution: {e}"))
-        })?;
+        // p = 0.5 is always a valid success probability.
+        let binom = Binomial::new(0.5, n as u64).expect("p = 0.5 is valid");
         (2.0 * binom.cdf(k)).clamp(0.0, 1.0)
     };
 
