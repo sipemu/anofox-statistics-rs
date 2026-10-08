@@ -10,6 +10,7 @@ pub mod forecast;
 pub mod modern;
 pub mod nonparametric;
 pub mod parametric;
+pub mod posthoc;
 pub mod resampling;
 pub mod utils;
 
@@ -42,6 +43,10 @@ pub use parametric::{
     two_way_anova, yuen_test, Alternative, AnovaKind, AnovaTableRow, CorrectedResult, LeveneResult,
     OneWayAnovaResult, RmAnovaResult, SphericityResult, TTestKind, TTestResult, TwoWayAnovaResult,
     YuenConfInt, YuenResult,
+};
+pub use posthoc::{
+    dunn_test, p_adjust, pairwise_t_test, ptukey, qtukey, tukey_hsd, PAdjustMethod,
+    PairwiseComparison, PairwiseResult,
 };
 pub use resampling::{
     bootstrap_ci, bootstrap_mean_ci, permutation_t_test, BootstrapCIResult, CircularBlockBootstrap,
