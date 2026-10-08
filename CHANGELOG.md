@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-10-08
+
+### Fixed
+
+- **Wilcoxon / Mann-Whitney confidence intervals no longer need O(n²) memory** (#19):
+  `mann_whitney_u` and `wilcoxon_signed_rank` with `conf_level` materialised all
+  `n1 * n2` pairwise differences (all `n(n+1)/2` Walsh averages) and sorted them —
+  a 31 GB allocation (process abort / OOM kill) at 62,500 observations per group,
+  even with `exact = false`. The estimate and interval now follow R's
+  `wilcox.test(..., conf.int = TRUE)` algorithm: on the normal-approximation path the
+  shift is root-found with a port of R's `zeroin` (`uniroot`, tolerance 1e-4) on the
+  standardised rank statistic, each evaluation an O(n) merge of the presorted
+  samples — **O(n log n) time, O(n) memory** (100,000 per group: ~60 ms, 13 MB peak
+  RSS in release; 0.4.4 needed ~80 GB). The exact path (no ties, small samples) keeps
+  the order statistics with R's quantile rule.
+- **Intervals now match R** (126 reference cases, agreement < 1e-10): the asymptotic
+  estimate/limits are R's root-finding values (0.4.4 used order statistics with a
+  normal-approximation index, off by ~1e-4); one-sided alternatives give one-sided
+  intervals (`(-Inf, u]`, `[l, Inf)`); the continuity correction is applied to the
+  interval as in R; the signed-rank interval is computed on `x - y` (not shifted by
+  `mu`, zeros kept) as R does. With an infinite observation the asymptotic
+  estimate/interval is NaN (R's root finder cannot search an infinite bracket).
+- **Exact null distributions no longer overflow**: the `u64` counts overflowed for
+  `n1 + n2 > ~62` / `n ≥ 64`; the pmf is now computed in `f64` with additions only.
+  `exact = true` is honoured for `n1 * n2 ≤ 10,000` (rank sum) and `n ≤ 300` non-zero
+  differences (signed rank); larger samples use the normal approximation, so an
+  explicit `exact = true` on database-sized input never runs the exact DP.
+
 ## [0.4.4] - 2026-10-08
 
 ### Fixed
