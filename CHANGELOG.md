@@ -34,6 +34,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `exact = true` is honoured for `n1 * n2 ≤ 10,000` (rank sum) and `n ≤ 300` non-zero
   differences (signed rank); larger samples use the normal approximation, so an
   explicit `exact = true` on database-sized input never runs the exact DP.
+- **No O(n²) memory anywhere on a single sample** (crate-wide audit for #19); results
+  are unchanged (exact integer counts / identical order statistics, otherwise within
+  1e-10), and every touched function documents its time and memory complexity:
+  - `kendall`: Knight's merge-sort algorithm, O(n log n) time (was O(n²)), exact
+    tie counts for tau-b/tau-c and the variance (100k: 0.03 s).
+  - `distance_cor` / `distance_cor_test`: Huo & Székely (2016) O(n log n) algorithm
+    with O(n) memory; 0.4.4 built four n×n matrices (~80 GB each at n = 100,000).
+  - `tost_wilcoxon_paired` / `tost_wilcoxon_two_sample`: Hodges-Lehmann order
+    statistics are selected without materialising all Walsh averages / pairwise
+    differences (new `utils::select`, O(n) memory); out-of-range CI indices for
+    `alpha > 0.5` no longer panic.
+  - `mmd_test_1d`: median-heuristic bandwidth by selection, O(n) memory (was n²/2
+    stored distances).
+  - `energy_distance_test_1d` (and d = 1 inputs): O(N log N + B·N) via sorted
+    prefix sums instead of O(B·N²).
+  - Inherently quadratic-time statistics (MMD, multivariate energy distance) stream
+    their pairwise sums with O(N·d) memory; documented.
 
 ## [0.4.4] - 2026-10-08
 
