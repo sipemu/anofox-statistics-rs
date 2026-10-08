@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-10-08
+
+### Fixed
+
+- **No panics on non-finite input** (#17): `wilcoxon_signed_rank` panicked on data
+  containing `±Inf` (`Inf - Inf = NaN` reached `partial_cmp(..).unwrap()` in the
+  ranking sort), and about 20 other sort sites, plus several `statrs` calls, could
+  panic in the same way on NaN. The crate was audited, and every public function
+  now returns a result or an error for NaN/`±Inf` data and scalar parameters:
+  - All sorts use `f64::total_cmp`. `statrs` survival functions and quantiles go
+    through NaN-safe wrappers, so a NaN statistic gives a NaN p-value instead of a
+    panic. This covers ANOVA (including sphericity corrections), TOST t/Yuen,
+    partial/Pearson/Spearman correlation, ICC, Brunner-Munzel and Kruskal-Wallis.
+  - **Rank-based tests match R:** `wilcoxon_signed_rank`, `mann_whitney_u`,
+    `kruskal_wallis`, `brunner_munzel`, `rank` and the rank-biserial helpers rank
+    `±Inf` as the largest/smallest value, as R's `wilcox.test`/`kruskal.test` do.
+    Paired `Inf - Inf` differences are dropped, as R does. `NaN` input returns the
+    `non-finite value` error. A Hodges-Lehmann estimate/CI made undefined by
+    `Inf - Inf` is NaN.
+  - Non-finite data now returns the `non-finite value` error instead of a
+    meaningless finite p-value in `permutation_t_test`, the energy-distance and MMD
+    tests, `clark_west`, `diebold_mariano`, `spa_test`, `mspe_adjusted_spa`,
+    `model_confidence_set` and the Wilcoxon TOSTs. `yuen_test`, `tost_yuen`,
+    `utils::math::median` and `trimmed_mean` reject NaN (`±Inf` can be trimmed).
+  - NaN parameters are rejected: equivalence bounds, MMD kernel parameters, MCS
+    `alpha`, Wilcoxon/Mann-Whitney `mu`, and `chisq_goodness_of_fit` expected
+    proportions (which also must be non-negative). A bootstrap percentile interval
+    is NaN when a replicate is NaN.
+- Added a property-style regression test that feeds NaN/`±Inf` (fixed patterns,
+  random fuzzing and constant data) to every public function and asserts that none
+  of them panic.
+
 ## [0.4.3] - 2026-10-07
 
 ### Fixed
