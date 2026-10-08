@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-10-08
+
+### Fixed
+
+- **`mcnemar_exact` no longer returns NaN for more than ~1,074 discordant pairs** (#20):
+  binomial probabilities were computed as `exp(log C(n, k)) * 0.5^n`, where `0.5^n`
+  underflows to 0 and `exp(log C(n, k))` overflows to infinity once `n = b + c`
+  exceeds ~1074 (0 * inf = NaN); the log-factorials also used Stirling's approximation
+  above 20 without correction terms. The two-sided p-value is now
+  `min(1, 2 * P(X <= min(b, c)))`, `X ~ Binomial(b + c, 0.5)`, via the regularized
+  incomplete beta function (statrs `Binomial::cdf`), matching R's
+  `binom.test(b, b + c, 0.5)$p.value` (= `exact2x2::mcnemar.exact`) to < 1e-9 relative
+  error from `b + c = 1` up to `b + c = 10^6`.
+- Audited the other exact tests for the same failure: `binom_test` (statrs
+  Binomial), `fisher_exact` (log-space hypergeometric with `ln_factorial`) and the
+  exact Mann-Whitney / signed-rank distributions (`f64` counts, gated to small
+  samples) were already safe; regression tests against R at `n = 10^6` / ~200,000
+  now guard them.
+
 ## [0.4.5] - 2026-10-08
 
 ### Fixed
