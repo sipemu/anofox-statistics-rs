@@ -10,7 +10,9 @@ pub mod forecast;
 pub mod modern;
 pub mod nonparametric;
 pub mod parametric;
+pub mod posthoc;
 pub mod resampling;
+pub mod test_result;
 pub mod utils;
 
 pub use correlation::{
@@ -43,10 +45,15 @@ pub use parametric::{
     OneWayAnovaResult, RmAnovaResult, SphericityResult, TTestKind, TTestResult, TwoWayAnovaResult,
     YuenConfInt, YuenResult,
 };
+pub use posthoc::{
+    dunn_test, p_adjust, pairwise_t_test, ptukey, qtukey, tukey_hsd, PAdjustMethod,
+    PairwiseComparison, PairwiseResult,
+};
 pub use resampling::{
     bootstrap_ci, bootstrap_mean_ci, permutation_t_test, BootstrapCIResult, CircularBlockBootstrap,
     PermutationEngine, PermutationResult, StationaryBootstrap,
 };
+pub use test_result::TestResult;
 
 pub use categorical::{
     binom_test, binom_test_with_conf_level, chisq_goodness_of_fit, chisq_test, cohen_kappa,

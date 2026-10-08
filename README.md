@@ -54,6 +54,17 @@ console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
   - Two-way ANOVA (factorial design with Type III SS)
   - Repeated measures ANOVA (with Mauchly's sphericity test and GG/HF corrections)
 
+- **Post-hoc Tests and Multiple Comparisons**
+  - `p_adjust`: Holm, Hochberg, Hommel, Bonferroni, BH (FDR), BY (R's `p.adjust`)
+  - Pairwise t-tests, pooled or Welch (R's `pairwise.t.test`)
+  - Tukey HSD with the studentized range distribution `ptukey`/`qtukey` (R's `TukeyHSD`)
+  - Dunn's test after Kruskal-Wallis (`dunn.test` / `FSA::dunnTest`)
+
+- **Unified Result Shape**
+  - `TestResult` (`method, alternative, statistic, df1, df2, p_value, estimate,
+    conf_low, conf_high, conf_level, effect_size, effect_name, n`), convertible
+    from every test result with `From`
+
 - **Nonparametric Tests**
   - Ranking with average tie handling
   - Mann-Whitney U test (Wilcoxon rank-sum)
@@ -114,7 +125,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anofox-statistics = "0.2"
+anofox-statistics = "0.4"
 ```
 
 ## Examples
@@ -536,6 +547,32 @@ let data_with_outlier = vec![10.0, 11.0, 12.0, 13.0, 14.0, 100.0];  // Outlier
 let normal_data = vec![10.1, 11.1, 12.1, 13.1, 14.1, 15.1];
 let bounds = EquivalenceBounds::Symmetric { delta: 2.0 };
 let result = tost_yuen(&data_with_outlier, &normal_data, &bounds, 0.05, 0.2)?;  // 20% trim
+```
+
+### Post-hoc Tests and the Unified Result
+
+```rust
+use anofox_statistics::{
+    kruskal_wallis, p_adjust, dunn_test, pairwise_t_test, tukey_hsd, Alternative,
+    PAdjustMethod, TestResult,
+};
+
+let values = vec![4.2, 5.1, 4.8, 6.3, 6.9, 7.1, 5.5, 5.0, 5.9];
+let groups = vec!["a", "a", "a", "b", "b", "b", "c", "c", "c"];
+
+// One row per pair (group1, group2), estimate = group2 - group1
+let tukey = tukey_hsd(&values, &groups, 0.95)?;
+for c in &tukey.comparisons {
+    println!("{}-{}: diff={:.3} [{:.3}, {:.3}] p adj={:.4}", c.group2, c.group1,
+             c.estimate, c.conf_low.unwrap(), c.conf_high.unwrap(), c.p_adj);
+}
+let pt = pairwise_t_test(&values, &groups, true, PAdjustMethod::Holm, Alternative::TwoSided)?;
+let dunn = dunn_test(&values, &groups, PAdjustMethod::BH)?;
+let adjusted = p_adjust(&[0.01, 0.04, 0.03], PAdjustMethod::Hommel);
+
+// Every test result converts to the same flat shape
+let kw = kruskal_wallis(&[&values[0..3], &values[3..6], &values[6..9]])?;
+let row = TestResult::from(&kw).with_n(values.len());
 ```
 
 ## Validation
