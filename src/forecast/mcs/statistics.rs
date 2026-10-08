@@ -110,7 +110,7 @@ pub(super) fn identify_worst_model(t_stats: &HashMap<(usize, usize), f64>, m: us
     model_scores
         .iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|(_, a), (_, b)| a.total_cmp(b))
         .map(|(i, _)| i)
         .unwrap_or(0)
 }

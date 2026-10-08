@@ -3,7 +3,7 @@ use crate::error::{Result, StatError};
 /// Sort data by value and return index-value pairs.
 fn sort_indexed(data: &[f64]) -> Vec<(usize, f64)> {
     let mut indexed: Vec<(usize, f64)> = data.iter().cloned().enumerate().collect();
-    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
     indexed
 }
 

@@ -141,7 +141,7 @@ pub fn tost_yuen(
 /// Compute trimmed mean by removing g observations from each tail.
 fn trimmed_mean(data: &[f64], g: usize) -> f64 {
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let n = sorted.len();
     let trimmed = &sorted[g..n - g];
@@ -154,7 +154,7 @@ fn trimmed_mean(data: &[f64], g: usize) -> f64 {
 /// Replace the g largest values with the (n-g)th largest.
 fn winsorized_variance(data: &[f64], g: usize) -> f64 {
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let n = sorted.len();
 

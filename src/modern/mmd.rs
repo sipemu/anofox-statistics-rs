@@ -301,7 +301,7 @@ fn median_heuristic_1d(data: &[f64]) -> f64 {
     }
 
     // Find median
-    distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    distances.sort_by(|a, b| a.total_cmp(b));
     let mid = distances.len() / 2;
     if distances.len() % 2 == 0 {
         (distances[mid - 1] + distances[mid]) / 2.0

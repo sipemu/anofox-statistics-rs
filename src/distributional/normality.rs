@@ -35,7 +35,7 @@ pub fn shapiro_wilk(data: &[f64]) -> Result<ShapiroWilkResult> {
 
     // Sort the data
     let mut x = data.to_vec();
-    x.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    x.sort_by(|a, b| a.total_cmp(b));
 
     // Check for constant data
     let range = x[n - 1] - x[0];

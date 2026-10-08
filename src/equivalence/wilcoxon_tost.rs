@@ -198,7 +198,7 @@ fn hodges_lehmann_one_sample(data: &[f64]) -> f64 {
         }
     }
 
-    walsh.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    walsh.sort_by(|a, b| a.total_cmp(b));
     median_sorted(&walsh)
 }
 
@@ -213,7 +213,7 @@ fn hodges_lehmann_two_sample(x: &[f64], y: &[f64]) -> f64 {
         }
     }
 
-    diffs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    diffs.sort_by(|a, b| a.total_cmp(b));
     median_sorted(&diffs)
 }
 
@@ -228,7 +228,7 @@ fn hodges_lehmann_ci(data: &[f64], alpha: f64) -> Result<(f64, f64)> {
             walsh.push((data[i] + data[j]) / 2.0);
         }
     }
-    walsh.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    walsh.sort_by(|a, b| a.total_cmp(b));
 
     let n_walsh = walsh.len();
 
@@ -261,7 +261,7 @@ fn hodges_lehmann_ci_two_sample(x: &[f64], y: &[f64], alpha: f64) -> Result<(f64
             diffs.push(xi - yi);
         }
     }
-    diffs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    diffs.sort_by(|a, b| a.total_cmp(b));
 
     let n_diffs = diffs.len();
     let nx_f = nx as f64;

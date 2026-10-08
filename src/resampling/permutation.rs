@@ -266,8 +266,8 @@ mod tests {
         let median_diff = |a: &[f64], b: &[f64]| -> f64 {
             let mut a_sorted: Vec<f64> = a.to_vec();
             let mut b_sorted: Vec<f64> = b.to_vec();
-            a_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
-            b_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
+            a_sorted.sort_by(|x, y| x.total_cmp(y));
+            b_sorted.sort_by(|x, y| x.total_cmp(y));
             let median_a = if a_sorted.len() % 2 == 1 {
                 a_sorted[a_sorted.len() / 2]
             } else {

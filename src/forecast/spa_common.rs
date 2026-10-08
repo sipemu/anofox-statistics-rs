@@ -81,7 +81,7 @@ pub fn find_best_model(standardized: &[f64]) -> Option<usize> {
     standardized
         .iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+        .max_by(|(_, a), (_, b)| a.total_cmp(b))
         .map(|(i, _)| i)
 }
 

@@ -505,7 +505,7 @@ fn mann_whitney_estimate_ci(
             diffs.push(xi - yi);
         }
     }
-    diffs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    diffs.sort_by(|a, b| a.total_cmp(b));
 
     // Hodges-Lehmann estimate: median of pairwise differences
     let estimate = if n_pairs % 2 == 0 {
@@ -609,7 +609,7 @@ fn wilcoxon_estimate_ci(
             walsh.push((diffs[i] + diffs[j]) / 2.0);
         }
     }
-    walsh.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    walsh.sort_by(|a, b| a.total_cmp(b));
 
     // Hodges-Lehmann estimate: median of Walsh averages
     let estimate = if n_walsh % 2 == 0 {

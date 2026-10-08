@@ -86,7 +86,7 @@ pub fn tost_bootstrap(
     }
 
     // Sort for percentile calculation
-    boot_diffs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    boot_diffs.sort_by(|a, b| a.total_cmp(b));
 
     // Percentile confidence interval at (1 - 2*alpha) level
     let lower_idx = (n_bootstrap as f64 * alpha).floor() as usize;

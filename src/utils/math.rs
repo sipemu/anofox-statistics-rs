@@ -87,7 +87,7 @@ pub fn median(data: &[f64]) -> Result<f64> {
     }
 
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let n = sorted.len();
     if n % 2 == 1 {
@@ -116,7 +116,7 @@ pub fn trimmed_mean(data: &[f64], trim: f64) -> Result<f64> {
     }
 
     let mut sorted = data.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let n = sorted.len();
     let k = (n as f64 * trim).floor() as usize;
