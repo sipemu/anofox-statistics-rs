@@ -2,7 +2,7 @@
 
 use crate::categorical::validate_2x2_table;
 use crate::error::Result;
-use statrs::distribution::{ChiSquared, ContinuousCDF};
+use statrs::distribution::{Binomial, ChiSquared, ContinuousCDF, DiscreteCDF};
 
 /// Result of McNemar's test
 #[derive(Debug, Clone)]
@@ -126,7 +126,7 @@ pub struct McNemarkExactResult {
 /// * `McNemarkExactResult` containing the exact p-value
 ///
 /// # R equivalent
-/// `mcnemar.test(matrix, correct = FALSE)` with small n uses exact test
+/// `binom.test(b, b + c, 0.5)` (equivalently `exact2x2::mcnemar.exact`)
 pub fn mcnemar_exact(table: &[[usize; 2]; 2]) -> Result<McNemarkExactResult> {
     validate_2x2_table(table)?;
 
@@ -134,21 +134,18 @@ pub fn mcnemar_exact(table: &[[usize; 2]; 2]) -> Result<McNemarkExactResult> {
     let c = table[1][0];
     let n = b + c;
 
-    // Two-sided exact p-value using binomial distribution
-    // P(X <= min(b,c)) + P(X >= max(b,c)) where X ~ Binomial(n, 0.5)
-    let p_value = if n == 0 {
+    // Two-sided exact p-value, R's `binom.test(b, b + c, 0.5)`: the null
+    // distribution is symmetric, so p = min(1, 2 * P(X <= min(b, c))) with
+    // X ~ Binomial(n, 0.5). The CDF is the regularized incomplete beta
+    // function, which neither overflows nor underflows for large n (the
+    // former `exp(log C(n, k)) * 0.5^n` summation returned NaN for n > ~1074).
+    let p_value = if n == 0 || b == c {
         1.0
     } else {
-        let k = b.min(c);
-        // Sum P(X = 0) + P(X = 1) + ... + P(X = k) + P(X = n-k) + ... + P(X = n)
-        // = 2 * sum(P(X = i) for i in 0..=k) if k < n/2
-        // For binomial(n, 0.5): P(X = k) = C(n,k) / 2^n
-        let mut p = 0.0;
-        for i in 0..=k {
-            p += binomial_pmf(n, i, 0.5);
-        }
-        // Two-sided
-        (2.0 * p).min(1.0)
+        let k = b.min(c) as u64;
+        // p = 0.5 is always a valid success probability.
+        let binom = Binomial::new(0.5, n as u64).expect("p = 0.5 is valid");
+        (2.0 * binom.cdf(k)).clamp(0.0, 1.0)
     };
 
     Ok(McNemarkExactResult {
@@ -157,42 +154,6 @@ pub fn mcnemar_exact(table: &[[usize; 2]; 2]) -> Result<McNemarkExactResult> {
         c,
         method: "McNemar's Chi-squared test (exact)".to_string(),
     })
-}
-
-/// Binomial PMF: P(X = k) where X ~ Binomial(n, p)
-fn binomial_pmf(n: usize, k: usize, p: f64) -> f64 {
-    if k > n {
-        return 0.0;
-    }
-    log_binomial_coeff(n, k).exp() * p.powi(k as i32) * (1.0 - p).powi((n - k) as i32)
-}
-
-/// Log of binomial coefficient
-fn log_binomial_coeff(n: usize, k: usize) -> f64 {
-    if k > n {
-        return f64::NEG_INFINITY;
-    }
-    if k == 0 || k == n {
-        return 0.0;
-    }
-    log_factorial(n) - log_factorial(k) - log_factorial(n - k)
-}
-
-/// Log factorial
-fn log_factorial(n: usize) -> f64 {
-    if n <= 1 {
-        return 0.0;
-    }
-    if n <= 20 {
-        let mut result = 0.0;
-        for i in 2..=n {
-            result += (i as f64).ln();
-        }
-        return result;
-    }
-    // Stirling's approximation
-    let n_f = n as f64;
-    n_f * n_f.ln() - n_f + 0.5 * (2.0 * std::f64::consts::PI * n_f).ln()
 }
 
 #[cfg(test)]

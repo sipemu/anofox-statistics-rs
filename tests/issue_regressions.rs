@@ -1,4 +1,4 @@
-//! Regression tests for GitHub issues #7-#15, one test per issue, using the
+//! Regression tests for GitHub issues #7-#20, one test per issue, using the
 //! reproductions from the issue reports. Reference values: R 4.6.1
 //! (cross-checked with scipy 1.17.0 where available).
 #![allow(clippy::excessive_precision, clippy::approx_constant)]
@@ -324,4 +324,59 @@ fn issue_17_rank_tests_accept_infinite_values_like_r() {
         None
     )
     .is_err());
+}
+
+/// #20: `mcnemar_exact` returned NaN once b + c exceeded ~1074. Reference:
+/// R 4.6.1 `binom.test(b, b + c, 0.5)$p.value` (= `exact2x2::mcnemar.exact`).
+#[test]
+fn issue_20_mcnemar_exact_large_counts_match_r() {
+    let cases: &[(usize, usize, f64)] = &[
+        (3, 7, 0.34375000000000011),
+        (0, 0, 1.0),
+        (5, 5, 1.0),
+        (0, 1, 1.0),
+        (1, 9, 0.021484375000000014),
+        (12, 30, 0.0079158973348967352),
+        (500, 600, 0.0028195449914364345),
+        (540, 560, 0.56675144795804511),
+        (1000, 1100, 0.030720707864242414),
+        (5000, 5200, 0.048787963126822431),
+        (499_000, 501_000, 0.045608299865382104),
+        (499_500, 500_500, 0.31779469136330574),
+        (0, 2000, 0.0),
+    ];
+    for &(b, c, expected) in cases {
+        for table in [[[7, b], [c, 9]], [[7, c], [b, 9]]] {
+            let r = mcnemar_exact(&table).unwrap();
+            assert!(r.p_value.is_finite(), "b={b} c={c}: {}", r.p_value);
+            let tol = 1e-9 * expected.max(1e-300);
+            assert!(
+                close(r.p_value, expected, tol.max(1e-15)),
+                "b={b} c={c}: {} vs {expected}",
+                r.p_value
+            );
+        }
+    }
+    // Extreme imbalance at b + c = 10^6: R reports a denormal ~3e-323.
+    let r = mcnemar_exact(&[[0, 400_000], [600_000, 0]]).unwrap();
+    assert!(r.p_value.is_finite() && r.p_value < 1e-300, "{}", r.p_value);
+}
+
+/// #20 audit: the other exact tests stay finite and match R at database scale.
+#[test]
+fn issue_20_exact_tests_large_n_match_r() {
+    // binom.test(300700, 1e6, 0.3)$p.value
+    let r = binom_test(300_700, 1_000_000, 0.3, Alternative::TwoSided).unwrap();
+    assert!(close(r.p_value, 0.12663056984451496, 1e-8), "{}", r.p_value);
+    // fisher.test(matrix(c(50000, 49000, 48000, 51000), 2))$p.value
+    let r = fisher_exact(&[[50_000, 48_000], [49_000, 51_000]], Alternative::TwoSided).unwrap();
+    assert!(
+        close(
+            r.p_value,
+            2.573335612947348e-19,
+            1e-9 * 2.573335612947348e-19
+        ),
+        "{}",
+        r.p_value
+    );
 }
