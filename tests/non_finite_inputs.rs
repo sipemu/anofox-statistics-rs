@@ -217,7 +217,11 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     run("spearman", &mut || {
         let _ = spearman(x, y, Some(0.95));
     });
-    for v in [KendallVariant::TauA, KendallVariant::TauB, KendallVariant::TauC] {
+    for v in [
+        KendallVariant::TauA,
+        KendallVariant::TauB,
+        KendallVariant::TauC,
+    ] {
         run("kendall", &mut || {
             let _ = kendall(x, y, v);
         });
@@ -274,7 +278,14 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     });
     for stat in [MCSStatistic::Range, MCSStatistic::Max] {
         run("model_confidence_set", &mut || {
-            let _ = model_confidence_set(&[x.to_vec(), y.to_vec(), z.clone()], 0.1, stat, 30, 2.0, Some(1));
+            let _ = model_confidence_set(
+                &[x.to_vec(), y.to_vec(), z.clone()],
+                0.1,
+                stat,
+                30,
+                2.0,
+                Some(1),
+            );
         });
     }
     run("bootstrap_ci", &mut || {
@@ -298,7 +309,10 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     run("tost_bootstrap", &mut || {
         let _ = tost_bootstrap(x, y, &bounds, 0.05, 50, Some(1));
     });
-    for m in [CorrelationTostMethod::Pearson, CorrelationTostMethod::Spearman] {
+    for m in [
+        CorrelationTostMethod::Pearson,
+        CorrelationTostMethod::Spearman,
+    ] {
         run("tost_correlation", &mut || {
             let _ = tost_correlation(x, y, 0.0, &bounds, 0.05, m);
         });
@@ -412,8 +426,22 @@ fn run_scalars(s: f64) -> Vec<String> {
     run("spa_test", &mut || {
         let _ = spa_test(&x, &[y.clone(), z.clone()], 30, s, Some(1));
         let _ = mspe_adjusted_spa(&x, &[y.clone(), z.clone()], 30, s, Some(1));
-        let _ = model_confidence_set(&[x.clone(), y.clone(), z.clone()], s, MCSStatistic::Range, 30, 2.0, Some(1));
-        let _ = model_confidence_set(&[x.clone(), y.clone(), z.clone()], 0.1, MCSStatistic::Max, 30, s, Some(1));
+        let _ = model_confidence_set(
+            &[x.clone(), y.clone(), z.clone()],
+            s,
+            MCSStatistic::Range,
+            30,
+            2.0,
+            Some(1),
+        );
+        let _ = model_confidence_set(
+            &[x.clone(), y.clone(), z.clone()],
+            0.1,
+            MCSStatistic::Max,
+            30,
+            s,
+            Some(1),
+        );
     });
     run("mmd_test", &mut || {
         let xv: Vec<Vec<f64>> = x.iter().map(|&v| vec![v]).collect();
@@ -450,7 +478,8 @@ fn run_scalars(s: f64) -> Vec<String> {
                 let _ = tost_yuen(&x, &y, bounds, 0.05, s);
                 let _ = tost_bootstrap(&x, &y, bounds, alpha, 50, Some(1));
                 let _ = tost_correlation(&x, &y, s, bounds, alpha, CorrelationTostMethod::Pearson);
-                let _ = tost_correlation(&x, &y, 0.0, bounds, alpha, CorrelationTostMethod::Spearman);
+                let _ =
+                    tost_correlation(&x, &y, 0.0, bounds, alpha, CorrelationTostMethod::Spearman);
                 let _ = tost_prop_one(6, 10, s, bounds, alpha);
                 let _ = tost_prop_one(6, 10, 0.5, bounds, alpha);
                 let _ = tost_prop_two(3, 10, 6, 12, bounds, alpha);
