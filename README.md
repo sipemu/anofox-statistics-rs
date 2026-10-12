@@ -54,6 +54,19 @@ console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
   - Two-way ANOVA (factorial design with Type III SS)
   - Repeated measures ANOVA (with Mauchly's sphericity test and GG/HF corrections)
 
+- **Classifier Evaluation** (`classification`)
+  - ROC and precision-recall curves with sklearn's tie handling (`roc_curve`, `pr_curve`)
+  - Calibration curve with Wilson intervals per bin (`calibration_curve`)
+  - ROC AUC, Brier score, log loss
+
+- **Time-Series Diagnostics** (`timeseries`)
+  - ACF / PACF with the ±1.96/√n band (R's `acf`, `pacf`)
+  - Ljung-Box and Box-Pierce tests (R's `Box.test`), Durbin-Watson statistic
+
+- **Survival Analysis** (`survival`)
+  - Kaplan-Meier with Greenwood SE and log / log-log / plain intervals (R's `survfit`)
+  - k-group log-rank test (R's `survdiff`)
+
 - **Post-hoc Tests and Multiple Comparisons**
   - `p_adjust`: Holm, Hochberg, Hommel, Bonferroni, BH (FDR), BY (R's `p.adjust`)
   - Pairwise t-tests, pooled or Welch (R's `pairwise.t.test`)
@@ -573,6 +586,29 @@ let adjusted = p_adjust(&[0.01, 0.04, 0.03], PAdjustMethod::Hommel);
 // Every test result converts to the same flat shape
 let kw = kruskal_wallis(&[&values[0..3], &values[3..6], &values[6..9]])?;
 let row = TestResult::from(&kw).with_n(values.len());
+```
+
+### Classifier Curves, Time-Series Diagnostics and Survival
+
+```rust
+use anofox_statistics::{
+    acf, auc, calibration_curve, kaplan_meier, ljung_box, log_rank, roc_curve, KmConfType,
+};
+
+let scores = vec![0.1, 0.4, 0.35, 0.8];
+let labels = vec![false, false, true, true];
+let roc = roc_curve(&scores, &labels, true)?; // fpr, tpr, thresholds (sklearn)
+let area = auc(&scores, &labels)?;            // 0.75
+let cal = calibration_curve(&scores, &labels, 5)?;
+
+let x = vec![1.2, 0.8, 1.9, 2.4, 1.1, 0.7, 1.5, 2.2, 1.8, 0.9, 1.3, 2.0];
+let r = acf(&x, 5)?;                          // lags 0..=5, conf_bound
+let lb = ljung_box(&x, 5, 0)?;                // Box.test(x, 5, "Ljung-Box")
+
+let time = vec![5.0, 8.0, 8.0, 12.0, 15.0, 20.0];
+let event = vec![true, true, false, true, false, true];
+let km = kaplan_meier(&time, &event, KmConfType::Log, 0.95)?;
+let lr = log_rank(&time, &event, &["a", "b", "a", "b", "a", "b"])?;
 ```
 
 ## Validation

@@ -5,7 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.8] - 2026-10-12
+
+### Added
+
+Upstream of DataZooDE/anofox-statistics#153, #155 and #156. Validated against R
+(`R/generate_curves_ts_surv_refs.R`, `tests/curves_ts_surv_reference.rs`).
+
+- **`classification` module**:
+  - `roc_curve(scores, labels, drop_intermediate) -> RocCurve {fpr, tpr, thresholds}`,
+    as scikit-learn `roc_curve` (tied scores form one point, first threshold `+inf`).
+    It matches `pROC::coords(roc, "all")`.
+  - `pr_curve(scores, labels) -> PrCurve {precision, recall, thresholds}`, as sklearn
+    `precision_recall_curve` (final point `(1, 0)` without a threshold).
+  - `calibration_curve(probs, labels, n_bins)` and
+    `calibration_curve_with_conf_level(...)` return `CalibrationCurve` with one
+    `CalibrationBin {bin, mean_pred, frac_pos, n, conf_low, conf_high}` per non-empty
+    bin. Binning is sklearn's `strategy = "uniform"`; the interval is Wilson's
+    (R `prop.test(correct = FALSE)`).
+  - `auc` (trapezoidal ROC AUC, ties count 1/2), `brier_score` and `log_loss`
+    (probabilities clipped to `[eps, 1 - eps]`, as sklearn).
+- **`timeseries` module**:
+  - `acf(x, max_lag)` and `pacf(x, max_lag)` (Durbin-Levinson) return
+    `AcfResult {lags, values, conf_bound, n}`, as R `acf` / `pacf`. `conf_bound` is
+    `qnorm(0.975) / sqrt(n)`.
+  - `ljung_box(x, lag, fitdf)` and `box_pierce(x, lag, fitdf)` return
+    `PortmanteauResult`, as R `Box.test`.
+  - `durbin_watson(residuals)`: the statistic of `lmtest::dwtest`. It has no p-value,
+    because `dwtest`'s exact p-value needs the design matrix.
+- **`survival` module**:
+  - `kaplan_meier(time, event, conf_type, conf_level) -> KaplanMeierResult` with
+    `time, n_risk, n_event, n_censor, survival, std_err` (Greenwood, S scale),
+    `std_err_log` (survfit's `std.err`), `conf_low, conf_high`. `KmConfType` is `Log`
+    (default, as R), `LogLog` or `Plain`, and parses R's names.
+  - `log_rank(time, event, group) -> LogRankResult<G>` for k groups, as R `survdiff`:
+    `chisq, df, p_value`, plus `n, observed, expected` per group.
+- `TestResult` conversions for `PortmanteauResult` and `LogRankResult<G>`.
 
 ## [0.4.7] - 2026-10-09
 

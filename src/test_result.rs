@@ -42,6 +42,8 @@ use crate::parametric::{
     TTestResult, TwoWayAnovaResult, YuenResult,
 };
 use crate::resampling::{BootstrapCIResult, PermutationResult};
+use crate::survival::LogRankResult;
+use crate::timeseries::PortmanteauResult;
 
 /// Unified result of a hypothesis test (the contract's `test` row).
 ///
@@ -204,7 +206,39 @@ from_owned!(
     SPAResult,
     MSPEAdjustedResult,
     MCSResult,
+    PortmanteauResult,
 );
+
+/// Ljung-Box / Box-Pierce: `statistic` is Q, `df1 = lag - fitdf`.
+impl From<&PortmanteauResult> for TestResult {
+    fn from(r: &PortmanteauResult) -> Self {
+        let mut t = TestResult::new(r.method.clone())
+            .stat(r.statistic)
+            .df(r.df)
+            .p(r.p_value);
+        t.n = Some(r.n);
+        t
+    }
+}
+
+/// Log-rank: `statistic` is the chi-squared, `df1` its degrees of freedom,
+/// `n` the total number of observations.
+impl<G> From<&LogRankResult<G>> for TestResult {
+    fn from(r: &LogRankResult<G>) -> Self {
+        let mut t = TestResult::new("Log-rank test")
+            .stat(r.chisq)
+            .df(r.df)
+            .p(r.p_value);
+        t.n = Some(r.n.iter().sum());
+        t
+    }
+}
+
+impl<G> From<LogRankResult<G>> for TestResult {
+    fn from(r: LogRankResult<G>) -> Self {
+        TestResult::from(&r)
+    }
+}
 
 /// `estimate` is the mean difference (two-sample: `mean_x - mean_y`;
 /// paired: the mean difference; one-sample: the mean). The t-test kind,

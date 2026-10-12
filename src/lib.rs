@@ -2,6 +2,7 @@
 #![allow(clippy::manual_is_multiple_of)]
 
 pub mod categorical;
+pub mod classification;
 pub mod correlation;
 pub mod distributional;
 pub mod equivalence;
@@ -12,7 +13,9 @@ pub mod nonparametric;
 pub mod parametric;
 pub mod posthoc;
 pub mod resampling;
+pub mod survival;
 pub mod test_result;
+pub mod timeseries;
 pub mod utils;
 
 pub use correlation::{
@@ -54,6 +57,15 @@ pub use resampling::{
     PermutationEngine, PermutationResult, StationaryBootstrap,
 };
 pub use test_result::TestResult;
+
+pub use classification::{
+    auc, brier_score, calibration_curve, calibration_curve_with_conf_level, log_loss, pr_curve,
+    roc_curve, CalibrationBin, CalibrationCurve, PrCurve, RocCurve,
+};
+pub use survival::{kaplan_meier, log_rank, KaplanMeierResult, KmConfType, LogRankResult};
+pub use timeseries::{
+    acf, box_pierce, durbin_watson, ljung_box, pacf, AcfResult, PortmanteauResult,
+};
 
 pub use categorical::{
     binom_test, binom_test_with_conf_level, chisq_goodness_of_fit, chisq_test, cohen_kappa,
