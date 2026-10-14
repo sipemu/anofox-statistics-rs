@@ -5,7 +5,8 @@
 //! `R/generate_posthoc_refs.R`.
 
 use anofox_statistics::{
-    dunn_test, p_adjust, pairwise_t_test, ptukey, qtukey, tukey_hsd, Alternative, PAdjustMethod,
+    dunn_test, p_adjust, pairwise_t_test, pairwise_t_test_with_conf_level, ptukey, qtukey,
+    tukey_hsd, Alternative, PAdjustMethod,
 };
 use std::path::PathBuf;
 
@@ -29,7 +30,7 @@ fn vec_of(s: &str) -> Vec<f64> {
 }
 
 fn close(a: f64, b: f64, tol: f64) -> bool {
-    (a.is_nan() && b.is_nan()) || (a - b).abs() <= tol * (1.0 + b.abs())
+    (a.is_nan() && b.is_nan()) || a == b || (a - b).abs() <= tol * (1.0 + b.abs())
 }
 
 fn records(name: &str) -> Vec<csv::StringRecord> {
@@ -156,7 +157,21 @@ fn posthoc_matches_r() {
                 assert!(close(c.df.unwrap(), num(&r[9]), tol), "{:?}", r);
                 assert!(close(c.p_value, num(&r[10]), tol), "{:?} {}", r, c.p_value);
                 assert!(close(c.p_adj, num(&r[11]), tol), "{:?} {}", r, c.p_adj);
-                assert!(c.conf_low.is_none());
+                // Interval: emmeans (pooled SD) or t.test (Welch), at the
+                // per-comparison level for "none", Bonferroni otherwise.
+                assert!(
+                    close(c.conf_low.unwrap(), num(&r[12]), tol),
+                    "{:?} {:?}",
+                    r,
+                    c.conf_low
+                );
+                assert!(
+                    close(c.conf_high.unwrap(), num(&r[13]), tol),
+                    "{:?} {:?}",
+                    r,
+                    c.conf_high
+                );
+                assert_eq!(res.conf_level, Some(0.95));
                 counts[0] += 1;
             }
             "tukey" => {
@@ -243,4 +258,71 @@ fn input_validation() {
     )
     .unwrap();
     assert!(r.comparisons[0].p_value.is_nan());
+}
+
+#[test]
+fn pairwise_t_conf_level_matches_r() {
+    // R: confint(pairs(emmeans(lm(v ~ g), ~ g), reverse = TRUE), level = 0.9,
+    //            adjust = "bonferroni")   and   t.test(v[g == "c"], v[g == "a"], conf.level = 0.9)
+    let v = [
+        1.2, 2.3, 1.9, 2.8, 2.0, 3.1, 3.9, 4.2, 3.3, 4.8, 3.6, 5.2, 4.1, 6.3, 5.0,
+    ];
+    let g = [
+        "a", "a", "a", "a", "a", "b", "b", "b", "b", "b", "b", "c", "c", "c", "c",
+    ];
+    let r = pairwise_t_test_with_conf_level(
+        &v,
+        &g,
+        true,
+        PAdjustMethod::Holm,
+        Alternative::TwoSided,
+        0.9,
+    )
+    .unwrap();
+    assert_eq!(r.conf_level, Some(0.9));
+    let expected = [
+        (0.7676309441395659, 2.7857023891937684),
+        (1.9921665961645778, 4.2278334038354242),
+        (0.25769763897743836, 2.4089690276892286),
+    ];
+    for (c, (lo, hi)) in r.comparisons.iter().zip(expected) {
+        assert!(close(c.conf_low.unwrap(), lo, 1e-12), "{:?}", c);
+        assert!(close(c.conf_high.unwrap(), hi, 1e-12), "{:?}", c);
+    }
+    let w = pairwise_t_test_with_conf_level(
+        &v,
+        &g,
+        false,
+        PAdjustMethod::None,
+        Alternative::TwoSided,
+        0.9,
+    )
+    .unwrap();
+    let ca = &w.comparisons[1];
+    assert_eq!((ca.group1, ca.group2), ("a", "c"));
+    assert!(close(ca.conf_low.unwrap(), 2.0546105724458554, 1e-12));
+    assert!(close(ca.conf_high.unwrap(), 4.1653894275541452, 1e-12));
+
+    for bad in [0.0, 1.0, f64::NAN] {
+        assert!(pairwise_t_test_with_conf_level(
+            &v,
+            &g,
+            true,
+            PAdjustMethod::None,
+            Alternative::TwoSided,
+            bad
+        )
+        .is_err());
+    }
+    // An undefined pooled SD gives an undefined interval.
+    let r = pairwise_t_test(
+        &[1.0, 2.0, 3.0, 4.0],
+        &["a", "a", "a", "b"],
+        true,
+        PAdjustMethod::None,
+        Alternative::Greater,
+    )
+    .unwrap();
+    assert!(r.comparisons[0].conf_low.unwrap().is_nan());
+    assert!(r.comparisons[0].conf_high.unwrap().is_nan());
 }

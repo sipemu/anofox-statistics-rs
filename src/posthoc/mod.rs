@@ -25,7 +25,7 @@ mod tukey_hsd;
 
 pub use dunn::dunn_test;
 pub use p_adjust::{p_adjust, PAdjustMethod};
-pub use pairwise_t::pairwise_t_test;
+pub use pairwise_t::{pairwise_t_test, pairwise_t_test_with_conf_level};
 pub use tukey_dist::{ptukey, qtukey};
 pub use tukey_hsd::tukey_hsd;
 
@@ -53,9 +53,9 @@ pub struct PairwiseComparison<G> {
     pub p_value: f64,
     /// Multiplicity-adjusted p-value.
     pub p_adj: f64,
-    /// Lower confidence limit for `estimate` (Tukey HSD only).
+    /// Lower confidence limit for `estimate` (Tukey HSD, pairwise t-test).
     pub conf_low: Option<f64>,
-    /// Upper confidence limit for `estimate` (Tukey HSD only).
+    /// Upper confidence limit for `estimate` (Tukey HSD, pairwise t-test).
     pub conf_high: Option<f64>,
 }
 
