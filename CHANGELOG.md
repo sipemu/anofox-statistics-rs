@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-10-14
+
 ### Added
 
 Upstream of DataZooDE/anofox-statistics#177 (part 2). Validated against R
