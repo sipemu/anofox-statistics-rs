@@ -64,7 +64,8 @@ pub use classification::{
 };
 pub use survival::{kaplan_meier, log_rank, KaplanMeierResult, KmConfType, LogRankResult};
 pub use timeseries::{
-    acf, box_pierce, durbin_watson, ljung_box, pacf, AcfResult, PortmanteauResult,
+    acf, box_pierce, durbin_watson, durbin_watson_test, ljung_box, pacf, AcfResult,
+    PortmanteauResult,
 };
 
 pub use categorical::{

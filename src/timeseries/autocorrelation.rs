@@ -112,9 +112,9 @@ pub fn pacf(x: &[f64], max_lag: usize) -> Result<AcfResult> {
 /// Durbin-Watson statistic `sum (e_t - e_{t-1})^2 / sum e_t^2`, the
 /// statistic reported by R `lmtest::dwtest`.
 ///
-/// Only the statistic is returned: the exact p-value of `dwtest` needs the
-/// regression's design matrix (Pan's algorithm on its eigenvalues), which
-/// is not available from residuals alone.
+/// Only the statistic is returned: its p-value depends on the regression's
+/// design matrix. Use [`durbin_watson_test`](super::durbin_watson_test) for
+/// the p-value of `dwtest`.
 ///
 /// # Errors
 /// Fewer than 2 residuals, non-finite values, or all residuals zero.

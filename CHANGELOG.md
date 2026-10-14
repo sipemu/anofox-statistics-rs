@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+Upstream of DataZooDE/anofox-statistics#177 (part 2). Validated against R
+(`R/generate_dwtest_refs.R`, `tests/dwtest_reference.rs`).
+
+- **`timeseries::durbin_watson_test(residuals, x, alternative, exact) -> TestResult`**,
+  as R `lmtest::dwtest`. `x` is the design matrix as columns, including the intercept
+  column when the model has one. `exact = None` uses R's default `n < 100`: the exact
+  p-value `P(sum (lambda_j - d) z_j^2 < 0)` over the eigenvalues of `M A` (Durbin and
+  Watson, 1971), integrated numerically from Imhof's (1961) formula to ~1e-11;
+  otherwise dwtest's normal approximation with the exact null mean and variance.
+  `alternative` is `Greater` (positive autocorrelation, R's default), `Less` or
+  `TwoSided`. The result has method `"Durbin-Watson test"`. `durbin_watson` is unchanged.
+  Exact p-values agree with dwtest's 15-term Pan series to 6e-8 and with a
+  high-precision reference to 3e-12. Where dwtest's series breaks down (it reports
+  a value outside `[0, 1]` and falls back to the normal approximation), this
+  function returns the exact p-value instead.
+
 ## [0.4.8] - 2026-10-12
 
 ### Added
