@@ -71,6 +71,7 @@ All algorithms are validated against and inspired by R's statistical functions:
 - `moments::agostino.test()` - D'Agostino's K-squared test
 - `e1071::skewness()`, `e1071::kurtosis()` - Skewness and kurtosis
 - `forecast::dm.test()` - Diebold-Mariano test
+- `lmtest::dwtest()` - Durbin-Watson test
 
 ---
 

@@ -61,7 +61,9 @@ console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
 
 - **Time-Series Diagnostics** (`timeseries`)
   - ACF / PACF with the ±1.96/√n band (R's `acf`, `pacf`)
-  - Ljung-Box and Box-Pierce tests (R's `Box.test`), Durbin-Watson statistic
+  - Ljung-Box and Box-Pierce tests (R's `Box.test`)
+  - Durbin-Watson statistic and test with exact (Imhof) or normal-approximation p-value
+    (`durbin_watson_test`, R's `lmtest::dwtest`)
 
 - **Survival Analysis** (`survival`)
   - Kaplan-Meier with Greenwood SE and log / log-log / plain intervals (R's `survfit`)
