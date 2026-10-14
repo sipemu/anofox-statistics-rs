@@ -3,9 +3,9 @@
 use super::{
     group_index, group_moments, p_adjust, pairs, PAdjustMethod, PairwiseComparison, PairwiseResult,
 };
-use crate::error::Result;
+use crate::error::{Result, StatError};
 use crate::parametric::Alternative;
-use crate::utils::dist::{t_cdf, t_sf};
+use crate::utils::dist::{t_cdf, t_inv, t_sf};
 use crate::utils::finite::ensure_finite;
 
 fn t_p_value(t: f64, df: f64, alternative: Alternative) -> f64 {
@@ -13,6 +13,23 @@ fn t_p_value(t: f64, df: f64, alternative: Alternative) -> f64 {
         Alternative::TwoSided => 2.0 * t_cdf(-t.abs(), df),
         Alternative::Greater => t_sf(t, df),
         Alternative::Less => t_cdf(t, df),
+    }
+}
+
+/// Confidence interval for `estimate` with standard error `se` and `df`
+/// degrees of freedom at level `level`; one-sided for a one-sided alternative.
+/// NaN when the standard error or the degrees of freedom are undefined.
+fn t_interval(estimate: f64, se: f64, df: f64, level: f64, alternative: Alternative) -> (f64, f64) {
+    if !(se.is_finite() && df > 0.0) {
+        return (f64::NAN, f64::NAN);
+    }
+    match alternative {
+        Alternative::TwoSided => {
+            let half = t_inv(1.0 - (1.0 - level) / 2.0, df) * se;
+            (estimate - half, estimate + half)
+        }
+        Alternative::Greater => (estimate - t_inv(level, df) * se, f64::INFINITY),
+        Alternative::Less => (f64::NEG_INFINITY, estimate + t_inv(level, df) * se),
     }
 }
 
@@ -30,9 +47,9 @@ fn t_p_value(t: f64, df: f64, alternative: Alternative) -> f64 {
 ///
 /// `alternative` refers to `group2 - group1` (R's row level minus column
 /// level). `estimate` is the difference in means, `statistic` the t statistic
-/// and `df` its degrees of freedom; `conf_low` / `conf_high` are `None`
-/// (R computes no intervals). `p_adj` applies `p_adjust_method` over all
-/// k(k-1)/2 p-values.
+/// and `df` its degrees of freedom. `conf_low` / `conf_high` are the 95%
+/// confidence interval for `estimate` (see [`pairwise_t_test_with_conf_level`]).
+/// `p_adj` applies `p_adjust_method` over all k(k-1)/2 p-values.
 ///
 /// Values must be finite. Memory is O(n + k²) for n values in k groups.
 ///
@@ -53,6 +70,44 @@ pub fn pairwise_t_test<G: Ord + Clone>(
     p_adjust_method: PAdjustMethod,
     alternative: Alternative,
 ) -> Result<PairwiseResult<G>> {
+    pairwise_t_test_with_conf_level(
+        values,
+        groups,
+        pooled_sd,
+        p_adjust_method,
+        alternative,
+        0.95,
+    )
+}
+
+/// [`pairwise_t_test`] with the confidence level of the intervals.
+///
+/// Each interval uses the comparison's own standard error and degrees of
+/// freedom (pooled SD with `N - k` df, or Welch), and is one-sided for a
+/// one-sided `alternative`. With `PAdjustMethod::None` it is the
+/// per-comparison interval at `conf_level`. With any other adjustment it is
+/// the Bonferroni simultaneous interval at `1 - (1 - conf_level) / m` for the
+/// m = k(k-1)/2 comparisons, as `emmeans::confint(pairs(...), adjust = )` does
+/// (step-wise and FDR adjustments have no interval counterpart, and emmeans
+/// substitutes Bonferroni for them). `conf_level` of the result is the
+/// family-wise level `conf_level`. Validated against
+/// `confint(pairs(emmeans(lm(values ~ groups), ~ groups), reverse = TRUE), adjust = )`
+/// (pooled SD) and `t.test` (Welch).
+///
+/// `conf_level` must be in (0, 1).
+pub fn pairwise_t_test_with_conf_level<G: Ord + Clone>(
+    values: &[f64],
+    groups: &[G],
+    pooled_sd: bool,
+    p_adjust_method: PAdjustMethod,
+    alternative: Alternative,
+    conf_level: f64,
+) -> Result<PairwiseResult<G>> {
+    if !(conf_level > 0.0 && conf_level < 1.0) {
+        return Err(StatError::InvalidParameter(
+            "conf_level must be between 0 and 1".to_string(),
+        ));
+    }
     ensure_finite("values", values)?;
     let g = group_index(values, groups)?;
     let (means, ss) = group_moments(values, &g);
@@ -67,12 +122,18 @@ pub fn pairwise_t_test<G: Ord + Clone>(
         (ss.iter().sum::<f64>() / total_degf).sqrt()
     };
 
-    let mut comparisons = Vec::with_capacity(k * (k - 1) / 2);
+    let m = k * (k - 1) / 2;
+    let level = if p_adjust_method == PAdjustMethod::None {
+        conf_level
+    } else {
+        1.0 - (1.0 - conf_level) / m as f64
+    };
+
+    let mut comparisons = Vec::with_capacity(m);
     for (j, i) in pairs(k) {
         let dif = means[i] - means[j];
-        let (t, df) = if pooled_sd {
-            let se = pooled * (1.0 / n[i] + 1.0 / n[j]).sqrt();
-            (dif / se, total_degf)
+        let (se, df) = if pooled_sd {
+            (pooled * (1.0 / n[i] + 1.0 / n[j]).sqrt(), total_degf)
         } else if n[i] < 2.0 || n[j] < 2.0 {
             (f64::NAN, f64::NAN)
         } else {
@@ -80,8 +141,10 @@ pub fn pairwise_t_test<G: Ord + Clone>(
             let vj = ss[j] / (n[j] - 1.0) / n[j];
             let se2 = vi + vj;
             let df = se2 * se2 / (vi * vi / (n[i] - 1.0) + vj * vj / (n[j] - 1.0));
-            (dif / se2.sqrt(), df)
+            (se2.sqrt(), df)
         };
+        let t = dif / se;
+        let (lo, hi) = t_interval(dif, se, df, level, alternative);
         comparisons.push(PairwiseComparison {
             group1: g.levels[j].clone(),
             group2: g.levels[i].clone(),
@@ -90,8 +153,8 @@ pub fn pairwise_t_test<G: Ord + Clone>(
             df: Some(df),
             p_value: t_p_value(t, df, alternative),
             p_adj: f64::NAN,
-            conf_low: None,
-            conf_high: None,
+            conf_low: Some(lo),
+            conf_high: Some(hi),
         });
     }
     let raw: Vec<f64> = comparisons.iter().map(|c| c.p_value).collect();
@@ -107,7 +170,7 @@ pub fn pairwise_t_test<G: Ord + Clone>(
         },
         p_adjust_method: Some(p_adjust_method),
         alternative,
-        conf_level: None,
+        conf_level: Some(conf_level),
         groups: g.levels,
         group_sizes: g.sizes,
         comparisons,

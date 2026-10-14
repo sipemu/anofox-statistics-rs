@@ -1,7 +1,8 @@
 # Reference values for p_adjust, ptukey/qtukey, pairwise_t_test, tukey_hsd and
 # dunn_test (tests/posthoc_reference.rs).
-# Run with: Rscript R/generate_posthoc_refs.R   (needs the dunn.test package)
+# Run with: Rscript R/generate_posthoc_refs.R   (needs the dunn.test and emmeans packages)
 suppressMessages(library(dunn.test))
+suppressMessages(library(emmeans))
 set.seed(20261009)
 f17 <- function(v) paste(ifelse(is.na(v), "NA", sprintf("%.17g", v)), collapse = " ")
 out <- function(df, name) write.csv(df, file.path("R/data", name), row.names = FALSE)
@@ -59,18 +60,31 @@ for (s in seq_along(sets)) {
       pr <- pairwise.t.test(x, g, p.adjust.method = "none", pool.sd = pool, alternative = alt)$p.value
       pj <- pairwise.t.test(x, g, p.adjust.method = meth, pool.sd = pool, alternative = alt)$p.value
       sp <- sqrt(sum(v * (n - 1)) / sum(n - 1))
+      # Intervals: per-comparison for "none", Bonferroni otherwise (what emmeans
+      # does for any p-value adjustment).
+      ci_adj <- if (meth == "none") "none" else "bonferroni"
+      level <- if (meth == "none") 0.95 else 1 - 0.05 / (k * (k - 1) / 2)
+      if (pool) {
+        side <- c(two.sided = "=", less = "<", greater = ">")[[alt]]
+        ci <- as.data.frame(confint(pairs(emmeans(lm(x ~ g, data.frame(x = x, g = factor(g))), ~ g), reverse = TRUE),
+                                    adjust = ci_adj, side = side))
+      }
       for (j in 1:(k - 1)) for (i in (j + 1):k) {
         a <- lv[j]; b <- lv[i]
         if (pool) {
           st <- (m[b] - m[a]) / (sp * sqrt(1 / n[a] + 1 / n[b])); df <- sum(n - 1)
+          r <- ci[ci$contrast == paste(b, "-", a), ]
+          lo <- r$lower.CL; hi <- r$upper.CL
         } else {
           tt <- t.test(x[g == b], x[g == a]); st <- tt$statistic; df <- tt$parameter
+          lo_hi <- t.test(x[g == b], x[g == a], alternative = alt, conf.level = level)$conf.int
+          lo <- lo_hi[1]; hi <- lo_hi[2]
         }
         add(set = s, test = "pairwise_t", pooled = pool, alternative = alt, option = meth,
             group1 = a, group2 = b, estimate = sprintf("%.17g", m[b] - m[a]),
             statistic = sprintf("%.17g", st), df = sprintf("%.17g", df),
             p_value = sprintf("%.17g", pr[b, a]), p_adj = sprintf("%.17g", pj[b, a]),
-            conf_low = "NA", conf_high = "NA")
+            conf_low = sprintf("%.17g", lo), conf_high = sprintf("%.17g", hi))
       }
     }
   # TukeyHSD

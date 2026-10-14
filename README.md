@@ -71,7 +71,8 @@ console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
 
 - **Post-hoc Tests and Multiple Comparisons**
   - `p_adjust`: Holm, Hochberg, Hommel, Bonferroni, BH (FDR), BY (R's `p.adjust`)
-  - Pairwise t-tests, pooled or Welch (R's `pairwise.t.test`)
+  - Pairwise t-tests, pooled or Welch (R's `pairwise.t.test`), with confidence intervals
+    (per-comparison, or Bonferroni when p-values are adjusted, as `emmeans`)
   - Tukey HSD with the studentized range distribution `ptukey`/`qtukey` (R's `TukeyHSD`)
   - Dunn's test after Kruskal-Wallis (`dunn.test` / `FSA::dunnTest`)
 
@@ -581,6 +582,7 @@ for c in &tukey.comparisons {
     println!("{}-{}: diff={:.3} [{:.3}, {:.3}] p adj={:.4}", c.group2, c.group1,
              c.estimate, c.conf_low.unwrap(), c.conf_high.unwrap(), c.p_adj);
 }
+// Bonferroni-adjusted 95% intervals; pairwise_t_test_with_conf_level sets the level
 let pt = pairwise_t_test(&values, &groups, true, PAdjustMethod::Holm, Alternative::TwoSided)?;
 let dunn = dunn_test(&values, &groups, PAdjustMethod::BH)?;
 let adjusted = p_adjust(&[0.01, 0.04, 0.03], PAdjustMethod::Hommel);

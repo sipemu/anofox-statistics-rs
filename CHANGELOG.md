@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.10] - 2026-10-14
+
+### Added
+
+Upstream of DataZooDE/anofox-statistics#198. Validated against R
+(`R/generate_posthoc_refs.R`, `tests/posthoc_reference.rs`).
+
+- **`pairwise_t_test` confidence intervals.** `conf_low` / `conf_high` of each
+  comparison are now the confidence interval for `group2 - group1` (previously
+  `None`), from the comparison's own standard error and degrees of freedom (pooled
+  SD with `N - k` df, or Welch), one-sided for a one-sided alternative. With
+  `PAdjustMethod::None` the interval is per-comparison; with any other adjustment
+  it is the Bonferroni simultaneous interval at `1 - (1 - conf_level) / m`, as
+  `emmeans::confint(pairs(...), adjust = )` (which substitutes Bonferroni for the
+  step-wise and FDR methods). `PairwiseResult::conf_level` is `Some(conf_level)`.
+  Matches `emmeans` (pooled SD) and `t.test` (Welch) to 1e-9.
+- **`pairwise_t_test_with_conf_level(values, groups, pooled_sd, p_adjust_method,
+  alternative, conf_level)`** sets the level; `pairwise_t_test` uses 0.95.
+
 ## [0.4.9] - 2026-10-14
 
 ### Added
