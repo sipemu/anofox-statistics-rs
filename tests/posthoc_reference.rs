@@ -1,12 +1,12 @@
-//! `p_adjust`, `ptukey`/`qtukey`, `pairwise_t_test`, `tukey_hsd` and
-//! `dunn_test` against R 4.6 (`p.adjust`, `ptukey`, `qtukey`,
+//! `p_adjust`, `p_adjust_n`, `ptukey`/`qtukey`, `pairwise_t_test`, `tukey_hsd`
+//! and `dunn_test` against R 4.6 (`p.adjust`, `ptukey`, `qtukey`,
 //! `pairwise.t.test`, `TukeyHSD(aov(...))`, `dunn.test(altp = TRUE)` +
 //! `p.adjust` as in `FSA::dunnTest`). Reference data:
-//! `R/generate_posthoc_refs.R`.
+//! `R/generate_posthoc_refs.R` and `R/generate_p_adjust_n_refs.R`.
 
 use anofox_statistics::{
-    dunn_test, p_adjust, pairwise_t_test, pairwise_t_test_with_conf_level, ptukey, qtukey,
-    tukey_hsd, Alternative, PAdjustMethod,
+    dunn_test, p_adjust, p_adjust_n, pairwise_t_test, pairwise_t_test_with_conf_level, ptukey,
+    qtukey, tukey_hsd, Alternative, PAdjustMethod,
 };
 use std::path::PathBuf;
 
@@ -56,6 +56,30 @@ fn p_adjust_matches_r() {
                 "case {} {}: {} vs {}",
                 &r[0],
                 &r[1],
+                g,
+                w
+            );
+        }
+    }
+}
+
+#[test]
+fn p_adjust_n_matches_r() {
+    let recs = records("p_adjust_n_reference.csv");
+    assert!(recs.len() >= 150);
+    for r in recs {
+        let method: PAdjustMethod = r[1].parse().unwrap();
+        let n: usize = r[2].parse().unwrap();
+        let got = p_adjust_n(&vec_of(&r[3]), method, n).unwrap();
+        let want = vec_of(&r[4]);
+        assert_eq!(got.len(), want.len());
+        for (g, w) in got.iter().zip(&want) {
+            assert!(
+                close(*g, *w, 1e-14),
+                "case {} {} n={}: {} vs {}",
+                &r[0],
+                &r[1],
+                n,
                 g,
                 w
             );
