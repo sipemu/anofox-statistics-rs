@@ -80,7 +80,7 @@ fn order_desc(p: &[f64]) -> Vec<usize> {
 /// the number of comparisons `n` is the number of non-NaN values, as in R.
 /// With at most one non-NaN value the input is returned unchanged, and
 /// Hommel with two values falls back to Hochberg (both as in R). Values are
-/// not range-checked, just as in R.
+/// not range-checked, just as in R. See [`p_adjust_n`] for an explicit `n`.
 ///
 /// Memory and time are O(n) and O(n log n) (Hommel: O(n²) time).
 ///
@@ -92,11 +92,48 @@ fn order_desc(p: &[f64]) -> Vec<usize> {
 /// assert!(adj[3].is_nan());
 /// ```
 pub fn p_adjust(p: &[f64], method: PAdjustMethod) -> Vec<f64> {
+    let lp = p.iter().filter(|x| !x.is_nan()).count();
+    adjust(p, method, lp)
+}
+
+/// Adjust p-values for `n` comparisons, matching R's
+/// `p.adjust(p, method, n)` exactly.
+///
+/// `n` is the total number of hypotheses, for when not every p-value is
+/// available; it must be at least the number of non-NaN values in `p`. The
+/// missing p-values are treated as R does (Hommel pads them with 1). NaN
+/// entries pass through as NaN, and with `n <= 1` the input is returned
+/// unchanged.
+///
+/// # Errors
+/// [`StatError::InvalidParameter`] when `n` is smaller than the number of
+/// non-NaN p-values.
+///
+/// # Example
+/// ```
+/// use anofox_statistics::{p_adjust_n, PAdjustMethod};
+/// let adj = p_adjust_n(&[0.01, 0.02], PAdjustMethod::Bonferroni, 10).unwrap();
+/// assert!((adj[0] - 0.1).abs() < 1e-12);
+/// assert!((adj[1] - 0.2).abs() < 1e-12);
+/// ```
+pub fn p_adjust_n(p: &[f64], method: PAdjustMethod, n: usize) -> Result<Vec<f64>> {
+    let lp = p.iter().filter(|x| !x.is_nan()).count();
+    if n < lp {
+        return Err(StatError::InvalidParameter(format!(
+            "n ({}) must be at least the number of non-missing p-values ({})",
+            n, lp
+        )));
+    }
+    Ok(adjust(p, method, n))
+}
+
+/// Shared body of [`p_adjust`] and [`p_adjust_n`]; `n` >= number of non-NaN values.
+fn adjust(p: &[f64], method: PAdjustMethod, n: usize) -> Vec<f64> {
     let mut out = p.to_vec();
     let idx: Vec<usize> = (0..p.len()).filter(|&i| !p[i].is_nan()).collect();
     let pv: Vec<f64> = idx.iter().map(|&i| p[i]).collect();
-    let n = pv.len();
-    if n <= 1 {
+    let lp = pv.len();
+    if n <= 1 || lp == 0 {
         return out;
     }
     let method = if n == 2 && method == PAdjustMethod::Hommel {
@@ -109,9 +146,9 @@ pub fn p_adjust(p: &[f64], method: PAdjustMethod) -> Vec<f64> {
         PAdjustMethod::None => pv,
         PAdjustMethod::Bonferroni => pv.iter().map(|&x| (nf * x).min(1.0)).collect(),
         PAdjustMethod::Holm => {
-            // pmin(1, cummax((n + 1 - i) * p[o]))[ro]
+            // i <- seq_len(lp); pmin(1, cummax((n + 1 - i) * p[o]))[ro]
             let o = order_asc(&pv);
-            let mut res = vec![0.0; n];
+            let mut res = vec![0.0; lp];
             let mut run = f64::NEG_INFINITY;
             for (i, &oi) in o.iter().enumerate() {
                 let v = (nf - i as f64) * pv[oi];
@@ -121,17 +158,17 @@ pub fn p_adjust(p: &[f64], method: PAdjustMethod) -> Vec<f64> {
             res
         }
         PAdjustMethod::Hochberg | PAdjustMethod::BH | PAdjustMethod::BY => {
-            // i <- n:1; o <- order(p, decreasing = TRUE); pmin(1, cummin(f(i) * p[o]))[ro]
+            // i <- lp:1; o <- order(p, decreasing = TRUE); pmin(1, cummin(f(i) * p[o]))[ro]
             let q = if method == PAdjustMethod::BY {
                 (1..=n).map(|k| 1.0 / k as f64).sum::<f64>()
             } else {
                 1.0
             };
             let o = order_desc(&pv);
-            let mut res = vec![0.0; n];
+            let mut res = vec![0.0; lp];
             let mut run = f64::INFINITY;
             for (pos, &oi) in o.iter().enumerate() {
-                let i = (n - pos) as f64;
+                let i = (lp - pos) as f64;
                 let v = match method {
                     PAdjustMethod::Hochberg => (nf + 1.0 - i) * pv[oi],
                     _ => q * nf / i * pv[oi],
@@ -141,7 +178,14 @@ pub fn p_adjust(p: &[f64], method: PAdjustMethod) -> Vec<f64> {
             }
             res
         }
-        PAdjustMethod::Hommel => hommel(&pv),
+        PAdjustMethod::Hommel => {
+            // if (n > lp) p <- c(p, rep.int(1, n - lp)); ...[ro[1:lp]]
+            let mut padded = pv;
+            padded.resize(n, 1.0);
+            let mut res = hommel(&padded);
+            res.truncate(lp);
+            res
+        }
     };
     for (k, &i) in idx.iter().enumerate() {
         out[i] = adj[k];
@@ -206,5 +250,24 @@ mod tests {
         let r = p_adjust(&[f64::NAN, 0.2], PAdjustMethod::BY);
         assert!(r[0].is_nan());
         assert_eq!(r[1], 0.2);
+    }
+
+    #[test]
+    fn explicit_n() {
+        let p = [0.01, f64::NAN, 0.04];
+        assert_eq!(p_adjust_n(&p, PAdjustMethod::Holm, 2).unwrap()[2], 0.04);
+        let r = p_adjust_n(&p, PAdjustMethod::Bonferroni, 5).unwrap();
+        assert!((r[0] - 0.05).abs() < 1e-15 && r[1].is_nan() && (r[2] - 0.2).abs() < 1e-15);
+        assert!(p_adjust_n(&p, PAdjustMethod::Holm, 1).is_err());
+        // a single p-value is adjusted when n > 1, and left alone when n == 1
+        assert_eq!(
+            p_adjust_n(&[0.3], PAdjustMethod::Bonferroni, 1).unwrap(),
+            vec![0.3]
+        );
+        assert_eq!(
+            p_adjust_n(&[0.3], PAdjustMethod::Bonferroni, 3).unwrap()[0],
+            0.8999999999999999
+        );
+        assert!(p_adjust_n(&[f64::NAN], PAdjustMethod::Hommel, 4).unwrap()[0].is_nan());
     }
 }

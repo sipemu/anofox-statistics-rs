@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+Upstream of DataZooDE/anofox-statistics#219. Validated against R
+(`R/generate_p_adjust_n_refs.R`, `tests/posthoc_reference.rs`).
+
+- **`p_adjust_n(p, method, n)`** is R's `p.adjust(p, method, n)`: the number of
+  hypotheses `n` can exceed the number of (non-NaN) p-values, for when not every
+  test is available. Hommel pads the missing p-values with 1, BY sums `1/k` to `n`,
+  and with `n <= 1` the input is returned unchanged, all as in R. Returns
+  `StatError::InvalidParameter` when `n` is smaller than the number of non-NaN
+  p-values. `p_adjust` is `p_adjust_n` with that number and is unchanged.
+
 ## [0.4.10] - 2026-10-14
 
 ### Added

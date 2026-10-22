@@ -49,8 +49,8 @@ pub use parametric::{
     YuenConfInt, YuenResult,
 };
 pub use posthoc::{
-    dunn_test, p_adjust, pairwise_t_test, pairwise_t_test_with_conf_level, ptukey, qtukey,
-    tukey_hsd, PAdjustMethod, PairwiseComparison, PairwiseResult,
+    dunn_test, p_adjust, p_adjust_n, pairwise_t_test, pairwise_t_test_with_conf_level, ptukey,
+    qtukey, tukey_hsd, PAdjustMethod, PairwiseComparison, PairwiseResult,
 };
 pub use resampling::{
     bootstrap_ci, bootstrap_mean_ci, permutation_t_test, BootstrapCIResult, CircularBlockBootstrap,

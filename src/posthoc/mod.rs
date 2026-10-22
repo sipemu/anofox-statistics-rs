@@ -1,6 +1,6 @@
 //! Multiple-comparison adjustment and pairwise post-hoc tests.
 //!
-//! - [`p_adjust`]: R's `p.adjust` (holm, hochberg, hommel, bonferroni, BH, BY).
+//! - [`p_adjust`] / [`p_adjust_n`]: R's `p.adjust` (holm, hochberg, hommel, bonferroni, BH, BY), the latter with an explicit `n`.
 //! - [`pairwise_t_test`]: R's `pairwise.t.test` (pooled or Welch).
 //! - [`tukey_hsd`]: R's `TukeyHSD(aov(values ~ groups))`, with [`ptukey`] /
 //!   [`qtukey`] ports of R's studentized range distribution.
@@ -24,7 +24,7 @@ mod tukey_dist;
 mod tukey_hsd;
 
 pub use dunn::dunn_test;
-pub use p_adjust::{p_adjust, PAdjustMethod};
+pub use p_adjust::{p_adjust, p_adjust_n, PAdjustMethod};
 pub use pairwise_t::{pairwise_t_test, pairwise_t_test_with_conf_level};
 pub use tukey_dist::{ptukey, qtukey};
 pub use tukey_hsd::tukey_hsd;
