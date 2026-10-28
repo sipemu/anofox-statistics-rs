@@ -5,7 +5,8 @@ use anofox_statistics::drift::{
     binned_proportions, category_proportions, hellinger, hellinger_categorical,
     hellinger_from_proportions, jensen_shannon, jensen_shannon_categorical,
     jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
-    kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
+    kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, tvd_test,
+    tvd_test_numeric, Binning,
 };
 use anofox_statistics::{
     ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_distance_1d,
@@ -638,4 +639,58 @@ fn wasserstein_edge_cases() {
     // constant reference: the normed distance divides by 0.001
     let r = wasserstein_test_1d(&[1.0, 1.0], &[2.0], 0, None).unwrap();
     assert_relative_eq!(r.distance_normed, 1000.0, epsilon = 1e-9);
+}
+
+// ---------------------------------------------------------------------------
+// #39 total variation distance
+// ---------------------------------------------------------------------------
+
+#[test]
+fn tvd_matches_r() {
+    let (xc, yc) = xyc();
+    let (xt, yt) = xyt();
+    for (name, r, c) in [("cat", xc, yc), ("tie", xt, yt)] {
+        let case = format!("tvd_{}", name);
+        let res = tvd_test_numeric(r, c, 1000, Some(7)).unwrap();
+        assert_relative_eq!(res.statistic, get1(&case, "statistic"), epsilon = 1e-15);
+        assert_eq!(res.n_categories as f64, get1(&case, "n_categories"));
+        // R: B = 100000; here B = 1000, tolerance 4 combined Monte Carlo SEs.
+        let e = get1(&case, "p_value_mc");
+        let se = (e * (1.0 - e) / 1000.0 + e * (1.0 - e) / 100000.0).sqrt();
+        assert!(
+            (res.p_value - e).abs() < 4.0 * se + 2e-3,
+            "{}: {} vs {}",
+            name,
+            res.p_value,
+            e
+        );
+    }
+    // statistic = 0.2 exactly (up to the rounding of 0.26 - 0.2 etc.), with labels
+    let res = tvd_test(&labels(xc), &labels(yc), 1000, Some(1)).unwrap();
+    assert_relative_eq!(res.statistic, 0.2, epsilon = 1e-15);
+    assert_eq!(res.n_categories, 5);
+    assert!((res.p_value - 0.28894).abs() < 0.06);
+    // A fixed seed gives identical results; labels and numeric codes agree.
+    assert_eq!(
+        res,
+        tvd_test(&labels(xc), &labels(yc), 1000, Some(1)).unwrap()
+    );
+    assert_eq!(res, tvd_test_numeric(xc, yc, 1000, Some(1)).unwrap());
+    let t = TestResult::from(&res);
+    assert_eq!(t.method, "Total variation distance (permutation test)");
+    assert_eq!((t.p_value, t.n), (Some(res.p_value), Some(90)));
+}
+
+#[test]
+fn tvd_edge_cases() {
+    assert!(tvd_test::<&str>(&[], &["a"], 10, None).is_err());
+    assert!(tvd_test(&["a"], &["a"], 0, None).is_err());
+    assert!(tvd_test_numeric(&[1.0, f64::NAN], &[1.0], 10, None).is_err());
+    assert!(tvd_test_numeric(&[1.0], &[f64::INFINITY], 10, None).is_err());
+    // identical distributions: TVD 0, p = 1
+    let r = tvd_test(&[1, 2, 1, 2], &[2, 1], 99, Some(3)).unwrap();
+    assert_eq!((r.statistic, r.p_value), (0.0, 1.0));
+    // disjoint categories: TVD 1
+    let r = tvd_test(&["a", "a"], &["b", "b", "b"], 99, Some(3)).unwrap();
+    assert_eq!(r.statistic, 1.0);
 }

@@ -277,6 +277,9 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
             let _ = cvm_test_2sample(x, y, method);
         });
     }
+    run("tvd_test_numeric", &mut || {
+        let _ = tvd_test_numeric(x, y, 20, Some(1));
+    });
     run("wasserstein", &mut || {
         let _ = wasserstein_distance_1d(x, y, 2.0);
         let _ = wasserstein_test_1d(x, y, 20, Some(1));
@@ -604,6 +607,10 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
             ),
             ("clark_west", clark_west(&x, &y, 1).err()),
             ("psi", psi(&x, &y, Binning::Auto).err()),
+            (
+                "tvd_test_numeric",
+                tvd_test_numeric(&x, &y, 20, Some(1)).err(),
+            ),
             (
                 "wasserstein_test_1d",
                 wasserstein_test_1d(&x, &y, 20, Some(1)).err(),

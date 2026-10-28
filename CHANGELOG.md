@@ -63,6 +63,11 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   quantile functions (R `transport::wasserstein1d`), evidently's normed score
   `W1 / max(population sd(reference), 0.001)`, and an optional seeded permutation
   p-value (O(N) per permutation). Returns `WassersteinResult`.
+- **`drift::tvd_test(reference, current, n_permutations, seed)` (#39)**, the total
+  variation distance between category distributions with a seeded permutation
+  p-value `(1 + #) / (1 + B)`, for labels of any `Ord` type; `tvd_test_numeric` for
+  numeric codes. Returns `TvdResult`.
+- Every new result type converts to `TestResult`.
 
 ## [0.4.11] - 2026-10-22
 

@@ -332,6 +332,27 @@ for (nm in c("main", "close", "tie")) {
   add(paste0("wass_", nm), "p_value_mc", twosamples::wass_test(a, b, nboots = 20000)[2])
 }
 
+# ---------------------------------------------------------------------------
+# #39 total variation distance between category distributions, with a
+# Monte Carlo permutation p-value (B = 100000)
+# ---------------------------------------------------------------------------
+tvd <- function(a, b) { lv <- sort(unique(c(a, b)))
+  0.5 * sum(abs(table(factor(a, lv)) / length(a) - table(factor(b, lv)) / length(b))) }
+tvd_cases <- list(cat = list(xc, yc), tie = list(xt, yt))
+set.seed(1)
+for (nm in names(tvd_cases)) {
+  a <- tvd_cases[[nm]][[1]]; b <- tvd_cases[[nm]][[2]]
+  obs <- tvd(a, b); z <- c(a, b); m <- length(a); B <- 100000
+  perm <- replicate(B, { i <- sample.int(length(z), m); tvd(z[i], z[-i]) })
+  add(paste0("tvd_", nm), "statistic", obs)
+  add(paste0("tvd_", nm), "p_value_mc", mean(perm >= obs - 1e-12))
+  add(paste0("tvd_", nm), "n_categories", length(unique(z)))
+}
+b <- binnings$cat
+check("tvd vs philentropy", tvd(xc, yc),
+      suppressMessages(philentropy::distance(rbind(b$p, b$q), method = "manhattan")) / 2)
+check("tvd (issue)", tvd(xc, yc), 0.2, 1e-15)
+
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)
 cat("wrote", nrow(out), "rows to R/data/drift_reference.csv\n")

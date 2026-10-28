@@ -32,7 +32,7 @@ use crate::correlation::{
     CorrelationMethod, CorrelationResult, DistanceCorResult, ICCResult, PartialCorResult,
 };
 use crate::distributional::{DAgostinoResult, JarqueBeraResult, ShapiroWilkResult};
-use crate::drift::DivergenceResult;
+use crate::drift::{DivergenceResult, TvdResult};
 use crate::equivalence::{OneSidedTestResult, TostResult};
 use crate::forecast::{CWResult, DMResult, MCSResult, MSPEAdjustedResult, SPAResult};
 use crate::modern::{EnergyDistanceResult, MMDResult, WassersteinResult};
@@ -217,7 +217,19 @@ from_owned!(
     CvmTestResult,
     EppsSingletonResult,
     WassersteinResult,
+    TvdResult,
 );
+
+/// Total variation distance: `statistic` is the TVD, `p_value` the
+/// permutation p-value, `n` the reference plus current sample size.
+impl From<&TvdResult> for TestResult {
+    fn from(r: &TvdResult) -> Self {
+        TestResult::new("Total variation distance (permutation test)")
+            .stat(r.statistic)
+            .p(r.p_value)
+            .with_n(r.n_reference + r.n_current)
+    }
+}
 
 /// 1-D Wasserstein: `statistic` is `W_1`, the effect size evidently's normed
 /// distance (`"distance_normed"`), `p_value` the permutation p-value when
