@@ -4,9 +4,9 @@
 use anofox_statistics::drift::{
     binned_proportions, category_proportions, hellinger, hellinger_categorical,
     hellinger_from_proportions, jensen_shannon, jensen_shannon_categorical,
-    jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
-    kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, tvd_test,
-    tvd_test_numeric, Binning,
+    jensen_shannon_divergence_from_proportions, jensen_shannon_from_proportions, kl_divergence,
+    kl_divergence_categorical, kl_divergence_from_proportions, psi, psi_categorical,
+    psi_from_proportions, tvd_test, tvd_test_numeric, Binning,
 };
 use anofox_statistics::{
     ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_distance_1d,
@@ -258,6 +258,23 @@ fn jensen_shannon_matches_r() {
             get1(&case, "statistic_log2"),
             epsilon = 1e-10
         );
+        // #44: the divergence, philentropy::JSD
+        assert_relative_eq!(
+            ln.divergence.unwrap(),
+            get1(&case, "divergence"),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(
+            log2.divergence.unwrap(),
+            get1(&case, "divergence_log2"),
+            epsilon = 1e-12
+        );
+        let (p, q) = binned_proportions(r, c, binning).unwrap();
+        assert_relative_eq!(
+            jensen_shannon_divergence_from_proportions(&p, &q, Some(2.0)).unwrap(),
+            get1(&case, "divergence_log2"),
+            epsilon = 1e-12
+        );
     }
     let (x, y) = xy();
     assert_relative_eq!(
@@ -268,7 +285,19 @@ fn jensen_shannon_matches_r() {
     let (xc, yc) = xyc();
     let cat = jensen_shannon_categorical(&labels(xc), &labels(yc), None).unwrap();
     assert_relative_eq!(cat.statistic, 0.27397012217, epsilon = 1e-10);
-    assert_eq!(TestResult::from(&cat).method, "Jensen-Shannon distance");
+    assert_relative_eq!(
+        cat.divergence.unwrap(),
+        get1("js_cat", "divergence"),
+        epsilon = 1e-12
+    );
+    let t = TestResult::from(&cat);
+    assert_eq!(t.method, "Jensen-Shannon distance");
+    assert_eq!(t.effect_name.as_deref(), Some("divergence"));
+    assert_eq!(t.effect_size, cat.divergence);
+    // Other divergences carry no secondary value.
+    let h = hellinger_categorical(&labels(xc), &labels(yc)).unwrap();
+    assert_eq!(h.divergence, None);
+    assert_eq!(TestResult::from(&h).effect_size, None);
 }
 
 #[test]

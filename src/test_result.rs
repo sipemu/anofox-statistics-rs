@@ -293,12 +293,18 @@ impl From<&KsTestResult> for TestResult {
 }
 
 /// Binned divergence (PSI, KL, Jensen-Shannon, Hellinger): `statistic` is the
-/// divergence, `n` the reference plus current sample size; no p-value.
+/// measure, `n` the reference plus current sample size; no p-value. For the
+/// Jensen-Shannon distance the divergence is the effect size
+/// (`"divergence"`).
 impl From<&DivergenceResult> for TestResult {
     fn from(r: &DivergenceResult) -> Self {
-        TestResult::new(r.method.clone())
+        let t = TestResult::new(r.method.clone())
             .stat(r.statistic)
-            .with_n(r.n_reference + r.n_current)
+            .with_n(r.n_reference + r.n_current);
+        match r.divergence {
+            Some(d) => t.with_effect_size("divergence", d),
+            None => t,
+        }
     }
 }
 

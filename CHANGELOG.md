@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Jensen-Shannon divergence (#44).** `drift::jensen_shannon_divergence_from_proportions`
+  returns the divergence (R `philentropy::JSD`, any log base), and `jensen_shannon` /
+  `jensen_shannon_categorical` fill the new `DivergenceResult::divergence` (`None` for
+  the other measures). `TestResult` reports it as the effect size `"divergence"`.
+
 ### Changed
 
 - **`drift::hellinger(.., Binning::Auto)` follows the shared `Auto` rule (#45).**

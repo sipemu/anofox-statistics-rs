@@ -31,9 +31,9 @@ pub use distributional::{
 pub use drift::{
     binned_proportions, category_proportions, hellinger, hellinger_categorical,
     hellinger_from_proportions, jensen_shannon, jensen_shannon_categorical,
-    jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
-    kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, tvd_test,
-    tvd_test_numeric, Binning, DivergenceResult, TvdResult,
+    jensen_shannon_divergence_from_proportions, jensen_shannon_from_proportions, kl_divergence,
+    kl_divergence_categorical, kl_divergence_from_proportions, psi, psi_categorical,
+    psi_from_proportions, tvd_test, tvd_test_numeric, Binning, DivergenceResult, TvdResult,
 };
 pub use error::{Result, StatError};
 pub use forecast::{

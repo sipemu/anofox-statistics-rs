@@ -131,6 +131,11 @@ for (nm in names(binnings)) {
         sqrt(suppressMessages(philentropy::JSD(rbind(b$p, b$q), unit = "log2"))))
   add(paste0("js_", nm), "statistic", jsd(b))
   add(paste0("js_", nm), "statistic_log2", jsd(b, 2))
+  # #44: the divergence itself, philentropy::JSD
+  add(paste0("js_", nm), "divergence",
+      suppressMessages(philentropy::JSD(rbind(b$p, b$q), unit = "log")))
+  add(paste0("js_", nm), "divergence_log2",
+      suppressMessages(philentropy::JSD(rbind(b$p, b$q), unit = "log2")))
 }
 check("js num (issue)", jsd(binnings$num), 0.257847900615, 1e-11)
 check("js cat (issue)", jsd(binnings$cat), 0.27397012217, 1e-10)

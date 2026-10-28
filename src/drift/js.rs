@@ -15,19 +15,30 @@ fn rel_entr(a: f64, b: f64) -> f64 {
     }
 }
 
-/// Jensen-Shannon *distance* from proportions `p` (reference) and `q`
-/// (current), as `scipy.spatial.distance.jensenshannon`: both vectors are
-/// normalized to sum to 1, `m = (p + q) / 2`, and the result is
-/// `sqrt((KL(p || m) + KL(q || m)) / 2)` in base `base` (default `e`). No zero
-/// fill is needed. Bounded by `sqrt(ln 2)` (natural log) or 1 (base 2).
+/// Jensen-Shannon *divergence* from proportions `p` (reference) and `q`
+/// (current): both vectors are normalized to sum to 1, `m = (p + q) / 2`, and
+/// the result is `(KL(p || m) + KL(q || m)) / 2` in base `base` (default
+/// `e`). No zero fill is needed. Bounded by `ln 2` (natural log) or 1 (base
+/// 2). [`jensen_shannon_from_proportions`] is its square root.
 ///
 /// Errors when the vectors are empty, differ in length, contain negative or
 /// non-finite values, or sum to zero, and when `base` is not a finite
 /// positive number other than 1.
 ///
-/// R: `sqrt(philentropy::JSD(rbind(p, q), unit = "log"))` (`philentropy::JSD`
-/// returns the divergence and defaults to `unit = "log2"`).
-pub fn jensen_shannon_from_proportions(p: &[f64], q: &[f64], base: Option<f64>) -> Result<f64> {
+/// R: `philentropy::JSD(rbind(p, q), unit = "log")` (`philentropy::JSD`
+/// defaults to `unit = "log2"`).
+///
+/// # Example
+/// ```
+/// use anofox_statistics::drift::jensen_shannon_divergence_from_proportions;
+/// let d = jensen_shannon_divergence_from_proportions(&[1.0, 0.0], &[0.0, 1.0], Some(2.0)).unwrap();
+/// assert!((d - 1.0).abs() < 1e-15);
+/// ```
+pub fn jensen_shannon_divergence_from_proportions(
+    p: &[f64],
+    q: &[f64],
+    base: Option<f64>,
+) -> Result<f64> {
     validate_proportions(p, q)?;
     let ln_b = ln_base(base)?;
     let (sp, sq): (f64, f64) = (p.iter().sum(), q.iter().sum());
@@ -42,7 +53,34 @@ pub fn jensen_shannon_from_proportions(p: &[f64], q: &[f64], base: Option<f64>) 
         .sum::<f64>()
         / 2.0;
     // Rounding can leave a tiny negative value for identical inputs.
-    Ok((js / ln_b).max(0.0).sqrt())
+    Ok((js / ln_b).max(0.0))
+}
+
+/// Jensen-Shannon *distance* from proportions `p` (reference) and `q`
+/// (current), as `scipy.spatial.distance.jensenshannon`: the square root of
+/// [`jensen_shannon_divergence_from_proportions`], in base `base` (default
+/// `e`). Bounded by `sqrt(ln 2)` (natural log) or 1 (base 2).
+///
+/// Errors as [`jensen_shannon_divergence_from_proportions`].
+///
+/// R: `sqrt(philentropy::JSD(rbind(p, q), unit = "log"))`.
+pub fn jensen_shannon_from_proportions(p: &[f64], q: &[f64], base: Option<f64>) -> Result<f64> {
+    Ok(jensen_shannon_divergence_from_proportions(p, q, base)?.sqrt())
+}
+
+/// A [`DivergenceResult`] with the distance as `statistic` and the
+/// divergence as `divergence`.
+fn result(
+    p: &[f64],
+    q: &[f64],
+    base: Option<f64>,
+    n_reference: usize,
+    n_current: usize,
+) -> Result<DivergenceResult> {
+    let divergence = jensen_shannon_divergence_from_proportions(p, q, base)?;
+    let mut r = DivergenceResult::new(METHOD, divergence.sqrt(), p.len(), n_reference, n_current);
+    r.divergence = Some(divergence);
+    Ok(r)
 }
 
 /// Jensen-Shannon distance between the bin proportions of a numeric
@@ -52,7 +90,8 @@ pub fn jensen_shannon_from_proportions(p: &[f64], q: &[f64], base: Option<f64>) 
 /// Symmetric and bounded (`<= sqrt(ln 2)`, or `<= 1` in base 2). With
 /// [`Binning::Auto`] this is evidently's `"jensenshannon"` test, which flags
 /// drift at a distance `>= 0.1`; evidently uses it by default for categorical
-/// columns of large datasets. The proportions are not zero-filled.
+/// columns of large datasets. The proportions are not zero-filled. The
+/// divergence (`statistic^2`, R `philentropy::JSD`) is in `divergence`.
 ///
 /// R equivalent (with `p`, `q` the bin proportions):
 /// `sqrt(philentropy::JSD(rbind(p, q), unit = "log"))`.
@@ -64,6 +103,7 @@ pub fn jensen_shannon_from_proportions(p: &[f64], q: &[f64], base: Option<f64>) 
 /// let current: Vec<f64> = (0..40).map(|i| 2.0 * (0.53 * i as f64).sin() + 0.5).collect();
 /// let r = jensen_shannon(&reference, &current, Binning::Auto, None).unwrap();
 /// assert!((r.statistic - 0.257847900615).abs() < 1e-10);
+/// assert!((r.divergence.unwrap() - r.statistic.powi(2)).abs() < 1e-15);
 /// ```
 pub fn jensen_shannon(
     reference: &[f64],
@@ -72,28 +112,17 @@ pub fn jensen_shannon(
     base: Option<f64>,
 ) -> Result<DivergenceResult> {
     let (p, q) = binned_proportions(reference, current, binning)?;
-    Ok(DivergenceResult::new(
-        METHOD,
-        jensen_shannon_from_proportions(&p, &q, base)?,
-        p.len(),
-        reference.len(),
-        current.len(),
-    ))
+    result(&p, &q, base, reference.len(), current.len())
 }
 
 /// Jensen-Shannon distance between the category distributions of two
-/// samples of labels (one bin per category seen in either sample).
+/// samples of labels (one bin per category seen in either sample), with the
+/// divergence in `divergence`.
 pub fn jensen_shannon_categorical<T: Ord>(
     reference: &[T],
     current: &[T],
     base: Option<f64>,
 ) -> Result<DivergenceResult> {
     let (p, q) = category_proportions(reference, current)?;
-    Ok(DivergenceResult::new(
-        METHOD,
-        jensen_shannon_from_proportions(&p, &q, base)?,
-        p.len(),
-        reference.len(),
-        current.len(),
-    ))
+    result(&p, &q, base, reference.len(), current.len())
 }
