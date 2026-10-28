@@ -5,6 +5,7 @@ pub mod categorical;
 pub mod classification;
 pub mod correlation;
 pub mod distributional;
+pub mod drift;
 pub mod equivalence;
 pub mod error;
 pub mod forecast;
@@ -27,6 +28,13 @@ pub use distributional::{
     dagostino_k_squared, jarque_bera, shapiro_wilk, DAgostinoResult, JarqueBeraResult,
     ShapiroWilkResult,
 };
+pub use drift::{
+    binned_proportions, category_proportions, hellinger, hellinger_categorical,
+    hellinger_from_proportions, jensen_shannon, jensen_shannon_categorical,
+    jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
+    kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, tvd_test,
+    tvd_test_numeric, Binning, DivergenceResult, TvdResult,
+};
 pub use error::{Result, StatError};
 pub use forecast::{
     clark_west, diebold_mariano, model_confidence_set, mspe_adjusted_spa, spa_test, CWResult,
@@ -34,13 +42,15 @@ pub use forecast::{
     SPAResult, VarEstimator,
 };
 pub use modern::{
-    energy_distance_test, energy_distance_test_1d, mmd_test, mmd_test_1d, EnergyDistanceResult,
-    Kernel, MMDResult,
+    energy_distance_test, energy_distance_test_1d, mmd_test, mmd_test_1d, wasserstein_distance_1d,
+    wasserstein_test_1d, EnergyDistanceResult, Kernel, MMDResult, WassersteinResult,
 };
 pub use nonparametric::{
-    brunner_munzel, kruskal_wallis, mann_whitney_u, matched_pairs_rank_biserial, rank,
-    rank_biserial, rank_biserial_from_u, wilcoxon_signed_rank, BrunnerMunzelResult, KruskalResult,
-    MannWhitneyResult, WilcoxonResult,
+    ad_test_ksamp, brunner_munzel, cvm_test_2sample, epps_singleton_test, kruskal_wallis,
+    ks_test_2sample, mann_whitney_u, matched_pairs_rank_biserial, rank, rank_biserial,
+    rank_biserial_from_u, wilcoxon_signed_rank, AndersonDarlingKResult, BrunnerMunzelResult,
+    CvmMethod, CvmTestResult, EppsSingletonResult, KruskalResult, KsTestResult, MannWhitneyResult,
+    WilcoxonResult,
 };
 pub use parametric::{
     brown_forsythe, cohens_d, cohens_d_one_sample, one_way_anova, repeated_measures_anova, t_test,

@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-28
+
+### Added
+
+evidently's data-drift tests (#40), upstream of DataZooDE/anofox-statistics#255.
+Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
+
+- **New `drift` module with shared binning (#35).** `drift::binned_proportions(reference,
+  current, Binning)` bins two samples on common bins: `Binning::Auto` is evidently's
+  rule (equal-width Sturges bins over the pooled sample, as numpy
+  `histogram_bin_edges(..., "sturges")`, when the reference has more than 20 distinct
+  values; one bin per distinct value otherwise), plus `Sturges`, `Quantile(n)`
+  (reference-quantile bins, R type 7, open outer edges) and `Categorical`.
+  `category_proportions` does the same for labels of any `Ord` type; `zero_fill` is
+  evidently's zero replacement.
+- **`drift::psi` (#35)**, the Population Stability Index `sum (p - q) ln(p / q)` on
+  zero-filled proportions (R `philentropy` Jeffreys divergence), with
+  `psi_categorical` and `psi_from_proportions`. Returns the new `DivergenceResult`,
+  which converts to `TestResult`.
+- **`drift::kl_divergence` (#36)**, `KL(p || q)` of the current bin proportions from
+  the reference ones, zero-filled and renormalized as `scipy.stats.entropy`, optional
+  log base (R `philentropy::KL`), with `kl_divergence_categorical` and
+  `kl_divergence_from_proportions`.
+- **`drift::jensen_shannon` (#37)**, the Jensen-Shannon *distance* (square root of the
+  divergence, as `scipy.spatial.distance.jensenshannon`; no zero fill), optional log
+  base (R `sqrt(philentropy::JSD(...))`), with `jensen_shannon_categorical` and
+  `jensen_shannon_from_proportions`.
+- **`drift::hellinger` (#38)**, `sqrt(1 - sum sqrt(p q))` in `[0, 1]` (R
+  `philentropy` Hellinger / 2), with `hellinger_categorical` and
+  `hellinger_from_proportions`. `Binning::Auto` copies evidently's numeric rule:
+  Sturges bins whose count comes from the number of distinct pooled values.
+- **`ks_test_2sample(x, y, alternative, exact)` (#30)**, the two-sample
+  Kolmogorov-Smirnov test as R `ks.test`: exact p-value from R's `psmirnov` recursion
+  (also with ties, as R >= 4.2) when `n_x * n_y < 10000`, otherwise the limiting
+  Kolmogorov distribution (R's `exact = FALSE` value, not scipy's finite-n
+  approximation). Returns `KsTestResult`.
+- **`ad_test_ksamp(groups, midrank)` (#31)**, the k-sample Anderson-Darling test
+  (Scholz and Stephens, 1987) as `kSamples::ad.test(method = "asymptotic")`: version 2
+  (midranks) or 1, standardized statistic `T.AD`, and kSamples' asymptotic p-value
+  (critical-value table interpolated with smoothing splines, through a port of R's
+  `smooth.spline`; not capped to `[0.001, 0.25]` like scipy). Returns
+  `AndersonDarlingKResult`.
+- **`cvm_test_2sample(x, y, CvmMethod)` (#32)**, the two-sample Cramér-von Mises test
+  (Anderson's T with midranks): exact permutation p-value by dynamic programming over
+  the lattice paths (Xiao, Gordon and Yakovlev, 2006) in integer arithmetic, which
+  with ties is the exact distribution given the tie pattern (R full enumeration;
+  scipy's `cramervonmises_2samp` uses the no-ties distribution there), or the limiting
+  distribution as `goftest::pCvM`; `CvmMethod::Auto` is exact when
+  `max(n_x, n_y) <= 20`. Returns `CvmTestResult`.
+- **`epps_singleton_test(x, y, t)` (#33)**, the Epps-Singleton test based on the
+  empirical characteristic function, as `scipy.stats.epps_singleton_2samp`
+  (default `t = [0.4, 0.8]` scaled by the pooled semi-IQR, small-sample correction,
+  chi-squared p-value with `df` = rank of the covariance matrix). The pseudo-inverse
+  uses a Jacobi eigen-decomposition (new `utils::math::symmetric_eigen`, crate
+  private) with numpy's cutoff. Returns `EppsSingletonResult`.
+- **`wasserstein_distance_1d(x, y, p)` and `wasserstein_test_1d(reference, current,
+  n_permutations, seed)` (#34)**: the 1-D Wasserstein-`p` distance over the empirical
+  quantile functions (R `transport::wasserstein1d`), evidently's normed score
+  `W1 / max(population sd(reference), 0.001)`, and an optional seeded permutation
+  p-value (O(N) per permutation). Returns `WassersteinResult`.
+- **`drift::tvd_test(reference, current, n_permutations, seed)` (#39)**, the total
+  variation distance between category distributions with a seeded permutation
+  p-value `(1 + #) / (1 + B)`, for labels of any `Ord` type; `tvd_test_numeric` for
+  numeric codes. Returns `TvdResult`.
+- Every new result type converts to `TestResult`.
+
 ## [0.4.11] - 2026-10-22
 
 ### Added

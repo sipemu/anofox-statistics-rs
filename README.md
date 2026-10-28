@@ -87,6 +87,10 @@ console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
   - Wilcoxon signed-rank test (paired)
   - Kruskal-Wallis test (k-sample)
   - Brunner-Munzel test (robust rank-based test for stochastic equality)
+  - Two-sample Kolmogorov-Smirnov test, exact (also with ties) or asymptotic (R's `ks.test`)
+  - k-sample Anderson-Darling test (Scholz-Stephens, `kSamples::ad.test` p-value)
+  - Two-sample Cramér-von Mises test, exact (also with ties) or asymptotic
+  - Epps-Singleton test (empirical characteristic function; suits discrete data)
 
 - **Distributional Tests**
   - Shapiro-Wilk normality test (Royston AS R94)
@@ -119,6 +123,14 @@ console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
 - **Modern Distribution Tests**
   - Energy distance test (univariate and multivariate)
   - Maximum Mean Discrepancy (MMD) with multiple kernels (Gaussian, Linear, Polynomial, Laplacian)
+  - 1-D Wasserstein distance (any `p`), evidently's SD-normed score, permutation p-value
+
+- **Data Drift** (`drift`, the statistical tests of evidently)
+  - Shared binning: evidently's rule (pooled Sturges or per-value bins), reference
+    quantiles, categories
+  - Population Stability Index, Kullback-Leibler divergence, Jensen-Shannon distance,
+    Hellinger distance (numeric, categorical, or from proportions)
+  - Total variation distance with a permutation p-value
 
 - **Forecast Evaluation**
   - Diebold-Mariano test for comparing predictive accuracy
@@ -141,7 +153,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anofox-statistics = "0.4"
+anofox-statistics = "0.5"
 ```
 
 ## Examples
@@ -384,6 +396,32 @@ println!("p-value: {:.4}", result.p_value);
 
 // MMD with automatic bandwidth selection
 let result = mmd_test(&sample1, &sample2, Kernel::GaussianMedian, 1000, Some(42))?;
+```
+
+### Data Drift (evidently's statistical tests)
+
+```rust
+use anofox_statistics::drift::{hellinger, jensen_shannon_categorical, psi, tvd_test, Binning};
+use anofox_statistics::{
+    ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_test_1d,
+    Alternative, CvmMethod,
+};
+
+let reference: Vec<f64> = (0..50).map(|i| 2.0 * (0.37 * i as f64).sin()).collect();
+let current: Vec<f64> = (0..40).map(|i| 2.0 * (0.53 * i as f64).sin() + 0.5).collect();
+
+// Rank-based tests
+let ks = ks_test_2sample(&reference, &current, Alternative::TwoSided, None)?; // p = 0.0575
+let ad = ad_test_ksamp(&[&reference, &current], true)?;                     // T.AD = 3.61
+let cvm = cvm_test_2sample(&reference, &current, CvmMethod::Auto)?;          // p = 0.0469
+let es = epps_singleton_test(&reference, &current, None)?;                   // W = 19.25
+let w = wasserstein_test_1d(&reference, &current, 1000, Some(42))?;          // normed 0.439
+
+// Binned divergences (evidently's binning with Binning::Auto)
+let p = psi(&reference, &current, Binning::Auto)?;                // 0.571
+let h = hellinger(&reference, &current, Binning::Auto)?;          // 0.262
+let js = jensen_shannon_categorical(&["a", "b", "b"], &["b", "c"], None)?;
+let tvd = tvd_test(&["a", "a", "b"], &["b", "b", "c"], 1000, Some(1))?;
 ```
 
 ### Correlation Analysis
@@ -659,6 +697,13 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `tost_wilcoxon_*()` | `wilcox_TOST()` | TOSTER |
 | `tost_bootstrap()` | `boot_t_TOST()` | TOSTER |
 | `tost_yuen()` | `yuen.TOST()` | WRS2 |
+| `ks_test_2sample()` | `ks.test()` | stats |
+| `ad_test_ksamp()` | `ad.test(method = "asymptotic")` | kSamples |
+| `cvm_test_2sample()` | formula + `pCvM()`; full enumeration (exact, also with ties) | goftest |
+| `epps_singleton_test()` | R port of Epps & Singleton (1986), as in scipy | MASS |
+| `wasserstein_distance_1d()`, `wasserstein_test_1d()` | `wasserstein1d()`, `wass_test()` | transport, twosamples |
+| `drift::psi()`, `kl_divergence()`, `jensen_shannon()`, `hellinger()` | `distance()`, `KL()`, `JSD()` | philentropy |
+| `drift::tvd_test()` | permutation test | stats |
 
 All 303 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
 

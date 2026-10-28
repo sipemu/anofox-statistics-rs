@@ -32,10 +32,14 @@ use crate::correlation::{
     CorrelationMethod, CorrelationResult, DistanceCorResult, ICCResult, PartialCorResult,
 };
 use crate::distributional::{DAgostinoResult, JarqueBeraResult, ShapiroWilkResult};
+use crate::drift::{DivergenceResult, TvdResult};
 use crate::equivalence::{OneSidedTestResult, TostResult};
 use crate::forecast::{CWResult, DMResult, MCSResult, MSPEAdjustedResult, SPAResult};
-use crate::modern::{EnergyDistanceResult, MMDResult};
-use crate::nonparametric::{BrunnerMunzelResult, KruskalResult, MannWhitneyResult, WilcoxonResult};
+use crate::modern::{EnergyDistanceResult, MMDResult, WassersteinResult};
+use crate::nonparametric::{
+    AndersonDarlingKResult, BrunnerMunzelResult, CvmTestResult, EppsSingletonResult, KruskalResult,
+    KsTestResult, MannWhitneyResult, WilcoxonResult,
+};
 use crate::parametric::anova::AnovaTableRow;
 use crate::parametric::{
     Alternative, CorrectedResult, LeveneResult, OneWayAnovaResult, RmAnovaResult, SphericityResult,
@@ -207,7 +211,96 @@ from_owned!(
     MSPEAdjustedResult,
     MCSResult,
     PortmanteauResult,
+    DivergenceResult,
+    KsTestResult,
+    AndersonDarlingKResult,
+    CvmTestResult,
+    EppsSingletonResult,
+    WassersteinResult,
+    TvdResult,
 );
+
+/// Total variation distance: `statistic` is the TVD, `p_value` the
+/// permutation p-value, `n` the reference plus current sample size.
+impl From<&TvdResult> for TestResult {
+    fn from(r: &TvdResult) -> Self {
+        TestResult::new("Total variation distance (permutation test)")
+            .stat(r.statistic)
+            .p(r.p_value)
+            .with_n(r.n_reference + r.n_current)
+    }
+}
+
+/// 1-D Wasserstein: `statistic` is `W_1`, the effect size evidently's normed
+/// distance (`"distance_normed"`), `p_value` the permutation p-value when
+/// computed.
+impl From<&WassersteinResult> for TestResult {
+    fn from(r: &WassersteinResult) -> Self {
+        let mut t = TestResult::new("Wasserstein distance")
+            .stat(r.distance)
+            .with_effect_size("distance_normed", r.distance_normed);
+        t.p_value = r.p_value;
+        t
+    }
+}
+
+/// Epps-Singleton: `statistic` is W, `df1` the rank of the covariance
+/// matrix, `n` the pooled sample size.
+impl From<&EppsSingletonResult> for TestResult {
+    fn from(r: &EppsSingletonResult) -> Self {
+        TestResult::new("Epps-Singleton two-sample test")
+            .stat(r.statistic)
+            .df(r.df as f64)
+            .p(r.p_value)
+            .with_n(r.n_x + r.n_y)
+    }
+}
+
+/// Two-sample Cramér-von Mises: `statistic` is T, `n` the pooled sample
+/// size; `method` says whether the p-value is exact.
+impl From<&CvmTestResult> for TestResult {
+    fn from(r: &CvmTestResult) -> Self {
+        let kind = if r.exact { "Exact" } else { "Asymptotic" };
+        TestResult::new(format!("{} two-sample Cramer-von Mises test", kind))
+            .stat(r.statistic)
+            .p(r.p_value)
+            .with_n(r.n_x + r.n_y)
+    }
+}
+
+/// k-sample Anderson-Darling: `statistic` is the standardized `T`, `n` the
+/// total sample size.
+impl From<&AndersonDarlingKResult> for TestResult {
+    fn from(r: &AndersonDarlingKResult) -> Self {
+        TestResult::new("k-sample Anderson-Darling test")
+            .stat(r.statistic)
+            .p(r.p_value)
+            .with_n(r.n)
+    }
+}
+
+/// Two-sample Kolmogorov-Smirnov: `statistic` is D (D+ / D- one-sided), `n`
+/// the pooled sample size; `method` says whether the p-value is exact.
+impl From<&KsTestResult> for TestResult {
+    fn from(r: &KsTestResult) -> Self {
+        let kind = if r.exact { "Exact" } else { "Asymptotic" };
+        TestResult::new(format!("{} two-sample Kolmogorov-Smirnov test", kind))
+            .stat(r.statistic)
+            .p(r.p_value)
+            .with_alternative(r.alternative)
+            .with_n(r.n_x + r.n_y)
+    }
+}
+
+/// Binned divergence (PSI, KL, Jensen-Shannon, Hellinger): `statistic` is the
+/// divergence, `n` the reference plus current sample size; no p-value.
+impl From<&DivergenceResult> for TestResult {
+    fn from(r: &DivergenceResult) -> Self {
+        TestResult::new(r.method.clone())
+            .stat(r.statistic)
+            .with_n(r.n_reference + r.n_current)
+    }
+}
 
 /// Ljung-Box / Box-Pierce: `statistic` is Q, `df1 = lag - fitdf`.
 impl From<&PortmanteauResult> for TestResult {

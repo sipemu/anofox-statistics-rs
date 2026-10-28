@@ -209,6 +209,25 @@ Tests load the CSV files and compare Rust results against R references.
 | `energy_distance_test()` | Manual distance calculation | 1e-6 | Permutation p-value |
 | `mmd_test()` | Kernel-based computation | 1e-6 | Multiple kernel types |
 
+### 7. Data-Drift Tests
+
+Reference script `R/generate_drift_refs.R` writes `R/data/drift_reference.csv`
+(`case, key, values`), checked by `tests/tdd_drift.rs`. All cases share the
+deterministic data `x <- 2*sin(0.37*(0:49))`, `y <- 2*sin(0.53*(0:39)) + 0.5`,
+`xc <- (0:49) %% 4`, `yc <- ((0:39)*3) %% 5`, plus tied, larger and nearly identical
+samples.
+
+| Function | R Equivalent | Tolerance | Notes |
+|----------|-------------|-----------|-------|
+| `binned_proportions()` | `findInterval()` on equal-width Sturges / `quantile()` breaks | 1e-15 | numpy `histogram_bin_edges(..., "sturges")` rule |
+| `psi()`, `kl_divergence()`, `jensen_shannon()`, `hellinger()` | `philentropy::distance()`, `KL()`, `JSD()` | 1e-10 | natural log and log2 |
+| `ks_test_2sample()` | `ks.test()` | 1e-12 | exact / asymptotic, 3 alternatives, ties |
+| `ad_test_ksamp()` | `kSamples::ad.test()`, `ad.pval()` | 1e-10 (statistic), 1e-9 (p) | versions 1 and 2, k = 2, 3, 4 |
+| `cvm_test_2sample()` | formula + `goftest::pCvM()`; full enumeration (exact, also with ties) | 1e-12 | larger untied exact case cross-checked against scipy |
+| `epps_singleton_test()` | R port of the paper as implemented by scipy (`MASS::ginv`, tol 1e-15) | 1e-10 relative | small-sample correction, rank-deficient case |
+| `wasserstein_distance_1d()` | `transport::wasserstein1d()` | 1e-12 | p = 1, 2, 3; permutation p-value vs `twosamples::wass_test` within Monte Carlo error |
+| `tvd_test()` | permutation test, B = 100000 | Monte Carlo | statistic exact |
+
 ## Example: Complete Validation Flow
 
 ### Welch T-Test Validation
@@ -263,10 +282,17 @@ The following R packages are required to regenerate reference data:
 | `e1071` | [CRAN](https://cran.r-project.org/package=e1071) | Skewness, kurtosis (type 2) |
 | `moments` | [CRAN](https://cran.r-project.org/package=moments) | D'Agostino tests |
 | `forecast` | [CRAN](https://cran.r-project.org/package=forecast) | Diebold-Mariano test |
+| `philentropy` | [CRAN](https://cran.r-project.org/package=philentropy) | Drift divergences (PSI, KL, JS, Hellinger) |
+| `kSamples` | [CRAN](https://cran.r-project.org/package=kSamples) | k-sample Anderson-Darling test |
+| `goftest` | [CRAN](https://cran.r-project.org/package=goftest) | Cramér-von Mises limiting distribution |
+| `transport` | [CRAN](https://cran.r-project.org/package=transport) | 1-D Wasserstein distance |
+| `twosamples` | [CRAN](https://cran.r-project.org/package=twosamples) | Wasserstein permutation test |
+| `MASS` | Recommended | Pseudo-inverse (Epps-Singleton port) |
 
 Install all dependencies in R:
 ```r
-install.packages(c("WRS2", "car", "lawstat", "e1071", "moments", "forecast"))
+install.packages(c("WRS2", "car", "lawstat", "e1071", "moments", "forecast",
+                   "philentropy", "kSamples", "goftest", "transport", "twosamples"))
 ```
 
 ## Tolerance Rationale

@@ -272,6 +272,56 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     run("clark_west", &mut || {
         let _ = clark_west(x, y, 1);
     });
+    for method in [CvmMethod::Auto, CvmMethod::Exact, CvmMethod::Asymptotic] {
+        run("cvm_test_2sample", &mut || {
+            let _ = cvm_test_2sample(x, y, method);
+        });
+    }
+    run("tvd_test_numeric", &mut || {
+        let _ = tvd_test_numeric(x, y, 20, Some(1));
+    });
+    run("wasserstein", &mut || {
+        let _ = wasserstein_distance_1d(x, y, 2.0);
+        let _ = wasserstein_test_1d(x, y, 20, Some(1));
+    });
+    run("epps_singleton_test", &mut || {
+        let _ = epps_singleton_test(x, y, None);
+    });
+    for midrank in [true, false] {
+        run("ad_test_ksamp", &mut || {
+            let _ = ad_test_ksamp(&[x, y], midrank);
+            let _ = ad_test_ksamp(&[x, y, &z], midrank);
+        });
+    }
+    for alt in ALTS {
+        for exact in [None, Some(true), Some(false)] {
+            run("ks_test_2sample", &mut || {
+                let _ = ks_test_2sample(x, y, alt, exact);
+            });
+        }
+    }
+    for b in [
+        Binning::Auto,
+        Binning::Sturges,
+        Binning::Quantile(4),
+        Binning::Categorical,
+    ] {
+        run("drift divergences", &mut || {
+            let _ = psi(x, y, b);
+            let _ = kl_divergence(x, y, b, Some(2.0));
+            let _ = jensen_shannon(x, y, b, None);
+            let _ = hellinger(x, y, b);
+        });
+    }
+    run("drift from proportions", &mut || {
+        let _ = psi_from_proportions(x, y);
+        for p in SCALARS {
+            let _ = wasserstein_distance_1d(x, y, p);
+        }
+        let _ = kl_divergence_from_proportions(x, y, None);
+        let _ = jensen_shannon_from_proportions(x, y, Some(2.0));
+        let _ = hellinger_from_proportions(x, y);
+    });
     run("spa_test", &mut || {
         let _ = spa_test(x, &[y.to_vec(), z.clone()], 30, 2.0, Some(1));
         let _ = mspe_adjusted_spa(x, &[y.to_vec(), z.clone()], 30, 2.0, Some(1));
@@ -556,6 +606,28 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
                 mmd_test(&xv, &yv, Kernel::Linear, 30, Some(1)).err(),
             ),
             ("clark_west", clark_west(&x, &y, 1).err()),
+            ("psi", psi(&x, &y, Binning::Auto).err()),
+            (
+                "tvd_test_numeric",
+                tvd_test_numeric(&x, &y, 20, Some(1)).err(),
+            ),
+            (
+                "wasserstein_test_1d",
+                wasserstein_test_1d(&x, &y, 20, Some(1)).err(),
+            ),
+            (
+                "epps_singleton_test",
+                epps_singleton_test(&x, &y, None).err(),
+            ),
+            ("hellinger", hellinger(&x, &y, Binning::Auto).err()),
+            (
+                "jensen_shannon",
+                jensen_shannon(&x, &y, Binning::Auto, None).err(),
+            ),
+            (
+                "kl_divergence",
+                kl_divergence(&x, &y, Binning::Auto, None).err(),
+            ),
             (
                 "diebold_mariano",
                 diebold_mariano(
