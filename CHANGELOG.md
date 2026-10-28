@@ -52,6 +52,12 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   Gordon and Yakovlev (2006) recursion in integer arithmetic, or the limiting
   distribution as `goftest::pCvM`; `CvmMethod::Auto` is exact when
   `max(n_x, n_y) <= 20`. Returns `CvmTestResult`.
+- **`epps_singleton_test(x, y, t)` (#33)**, the Epps-Singleton test based on the
+  empirical characteristic function, as `scipy.stats.epps_singleton_2samp`
+  (default `t = [0.4, 0.8]` scaled by the pooled semi-IQR, small-sample correction,
+  chi-squared p-value with `df` = rank of the covariance matrix). The pseudo-inverse
+  uses a Jacobi eigen-decomposition (new `utils::math::symmetric_eigen`, crate
+  private) with numpy's cutoff. Returns `EppsSingletonResult`.
 
 ## [0.4.11] - 2026-10-22
 

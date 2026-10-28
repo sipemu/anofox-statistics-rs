@@ -277,6 +277,9 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
             let _ = cvm_test_2sample(x, y, method);
         });
     }
+    run("epps_singleton_test", &mut || {
+        let _ = epps_singleton_test(x, y, None);
+    });
     for midrank in [true, false] {
         run("ad_test_ksamp", &mut || {
             let _ = ad_test_ksamp(&[x, y], midrank);
@@ -594,6 +597,10 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
             ),
             ("clark_west", clark_west(&x, &y, 1).err()),
             ("psi", psi(&x, &y, Binning::Auto).err()),
+            (
+                "epps_singleton_test",
+                epps_singleton_test(&x, &y, None).err(),
+            ),
             ("hellinger", hellinger(&x, &y, Binning::Auto).err()),
             (
                 "jensen_shannon",

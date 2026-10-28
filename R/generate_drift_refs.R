@@ -271,6 +271,42 @@ for (nm in names(exact_cases)) {
 qgrid <- c(0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.461, 0.5, 0.75, 1, 1.5, 2, 3)
 add("pcvm", "in_q", qgrid); add("pcvm", "p", goftest::pCvM(qgrid))
 
+# ---------------------------------------------------------------------------
+# #33 Epps-Singleton: direct port of the paper as implemented by scipy
+# (no CRAN package implements it). The pseudo-inverse and the rank use
+# numpy's cutoff (singular values above 1e-15 * max): MASS::ginv's default
+# sqrt(eps) would drop a small but genuine eigenvalue in case t3, which
+# scipy keeps.
+# ---------------------------------------------------------------------------
+es2 <- function(x, y, t = c(0.4, 0.8)) {
+  nx <- length(x); ny <- length(y); n <- nx + ny
+  sigma <- IQR(c(x, y)) / 2; ts <- t / sigma            # IQR type 7 == numpy linear
+  g  <- function(v) cbind(cos(outer(v, ts)), sin(outer(v, ts)))
+  gx <- g(x); gy <- g(y)
+  S  <- (n / nx) * cov(gx) * (nx - 1) / nx + (n / ny) * cov(gy) * (ny - 1) / ny
+  d  <- colMeans(gx) - colMeans(gy)
+  W  <- n * drop(t(d) %*% MASS::ginv(S, tol = 1e-15) %*% d)
+  if (max(nx, ny) < 25) W <- W / (1 + n^-0.45 + 10.1 * (nx^-1.7 + ny^-1.7))
+  sv <- svd(S)$d; r <- sum(sv > 1e-15 * sv[1])          # scipy: rank of pinv(S)
+  c(statistic = W, p_value = pchisq(W, df = r, lower.tail = FALSE), df = r)
+}
+es_cases <- list(
+  main = list(x, y, c(0.4, 0.8)),
+  small = list(x[1:15], y[1:12], c(0.4, 0.8)),
+  discrete = list((0:59) %% 5, ((0:44) * 2) %% 7, c(0.4, 0.8)),
+  rankdef = list(rep(c(0, 1, 1), 10), rep(c(0, 0, 1), 9), c(0.4, 0.8)),
+  t3 = list(x, y, c(0.3, 0.6, 1.2)),
+  tie = list(xt, yt, c(0.4, 0.8)))
+for (nm in names(es_cases)) {
+  cs <- es_cases[[nm]]
+  key <- paste0("es_", nm)
+  add(key, "in_x", cs[[1]]); add(key, "in_y", cs[[2]]); add(key, "in_t", cs[[3]])
+  r <- es2(cs[[1]], cs[[2]], cs[[3]])
+  add(key, "statistic", r[1]); add(key, "p_value", r[2]); add(key, "df", r[3])
+}
+r <- es2(x, y)
+check("es W (issue)", r[1], 19.25205304182, 1e-10); check("es p (issue)", r[2], 0.00070119804217, 1e-13)
+
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)
 cat("wrote", nrow(out), "rows to R/data/drift_reference.csv\n")

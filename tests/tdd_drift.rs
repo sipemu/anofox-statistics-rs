@@ -8,7 +8,8 @@ use anofox_statistics::drift::{
     kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
 };
 use anofox_statistics::{
-    ad_test_ksamp, cvm_test_2sample, ks_test_2sample, Alternative, CvmMethod, TestResult,
+    ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, Alternative, CvmMethod,
+    TestResult,
 };
 use approx::assert_relative_eq;
 use std::collections::HashMap;
@@ -519,4 +520,48 @@ fn cvm_edge_cases() {
         let r = cvm_test_2sample(&[1.0], &[2.0], method).unwrap();
         assert_eq!(r.p_value, 1.0);
     }
+}
+
+// ---------------------------------------------------------------------------
+// #33 Epps-Singleton
+// ---------------------------------------------------------------------------
+
+#[test]
+fn epps_singleton_matches_r() {
+    for name in ["main", "small", "discrete", "rankdef", "t3", "tie"] {
+        let case = format!("es_{}", name);
+        let r = epps_singleton_test(
+            get(&case, "in_x"),
+            get(&case, "in_y"),
+            Some(get(&case, "in_t")),
+        )
+        .unwrap();
+        assert_relative_eq!(r.statistic, get1(&case, "statistic"), max_relative = 1e-10);
+        assert_relative_eq!(r.p_value, get1(&case, "p_value"), max_relative = 1e-9);
+        assert_eq!(r.df as f64, get1(&case, "df"), "{}", case);
+    }
+    // Issue values, default t.
+    let (x, y) = xy();
+    let r = epps_singleton_test(x, y, None).unwrap();
+    assert_relative_eq!(r.statistic, 19.25205304182, epsilon = 1e-9);
+    assert_relative_eq!(r.p_value, 0.00070119804217, epsilon = 1e-12);
+    let t = TestResult::from(&r);
+    assert_eq!(t.method, "Epps-Singleton two-sample test");
+    assert_eq!((t.df1, t.n), (Some(4.0), Some(90)));
+}
+
+#[test]
+fn epps_singleton_rejects_bad_input() {
+    let (x, y) = xy();
+    assert!(epps_singleton_test(&x[..4], y, None).is_err());
+    assert!(epps_singleton_test(x, &y[..4], None).is_err());
+    assert!(epps_singleton_test(x, y, Some(&[])).is_err());
+    assert!(epps_singleton_test(x, y, Some(&[0.4, -0.8])).is_err());
+    assert!(epps_singleton_test(x, y, Some(&[f64::NAN])).is_err());
+    let mut xn = x.to_vec();
+    xn[2] = f64::INFINITY;
+    assert!(epps_singleton_test(&xn, y, None).is_err());
+    // zero pooled IQR
+    let c = [1.0; 10];
+    assert!(epps_singleton_test(&c, &c, None).is_err());
 }

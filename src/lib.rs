@@ -46,10 +46,11 @@ pub use modern::{
     Kernel, MMDResult,
 };
 pub use nonparametric::{
-    ad_test_ksamp, brunner_munzel, cvm_test_2sample, kruskal_wallis, ks_test_2sample,
-    mann_whitney_u, matched_pairs_rank_biserial, rank, rank_biserial, rank_biserial_from_u,
-    wilcoxon_signed_rank, AndersonDarlingKResult, BrunnerMunzelResult, CvmMethod, CvmTestResult,
-    KruskalResult, KsTestResult, MannWhitneyResult, WilcoxonResult,
+    ad_test_ksamp, brunner_munzel, cvm_test_2sample, epps_singleton_test, kruskal_wallis,
+    ks_test_2sample, mann_whitney_u, matched_pairs_rank_biserial, rank, rank_biserial,
+    rank_biserial_from_u, wilcoxon_signed_rank, AndersonDarlingKResult, BrunnerMunzelResult,
+    CvmMethod, CvmTestResult, EppsSingletonResult, KruskalResult, KsTestResult, MannWhitneyResult,
+    WilcoxonResult,
 };
 pub use parametric::{
     brown_forsythe, cohens_d, cohens_d_one_sample, one_way_anova, repeated_measures_anova, t_test,

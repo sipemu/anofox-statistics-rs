@@ -203,3 +203,91 @@ pub fn kurtosis(data: &[f64]) -> Result<f64> {
 
     Ok(g2)
 }
+
+/// Eigen-decomposition of a small symmetric matrix by cyclic Jacobi
+/// rotations. Returns the eigenvalues and the eigenvectors as the columns of
+/// the second matrix (`vectors[i][j]` is component `i` of eigenvector `j`).
+/// Only the upper triangle of `a` is read.
+#[allow(clippy::needless_range_loop)]
+pub(crate) fn symmetric_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
+    let n = a.len();
+    let mut m: Vec<Vec<f64>> = (0..n)
+        .map(|i| {
+            (0..n)
+                .map(|j| if i <= j { a[i][j] } else { a[j][i] })
+                .collect()
+        })
+        .collect();
+    let mut v: Vec<Vec<f64>> = (0..n)
+        .map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
+        .collect();
+    for _sweep in 0..100 {
+        let off: f64 = (0..n)
+            .flat_map(|i| ((i + 1)..n).map(move |j| (i, j)))
+            .map(|(i, j)| m[i][j] * m[i][j])
+            .sum();
+        let diag: f64 = (0..n).map(|i| m[i][i] * m[i][i]).sum();
+        if off == 0.0 || off <= 1e-36 * diag {
+            break;
+        }
+        for p in 0..n {
+            for q in (p + 1)..n {
+                if m[p][q] == 0.0 {
+                    continue;
+                }
+                // Rotation that zeroes m[p][q] (Golub and Van Loan, 8.4.2).
+                let theta = (m[q][q] - m[p][p]) / (2.0 * m[p][q]);
+                let t = theta.signum() / (theta.abs() + (theta * theta + 1.0).sqrt());
+                let t = if theta == 0.0 { 1.0 } else { t };
+                let c = 1.0 / (t * t + 1.0).sqrt();
+                let s = t * c;
+                for k in 0..n {
+                    let (mkp, mkq) = (m[k][p], m[k][q]);
+                    m[k][p] = c * mkp - s * mkq;
+                    m[k][q] = s * mkp + c * mkq;
+                }
+                for k in 0..n {
+                    let (mpk, mqk) = (m[p][k], m[q][k]);
+                    m[p][k] = c * mpk - s * mqk;
+                    m[q][k] = s * mpk + c * mqk;
+                }
+                for k in 0..n {
+                    let (vkp, vkq) = (v[k][p], v[k][q]);
+                    v[k][p] = c * vkp - s * vkq;
+                    v[k][q] = s * vkp + c * vkq;
+                }
+            }
+        }
+    }
+    ((0..n).map(|i| m[i][i]).collect(), v)
+}
+
+#[cfg(test)]
+mod eigen_tests {
+    use super::symmetric_eigen;
+
+    #[test]
+    fn reconstructs_matrix() {
+        let a = vec![
+            vec![4.0, 1.0, -2.0, 0.5],
+            vec![1.0, 3.0, 0.0, 1.0],
+            vec![-2.0, 0.0, 5.0, -1.0],
+            vec![0.5, 1.0, -1.0, 2.0],
+        ];
+        let (w, v) = symmetric_eigen(&a);
+        for i in 0..4 {
+            for j in 0..4 {
+                let r: f64 = (0..4).map(|k| v[i][k] * w[k] * v[j][k]).sum();
+                assert!((r - a[i][j]).abs() < 1e-13);
+            }
+        }
+        // trace is preserved
+        assert!((w.iter().sum::<f64>() - 14.0).abs() < 1e-13);
+        // rank-one matrix: one non-zero eigenvalue
+        let b = vec![vec![1.0, 2.0], vec![2.0, 4.0]];
+        let (w, _) = symmetric_eigen(&b);
+        let mut w = w;
+        w.sort_by(|a, b| a.total_cmp(b));
+        assert!(w[0].abs() < 1e-15 && (w[1] - 5.0).abs() < 1e-14);
+    }
+}

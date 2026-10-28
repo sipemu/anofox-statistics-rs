@@ -37,8 +37,8 @@ use crate::equivalence::{OneSidedTestResult, TostResult};
 use crate::forecast::{CWResult, DMResult, MCSResult, MSPEAdjustedResult, SPAResult};
 use crate::modern::{EnergyDistanceResult, MMDResult};
 use crate::nonparametric::{
-    AndersonDarlingKResult, BrunnerMunzelResult, CvmTestResult, KruskalResult, KsTestResult,
-    MannWhitneyResult, WilcoxonResult,
+    AndersonDarlingKResult, BrunnerMunzelResult, CvmTestResult, EppsSingletonResult, KruskalResult,
+    KsTestResult, MannWhitneyResult, WilcoxonResult,
 };
 use crate::parametric::anova::AnovaTableRow;
 use crate::parametric::{
@@ -215,7 +215,20 @@ from_owned!(
     KsTestResult,
     AndersonDarlingKResult,
     CvmTestResult,
+    EppsSingletonResult,
 );
+
+/// Epps-Singleton: `statistic` is W, `df1` the rank of the covariance
+/// matrix, `n` the pooled sample size.
+impl From<&EppsSingletonResult> for TestResult {
+    fn from(r: &EppsSingletonResult) -> Self {
+        TestResult::new("Epps-Singleton two-sample test")
+            .stat(r.statistic)
+            .df(r.df as f64)
+            .p(r.p_value)
+            .with_n(r.n_x + r.n_y)
+    }
+}
 
 /// Two-sample Cramér-von Mises: `statistic` is T, `n` the pooled sample
 /// size; `method` says whether the p-value is exact.
