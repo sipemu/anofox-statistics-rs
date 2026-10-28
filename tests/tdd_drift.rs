@@ -302,12 +302,7 @@ fn jensen_shannon_bounds() {
 #[test]
 fn hellinger_matches_r() {
     for (name, r, c, binning) in binning_cases() {
-        // Auto means evidently's numeric Hellinger rule; the categorical
-        // case of the R script uses one bin per value.
-        let binning = match binning {
-            Binning::Auto => Binning::Categorical,
-            b => b,
-        };
+        // The numeric Auto case uses evidently's Hellinger bins, checked below.
         if name == "num" {
             continue;
         }
@@ -332,14 +327,27 @@ fn hellinger_matches_r() {
     let cat = hellinger_categorical(&labels(xc), &labels(yc)).unwrap();
     assert_relative_eq!(cat.statistic, 0.325194993744, epsilon = 1e-11);
     assert_eq!(TestResult::from(&cat).method, "Hellinger distance");
-    // With ties, evidently's rule (bins from distinct values) differs from
-    // the pooled-size Sturges rule.
+    // Integer codes under Auto: one bin per code, as psi / kl / js (#45).
+    let auto = hellinger(xc, yc, Binning::Auto).unwrap();
+    assert_relative_eq!(auto.statistic, 0.325194993744, epsilon = 1e-11);
+    assert_eq!(auto.n_bins, cat.n_bins);
+    // xt has 20 distinct values: Auto bins per value.
     let (xt, yt) = xyt();
+    let res = hellinger(xt, yt, Binning::Auto).unwrap();
+    assert_eq!(res.n_bins as f64, get1("hellinger_auto_tie", "n_bins"));
+    assert_relative_eq!(
+        res.statistic,
+        get1("hellinger_auto_tie", "statistic"),
+        epsilon = 1e-10
+    );
+    // With ties and > 20 distinct values, evidently's rule (bins from
+    // distinct values) differs from the pooled-size Sturges rule.
+    let (xtl, ytl) = (get("data", "in_xtl"), get("data", "in_ytl"));
     for (b, case) in [
-        (Binning::Auto, "hellinger_auto_tie"),
-        (Binning::Sturges, "hellinger_sturges_tie"),
+        (Binning::Auto, "hellinger_auto_tiel"),
+        (Binning::Sturges, "hellinger_sturges_tiel"),
     ] {
-        let res = hellinger(xt, yt, b).unwrap();
+        let res = hellinger(xtl, ytl, b).unwrap();
         assert_eq!(res.n_bins as f64, get1(case, "n_bins"));
         assert_relative_eq!(res.statistic, get1(case, "statistic"), epsilon = 1e-10);
     }

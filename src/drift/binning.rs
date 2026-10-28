@@ -14,7 +14,9 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Binning {
     /// evidently's rule: [`Binning::Sturges`] when the reference has more than
-    /// 20 distinct values, [`Binning::Categorical`] otherwise.
+    /// 20 distinct values, [`Binning::Categorical`] otherwise. Shared by all
+    /// divergences; [`hellinger`](super::hellinger()) counts its Sturges bins
+    /// from the distinct pooled values instead of the pooled sample size.
     Auto,
     /// Equal-width bins over the range of the pooled sample, with
     /// `ceil(log2(n) + 1)` bins for `n` pooled values (numpy
@@ -39,6 +41,11 @@ fn n_distinct_sorted(sorted: &[f64]) -> usize {
         return 0;
     }
     1 + sorted.windows(2).filter(|w| w[0] != w[1]).count()
+}
+
+/// Number of distinct values of `data`.
+pub(crate) fn n_distinct(data: &[f64]) -> usize {
+    n_distinct_sorted(&sorted(data))
 }
 
 fn sorted(data: &[f64]) -> Vec<f64> {
@@ -172,7 +179,7 @@ pub fn binned_proportions(
     validate(reference, current)?;
     match binning {
         Binning::Auto => {
-            let binning = if n_distinct_sorted(&sorted(reference)) > 20 {
+            let binning = if n_distinct(reference) > 20 {
                 Binning::Sturges
             } else {
                 Binning::Categorical

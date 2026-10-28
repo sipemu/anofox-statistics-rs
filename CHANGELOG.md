@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`drift::hellinger(.., Binning::Auto)` follows the shared `Auto` rule (#45).**
+  Data with at most 20 distinct reference values (e.g. integer category codes) now get
+  one bin per value, as `psi`, `kl_divergence` and `jensen_shannon` do; above 20,
+  `Auto` still uses evidently's numeric Hellinger bins (Sturges count from the
+  distinct pooled values). The real-valued reference (0.262287362723) is unchanged;
+  integer codes now give the categorical 0.325194993744.
+
 ## [0.5.0] - 2026-10-28
 
 ### Added

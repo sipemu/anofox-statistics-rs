@@ -152,12 +152,22 @@ b <- sturges_props(x, y, unique(c(x, y)))
 add("hellinger_auto_num", "statistic", hell(b))
 check("hellinger num (issue)", hell(b), 0.262287362723, 1e-11)
 check("hellinger cat (issue)", hell(binnings$cat), 0.325194993744, 1e-11)
-b <- sturges_props(xt, yt, unique(c(xt, yt)))
-add("hellinger_auto_tie", "n_bins", length(b$p))
-add("hellinger_auto_tie", "statistic", hell(b))
-b <- sturges_props(xt, yt)
-add("hellinger_sturges_tie", "n_bins", length(b$p))
-add("hellinger_sturges_tie", "statistic", hell(b))
+# Auto applies evidently's > 20 distinct reference values rule first (#45):
+# xt has 20 distinct values, so it is binned per value.
+stopifnot(length(unique(xt)) == 20)
+add("hellinger_auto_tie", "n_bins", length(binnings$tie_cat$p))
+add("hellinger_auto_tie", "statistic", hell(binnings$tie_cat))
+# Tied data with > 20 distinct reference values: Sturges bins whose count
+# comes from the distinct pooled values, unlike Binning::Sturges.
+xtl <- round(xl, 1); ytl <- round(yl, 1)
+stopifnot(length(unique(xtl)) > 20)
+add("data", "in_xtl", xtl); add("data", "in_ytl", ytl)
+b <- sturges_props(xtl, ytl, unique(c(xtl, ytl)))
+add("hellinger_auto_tiel", "n_bins", length(b$p))
+add("hellinger_auto_tiel", "statistic", hell(b))
+b <- sturges_props(xtl, ytl)
+add("hellinger_sturges_tiel", "n_bins", length(b$p))
+add("hellinger_sturges_tiel", "statistic", hell(b))
 
 # ---------------------------------------------------------------------------
 # #30 two-sample Kolmogorov-Smirnov: stats::ks.test, exact = NULL/TRUE/FALSE
