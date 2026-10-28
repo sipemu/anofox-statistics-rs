@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.12] - 2026-10-28
+## [0.5.0] - 2026-10-28
 
 ### Added
 
@@ -50,8 +50,10 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   `smooth.spline`; not capped to `[0.001, 0.25]` like scipy). Returns
   `AndersonDarlingKResult`.
 - **`cvm_test_2sample(x, y, CvmMethod)` (#32)**, the two-sample Cramér-von Mises test
-  as `scipy.stats.cramervonmises_2samp` (midranks): exact p-value from the Xiao,
-  Gordon and Yakovlev (2006) recursion in integer arithmetic, or the limiting
+  (Anderson's T with midranks): exact permutation p-value by dynamic programming over
+  the lattice paths (Xiao, Gordon and Yakovlev, 2006) in integer arithmetic, which
+  with ties is the exact distribution given the tie pattern (R full enumeration;
+  scipy's `cramervonmises_2samp` uses the no-ties distribution there), or the limiting
   distribution as `goftest::pCvM`; `CvmMethod::Auto` is exact when
   `max(n_x, n_y) <= 20`. Returns `CvmTestResult`.
 - **`epps_singleton_test(x, y, t)` (#33)**, the Epps-Singleton test based on the

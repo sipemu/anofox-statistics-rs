@@ -223,8 +223,8 @@ samples.
 | `psi()`, `kl_divergence()`, `jensen_shannon()`, `hellinger()` | `philentropy::distance()`, `KL()`, `JSD()` | 1e-10 | natural log and log2 |
 | `ks_test_2sample()` | `ks.test()` | 1e-12 | exact / asymptotic, 3 alternatives, ties |
 | `ad_test_ksamp()` | `kSamples::ad.test()`, `ad.pval()` | 1e-10 (statistic), 1e-9 (p) | versions 1 and 2, k = 2, 3, 4 |
-| `cvm_test_2sample()` | formula + `goftest::pCvM()`; enumeration | 1e-12 | exact path also checked against scipy |
-| `epps_singleton_test()` | port of scipy (`MASS::ginv`, tol 1e-15) | 1e-10 relative | small-sample correction, rank-deficient case |
+| `cvm_test_2sample()` | formula + `goftest::pCvM()`; full enumeration (exact, also with ties) | 1e-12 | larger untied exact case cross-checked against scipy |
+| `epps_singleton_test()` | R port of the paper as implemented by scipy (`MASS::ginv`, tol 1e-15) | 1e-10 relative | small-sample correction, rank-deficient case |
 | `wasserstein_distance_1d()` | `transport::wasserstein1d()` | 1e-12 | p = 1, 2, 3; permutation p-value vs `twosamples::wass_test` within Monte Carlo error |
 | `tvd_test()` | permutation test, B = 100000 | Monte Carlo | statistic exact |
 

@@ -233,7 +233,7 @@ for (spar in c(0.25, 0.4)) {
 # ---------------------------------------------------------------------------
 # #32 two-sample Cramer-von Mises (Anderson 1962), midranks. Asymptotic
 # p-value with the limiting CDF goftest::pCvM (as scipy); exact p-value by
-# full enumeration of the splits for small samples.
+# full enumeration of the splits for small samples, also with ties.
 # ---------------------------------------------------------------------------
 cvm_u <- function(rk, m, n) {
   rx <- sort(rk[1:m]); ry <- sort(rk[(m + 1):(m + n)])
@@ -264,6 +264,14 @@ exact_cases <- list(e54 = c(5, 4), e76 = c(7, 6), e88 = c(8, 8), e107 = c(10, 7)
 for (nm in names(exact_cases)) {
   m <- exact_cases[[nm]][1]; n <- exact_cases[[nm]][2]
   a <- sin(1.3 * (0:(m - 1))) ; b <- sin(0.9 * (0:(n - 1))) + 0.4
+  add(paste0("cvm_", nm), "in_x", a); add(paste0("cvm_", nm), "in_y", b)
+  r <- cvm_exact(a, b)
+  add(paste0("cvm_", nm), "statistic", r[1]); add(paste0("cvm_", nm), "p_value", r[2])
+}
+# exact with ties: full enumeration with midranks (scipy differs here)
+tie_exact <- list(t108 = list(xt[1:10], yt[1:8]), tcat = list(xc[1:9], yc[1:8]))
+for (nm in names(tie_exact)) {
+  a <- tie_exact[[nm]][[1]]; b <- tie_exact[[nm]][[2]]
   add(paste0("cvm_", nm), "in_x", a); add(paste0("cvm_", nm), "in_y", b)
   r <- cvm_exact(a, b)
   add(paste0("cvm_", nm), "statistic", r[1]); add(paste0("cvm_", nm), "p_value", r[2])

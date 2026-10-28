@@ -31,7 +31,7 @@ pub struct CvmTestResult {
 }
 
 /// Two-sample Cramér-von Mises test of whether `x` and `y` come from the
-/// same continuous distribution, as `scipy.stats.cramervonmises_2samp`.
+/// same distribution (the statistic of `scipy.stats.cramervonmises_2samp`).
 ///
 /// With the midranks `r_i` of the sorted `x` and `s_j` of the sorted `y` in
 /// the pooled sample (`m = n_x`, `n = n_y`, `N = m + n`),
@@ -39,11 +39,14 @@ pub struct CvmTestResult {
 /// `T = U / (m n N) - (4 m n - 1) / (6 N)` (Anderson, 1962).
 ///
 /// P-value:
-/// - Exact: the distribution of `U` over all `choose(N, m)` splits, by the
-///   recursion of Xiao, Gordon and Yakovlev (2006), in exact integer
-///   arithmetic. It assumes no ties; with ties the midrank `U` is compared
-///   with the no-ties distribution, as in scipy. Cost grows quickly with the
-///   sample sizes, so `Exact` is meant for small samples.
+/// - Exact: the permutation distribution of `U` over all `choose(N, m)`
+///   splits of the pooled sample, by dynamic programming over the lattice
+///   paths (Xiao, Gordon and Yakovlev, 2006) in exact integer arithmetic.
+///   With ties it is the exact distribution of the midrank `U` given the tie
+///   pattern, i.e. full enumeration of the splits in R; scipy instead
+///   compares the midrank `U` with the no-ties distribution, so its exact
+///   p-value differs with ties. Cost grows quickly with the sample sizes, so
+///   `Exact` is meant for small samples.
 /// - Asymptotic: `T_n = 1/6 + (T - E[T]) / sqrt(45 Var[T])` against the
 ///   limiting Cramér-von Mises distribution (Csörgő and Faraway, 1996),
 ///   computed as `goftest::pCvM`.
@@ -54,7 +57,8 @@ pub struct CvmTestResult {
 /// `±Inf` ranks as an extreme value; `NaN` or an empty sample is an error.
 ///
 /// R equivalent: `CvM2SL2Test` has been archived on CRAN; the asymptotic
-/// p-value is `1 - goftest::pCvM(Tn)` with `Tn` as above.
+/// p-value is `1 - goftest::pCvM(Tn)` with `Tn` as above, the exact one the
+/// share of splits `combn(N, m)` with `U >= U_obs`.
 ///
 /// # Example
 /// ```
@@ -101,7 +105,16 @@ pub fn cvm_test_2sample(x: &[f64], y: &[f64], method: CvmMethod) -> Result<CvmTe
     let statistic = u / (k * big_n) - (4.0 * k - 1.0) / (6.0 * big_n);
 
     let p_value = if exact {
-        cvm_exact_pvalue(u4, m, n)
+        let mut pooled = [x, y].concat();
+        pooled.sort_by(|a, b| a.total_cmp(b));
+        let mut ties = Vec::new();
+        let mut k = 0;
+        while k < pooled.len() {
+            let l = pooled[k..].iter().take_while(|&&v| v == pooled[k]).count();
+            ties.push(l);
+            k += l;
+        }
+        cvm_exact_pvalue(u4, m, n, &ties)
     } else {
         let et = (1.0 + 1.0 / big_n) / 6.0;
         let vt = (big_n + 1.0) * (4.0 * k * big_n - 3.0 * (mf * mf + nf * nf) - 2.0 * k)
@@ -124,77 +137,86 @@ pub fn cvm_test_2sample(x: &[f64], y: &[f64], method: CvmMethod) -> Result<CvmTe
     })
 }
 
-fn gcd(a: u64, b: u64) -> u64 {
-    if b == 0 {
-        a
-    } else {
-        gcd(b, a % b)
-    }
-}
-
-/// Add the counts of two frequency tables sorted by value.
-fn merge(a: &[(u64, f64)], b: &[(u64, f64)]) -> Vec<(u64, f64)> {
+/// Add the counts of `b`, shifted by `shift` and multiplied by `weight`, to
+/// the frequency table `a`; both are sorted by value.
+fn merge_into(a: &[(u64, f64)], b: &[(u64, f64)], shift: u64, weight: f64) -> Vec<(u64, f64)> {
     let mut out = Vec::with_capacity(a.len() + b.len());
     let (mut i, mut j) = (0, 0);
-    while i < a.len() && j < b.len() {
-        match a[i].0.cmp(&b[j].0) {
-            std::cmp::Ordering::Less => {
-                out.push(a[i]);
-                i += 1;
-            }
-            std::cmp::Ordering::Greater => {
-                out.push(b[j]);
-                j += 1;
-            }
-            std::cmp::Ordering::Equal => {
-                out.push((a[i].0, a[i].1 + b[j].1));
+    while i < a.len() || j < b.len() {
+        let bj = b.get(j).map(|e| (e.0 + shift, e.1 * weight));
+        match (a.get(i), bj) {
+            (Some(&ai), Some(bj)) if ai.0 == bj.0 => {
+                out.push((ai.0, ai.1 + bj.1));
                 i += 1;
                 j += 1;
             }
+            (Some(&ai), Some(bj)) if ai.0 < bj.0 => {
+                out.push(ai);
+                i += 1;
+            }
+            (Some(&ai), None) => {
+                out.push(ai);
+                i += 1;
+            }
+            (_, Some(bj)) => {
+                out.push(bj);
+                j += 1;
+            }
+            (None, None) => unreachable!(),
         }
     }
-    out.extend_from_slice(&a[i..]);
-    out.extend_from_slice(&b[j..]);
     out
 }
 
-/// Exact `P(U >= U_obs)` from `u4 = 4 U_obs` (Xiao, Gordon and Yakovlev,
-/// 2006, as scipy's `_pval_cvm_2samp_exact`).
+/// Exact `P(U >= U_obs)` from `u4 = 4 U_obs`: the permutation distribution
+/// of the midrank statistic `U` over all `choose(N, m)` splits of the pooled
+/// sample, given its tie groups `ties` (sizes, in ascending order of value).
 ///
-/// With `L = lcm(m, n)`, `a = L / m`, `b = L / n`, the statistic of a split is
-/// an affine function of `zeta = sum over the lattice path of (a v - b u)^2`.
-/// The frequency table of `zeta` over the paths to `(u, v)` is built by
-/// dynamic programming over the lattice.
-fn cvm_exact_pvalue(u4: i128, m: usize, n: usize) -> f64 {
-    let (mu, nu) = (m as u64, n as u64);
-    let lcm = mu / gcd(mu, nu) * nu;
-    let (a, b) = ((lcm / mu) as i128, (lcm / nu) as i128);
-    let (mi, ni, li) = (m as i128, n as i128, lcm as i128);
-    let mn = mi * ni;
-    // zeta_obs = floor(L^2 N (6 U - mn (4 mn - 1)) / (6 m^2 n^2)), U = u4 / 4
-    let num = li * li * (mi + ni) * (6 * u4 - 4 * mn * (4 * mn - 1));
-    let zeta = num.div_euclid(24 * mn * mn);
-
-    // gs[v]: frequency table of zeta over the paths to (u, v).
-    let mut gs: Vec<Vec<(u64, f64)>> = vec![Vec::new(); m + 1];
-    gs[0] = vec![(0, 1.0)];
-    for u in 0..=n {
-        let mut tmp: Vec<(u64, f64)> = Vec::new();
-        let mut next = Vec::with_capacity(m + 1);
-        for (v, g) in gs.iter().enumerate() {
-            tmp = merge(&tmp, g);
-            let res = (a * v as i128 - b * u as i128).pow(2) as u64;
-            for e in tmp.iter_mut() {
-                e.0 += res;
+/// Dynamic programming over the tie groups: a split is a lattice path, and a
+/// tie group of size `l` with doubled midrank `R` that sends `a` values to
+/// `x` (`choose(l, a)` ways), after `i` values of `x` and `j` of `y`, adds
+/// `m sum_{t=1}^{a} (R - 2(i + t))^2 + n sum_{t=1}^{l-a} (R - 2(j + t))^2`
+/// to `4 U`. Without ties this is the distribution of Xiao, Gordon and
+/// Yakovlev (2006); with ties it equals full enumeration of the splits.
+fn cvm_exact_pvalue(u4: i128, m: usize, n: usize, ties: &[usize]) -> f64 {
+    let (mi, ni) = (m as i128, n as i128);
+    // tables[i]: frequency table of 4 U over the paths with i values of x
+    let mut tables: Vec<Vec<(u64, f64)>> = vec![Vec::new(); m + 1];
+    tables[0] = vec![(0, 1.0)];
+    let mut done = 0usize;
+    for &l in ties {
+        let r2 = (2 * done + l + 1) as i128;
+        let mut next: Vec<Vec<(u64, f64)>> = vec![Vec::new(); m + 1];
+        for (i, table) in tables.iter().enumerate() {
+            if table.is_empty() {
+                continue;
             }
-            next.push(tmp.clone());
+            let j = done - i;
+            let mut binom = 1.0f64;
+            for a in 0..=l {
+                if a > 0 {
+                    binom = binom * (l - a + 1) as f64 / a as f64;
+                }
+                if i + a > m || j + (l - a) > n {
+                    continue;
+                }
+                let sx: i128 = (1..=a as i128)
+                    .map(|t| (r2 - 2 * (i as i128 + t)).pow(2))
+                    .sum();
+                let sy: i128 = (1..=(l - a) as i128)
+                    .map(|t| (r2 - 2 * (j as i128 + t)).pow(2))
+                    .sum();
+                let add = (mi * sx + ni * sy) as u64;
+                next[i + a] = merge_into(&next[i + a], table, add, binom);
+            }
         }
-        gs = next;
+        tables = next;
+        done += l;
     }
-    let total: f64 = gs[m].iter().map(|e| e.1).sum();
-    let tail: f64 = gs[m]
+    let total: f64 = tables[m].iter().map(|e| e.1).sum();
+    let tail: f64 = tables[m]
         .iter()
-        .filter(|e| e.0 as i128 >= zeta)
+        .filter(|e| e.0 as i128 >= u4)
         .map(|e| e.1)
         .sum();
     tail / total
@@ -300,6 +322,6 @@ mod tests {
     #[test]
     fn exact_tiny() {
         // m = n = 1: U = 1/2 for both splits; T = 0, p = 1.
-        assert_eq!(cvm_exact_pvalue(2, 1, 1), 1.0);
+        assert_eq!(cvm_exact_pvalue(2, 1, 1, &[1, 1]), 1.0);
     }
 }

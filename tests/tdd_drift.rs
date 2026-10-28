@@ -493,7 +493,7 @@ fn cvm_asymptotic_matches_r() {
 
 #[test]
 fn cvm_exact_matches_enumeration() {
-    for name in ["e54", "e76", "e88", "e107", "e39"] {
+    for name in ["e54", "e76", "e88", "e107", "e39", "t108", "tcat"] {
         let case = format!("cvm_{}", name);
         let (x, y) = (get(&case, "in_x"), get(&case, "in_y"));
         let r = cvm_test_2sample(x, y, CvmMethod::Auto).unwrap();
@@ -501,16 +501,11 @@ fn cvm_exact_matches_enumeration() {
         assert_relative_eq!(r.statistic, get1(&case, "statistic"), epsilon = 1e-12);
         assert_relative_eq!(r.p_value, get1(&case, "p_value"), epsilon = 1e-12);
     }
-    // scipy.stats.cramervonmises_2samp(method="exact") 1.17, for larger
-    // samples and for ties (midrank U against the no-ties distribution).
+    // Cross-check for samples too large to enumerate in R:
+    // scipy.stats.cramervonmises_2samp(method = "exact") 1.17 (no ties).
     let (x, y) = xy();
     let r = cvm_test_2sample(x, y, CvmMethod::Exact).unwrap();
     assert_relative_eq!(r.p_value, 0.04728222743467917, epsilon = 1e-12);
-    let (xt, yt) = xyt();
-    let r = cvm_test_2sample(&xt[..12], &yt[..10], CvmMethod::Auto).unwrap();
-    assert!(r.exact);
-    assert_relative_eq!(r.statistic, 0.07102272727272707, epsilon = 1e-12);
-    assert_relative_eq!(r.p_value, 0.792741314413141, epsilon = 1e-12);
 }
 
 #[test]

@@ -89,7 +89,7 @@ console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
   - Brunner-Munzel test (robust rank-based test for stochastic equality)
   - Two-sample Kolmogorov-Smirnov test, exact (also with ties) or asymptotic (R's `ks.test`)
   - k-sample Anderson-Darling test (Scholz-Stephens, `kSamples::ad.test` p-value)
-  - Two-sample Cramér-von Mises test, exact or asymptotic (scipy's `cramervonmises_2samp`)
+  - Two-sample Cramér-von Mises test, exact (also with ties) or asymptotic
   - Epps-Singleton test (empirical characteristic function; suits discrete data)
 
 - **Distributional Tests**
@@ -153,7 +153,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anofox-statistics = "0.4"
+anofox-statistics = "0.5"
 ```
 
 ## Examples
@@ -699,8 +699,8 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `tost_yuen()` | `yuen.TOST()` | WRS2 |
 | `ks_test_2sample()` | `ks.test()` | stats |
 | `ad_test_ksamp()` | `ad.test(method = "asymptotic")` | kSamples |
-| `cvm_test_2sample()` | formula + `pCvM()`; full enumeration (exact) | goftest |
-| `epps_singleton_test()` | port of scipy's `epps_singleton_2samp` | MASS |
+| `cvm_test_2sample()` | formula + `pCvM()`; full enumeration (exact, also with ties) | goftest |
+| `epps_singleton_test()` | R port of Epps & Singleton (1986), as in scipy | MASS |
 | `wasserstein_distance_1d()`, `wasserstein_test_1d()` | `wasserstein1d()`, `wass_test()` | transport, twosamples |
 | `drift::psi()`, `kl_divergence()`, `jensen_shannon()`, `hellinger()` | `distance()`, `KL()`, `JSD()` | philentropy |
 | `drift::tvd_test()` | permutation test | stats |
