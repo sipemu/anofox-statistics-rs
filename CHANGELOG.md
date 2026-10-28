@@ -36,6 +36,11 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   `philentropy` Hellinger / 2), with `hellinger_categorical` and
   `hellinger_from_proportions`. `Binning::Auto` copies evidently's numeric rule:
   Sturges bins whose count comes from the number of distinct pooled values.
+- **`ks_test_2sample(x, y, alternative, exact)` (#30)**, the two-sample
+  Kolmogorov-Smirnov test as R `ks.test`: exact p-value from R's `psmirnov` recursion
+  (also with ties, as R >= 4.2) when `n_x * n_y < 10000`, otherwise the limiting
+  Kolmogorov distribution (R's `exact = FALSE` value, not scipy's finite-n
+  approximation). Returns `KsTestResult`.
 
 ## [0.4.11] - 2026-10-22
 

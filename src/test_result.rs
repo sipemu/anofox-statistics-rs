@@ -36,7 +36,9 @@ use crate::drift::DivergenceResult;
 use crate::equivalence::{OneSidedTestResult, TostResult};
 use crate::forecast::{CWResult, DMResult, MCSResult, MSPEAdjustedResult, SPAResult};
 use crate::modern::{EnergyDistanceResult, MMDResult};
-use crate::nonparametric::{BrunnerMunzelResult, KruskalResult, MannWhitneyResult, WilcoxonResult};
+use crate::nonparametric::{
+    BrunnerMunzelResult, KruskalResult, KsTestResult, MannWhitneyResult, WilcoxonResult,
+};
 use crate::parametric::anova::AnovaTableRow;
 use crate::parametric::{
     Alternative, CorrectedResult, LeveneResult, OneWayAnovaResult, RmAnovaResult, SphericityResult,
@@ -209,7 +211,21 @@ from_owned!(
     MCSResult,
     PortmanteauResult,
     DivergenceResult,
+    KsTestResult,
 );
+
+/// Two-sample Kolmogorov-Smirnov: `statistic` is D (D+ / D- one-sided), `n`
+/// the pooled sample size; `method` says whether the p-value is exact.
+impl From<&KsTestResult> for TestResult {
+    fn from(r: &KsTestResult) -> Self {
+        let kind = if r.exact { "Exact" } else { "Asymptotic" };
+        TestResult::new(format!("{} two-sample Kolmogorov-Smirnov test", kind))
+            .stat(r.statistic)
+            .p(r.p_value)
+            .with_alternative(r.alternative)
+            .with_n(r.n_x + r.n_y)
+    }
+}
 
 /// Binned divergence (PSI, KL, Jensen-Shannon, Hellinger): `statistic` is the
 /// divergence, `n` the reference plus current sample size; no p-value.

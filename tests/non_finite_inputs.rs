@@ -272,6 +272,13 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     run("clark_west", &mut || {
         let _ = clark_west(x, y, 1);
     });
+    for alt in ALTS {
+        for exact in [None, Some(true), Some(false)] {
+            run("ks_test_2sample", &mut || {
+                let _ = ks_test_2sample(x, y, alt, exact);
+            });
+        }
+    }
     for b in [
         Binning::Auto,
         Binning::Sturges,

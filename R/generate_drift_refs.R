@@ -33,6 +33,15 @@ add("data", "in_xc", xc); add("data", "in_yc", yc)
 xt <- round(2 * sin(0.37 * (0:59)), 1); yt <- round(2 * sin(0.53 * (0:34)) + 0.4, 1)
 add("data", "in_xt", xt); add("data", "in_yt", yt)
 
+# Larger samples (m * n >= 10000: R's default is the asymptotic p-value) and
+# two nearly identical samples (small D, high p-value).
+xl <- 2 * sin(0.11 * (0:149)); yl <- 2 * sin(0.13 * (0:79)) + 0.3
+xs <- sin(0.7 * (0:29));       ys <- sin(0.7 * (0:24) + 0.2)
+add("data", "in_xl", xl); add("data", "in_yl", yl)
+add("data", "in_xs", xs); add("data", "in_ys", ys)
+num_cases <- list(main = list(x, y), tie = list(xt, yt), large = list(xl, yl),
+                  close = list(xs, ys))
+
 # ---------------------------------------------------------------------------
 # Binning (evidently get_binned_data) and the zero fill
 # ---------------------------------------------------------------------------
@@ -148,6 +157,25 @@ add("hellinger_auto_tie", "statistic", hell(b))
 b <- sturges_props(xt, yt)
 add("hellinger_sturges_tie", "n_bins", length(b$p))
 add("hellinger_sturges_tie", "statistic", hell(b))
+
+# ---------------------------------------------------------------------------
+# #30 two-sample Kolmogorov-Smirnov: stats::ks.test, exact = NULL/TRUE/FALSE
+# ---------------------------------------------------------------------------
+for (nm in names(num_cases)) {
+  a <- num_cases[[nm]][[1]]; b <- num_cases[[nm]][[2]]
+  for (alt in c("two.sided", "less", "greater")) {
+    for (ex in list(NULL, TRUE, FALSE)) {
+      r <- suppressWarnings(ks.test(a, b, alternative = alt, exact = ex))
+      key <- paste0("ks_", nm, "_", alt, "_",
+                    if (is.null(ex)) "auto" else if (ex) "exact" else "asymp")
+      add(key, "statistic", unname(r$statistic))
+      add(key, "p_value", r$p.value)
+      add(key, "exact", as.numeric(r$exact))
+    }
+  }
+}
+r <- ks.test(x, y); check("ks exact (issue)", r$p.value, 0.0574636491581, 1e-12)
+r <- ks.test(x, y, exact = FALSE); check("ks asymp (issue)", r$p.value, 0.0693904727347, 1e-12)
 
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)

@@ -7,7 +7,7 @@ use anofox_statistics::drift::{
     jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
     kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
 };
-use anofox_statistics::TestResult;
+use anofox_statistics::{ks_test_2sample, Alternative, TestResult};
 use approx::assert_relative_eq;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -60,6 +60,24 @@ fn xyc() -> (&'static [f64], &'static [f64]) {
 fn xyt() -> (&'static [f64], &'static [f64]) {
     (get("data", "in_xt"), get("data", "in_yt"))
 }
+
+/// The numeric two-sample cases of the R script: name -> (x, y).
+fn num_cases() -> Vec<(&'static str, &'static [f64], &'static [f64])> {
+    let (x, y) = xy();
+    let (xt, yt) = xyt();
+    vec![
+        ("main", x, y),
+        ("tie", xt, yt),
+        ("large", get("data", "in_xl"), get("data", "in_yl")),
+        ("close", get("data", "in_xs"), get("data", "in_ys")),
+    ]
+}
+
+const ALTS: [(Alternative, &str); 3] = [
+    (Alternative::TwoSided, "two.sided"),
+    (Alternative::Less, "less"),
+    (Alternative::Greater, "greater"),
+];
 
 /// The categorical sample as string labels.
 fn labels(v: &[f64]) -> Vec<String> {
@@ -335,4 +353,57 @@ fn hellinger_bounds() {
     );
     assert!(hellinger_from_proportions(&[0.3, 0.7], &[1.0]).is_err());
     assert!(hellinger(&[1.0], &[f64::NAN], Binning::Auto).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// #30 two-sample Kolmogorov-Smirnov
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ks_matches_r() {
+    for (name, x, y) in num_cases() {
+        for (alt, alt_name) in ALTS {
+            for (exact, ex_name) in [
+                (None, "auto"),
+                (Some(true), "exact"),
+                (Some(false), "asymp"),
+            ] {
+                let case = format!("ks_{}_{}_{}", name, alt_name, ex_name);
+                let r = ks_test_2sample(x, y, alt, exact).unwrap();
+                assert_relative_eq!(r.statistic, get1(&case, "statistic"), epsilon = 1e-12);
+                assert_relative_eq!(r.p_value, get1(&case, "p_value"), epsilon = 1e-12);
+                assert_eq!(r.exact, get1(&case, "exact") == 1.0, "{}", case);
+                assert_eq!((r.n_x, r.n_y), (x.len(), y.len()));
+            }
+        }
+    }
+    // Issue values.
+    let (x, y) = xy();
+    let r = ks_test_2sample(x, y, Alternative::TwoSided, None).unwrap();
+    assert_relative_eq!(r.statistic, 0.275, epsilon = 1e-15);
+    assert_relative_eq!(r.p_value, 0.0574636491581, epsilon = 1e-9);
+    let r = ks_test_2sample(x, y, Alternative::TwoSided, Some(false)).unwrap();
+    assert_relative_eq!(r.p_value, 0.0693904727347, epsilon = 1e-9);
+    let t = TestResult::from(&r);
+    assert_eq!(t.method, "Asymptotic two-sample Kolmogorov-Smirnov test");
+    assert_eq!(t.alternative_name(), Some("two.sided"));
+    assert_eq!(t.n, Some(90));
+}
+
+#[test]
+fn ks_edge_cases() {
+    assert!(ks_test_2sample(&[], &[1.0], Alternative::TwoSided, None).is_err());
+    assert!(ks_test_2sample(&[1.0, f64::NAN], &[1.0], Alternative::TwoSided, None).is_err());
+    // Identical samples: D = 0, p = 1.
+    let r = ks_test_2sample(&[1.0, 2.0], &[2.0, 1.0], Alternative::TwoSided, None).unwrap();
+    assert_eq!((r.statistic, r.p_value), (0.0, 1.0));
+    // +-Inf ranks as an extreme value.
+    let r = ks_test_2sample(
+        &[f64::NEG_INFINITY, 0.0],
+        &[1.0, f64::INFINITY],
+        Alternative::Greater,
+        None,
+    )
+    .unwrap();
+    assert_eq!(r.statistic, 1.0);
 }
