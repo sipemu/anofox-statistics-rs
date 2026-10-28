@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.12] - 2026-10-28
+
 ### Added
 
 evidently's data-drift tests (#40), upstream of DataZooDE/anofox-statistics#255.

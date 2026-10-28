@@ -38,7 +38,7 @@ pub fn kl_divergence_from_proportions(p: &[f64], q: &[f64], base: Option<f64>) -
 /// The proportions are zero-filled ([`zero_fill`]) and renormalized before
 /// `sum_i p_i log(p_i / q_i)` is taken, in base `base` (default `e`). With
 /// [`Binning::Auto`] this is evidently's `"kl_div"` test, which flags drift
-/// at `KL >= 0.1`. KL is not symmetric; [`psi`](super::psi) is its
+/// at `KL >= 0.1`. KL is not symmetric; [`psi`](super::psi()) is its
 /// symmetrized form (without the renormalization).
 ///
 /// R equivalent (with `p`, `q` the bin proportions and `fill` the zero fill):
