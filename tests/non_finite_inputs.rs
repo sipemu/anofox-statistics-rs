@@ -282,12 +282,14 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
             let _ = psi(x, y, b);
             let _ = kl_divergence(x, y, b, Some(2.0));
             let _ = jensen_shannon(x, y, b, None);
+            let _ = hellinger(x, y, b);
         });
     }
     run("drift from proportions", &mut || {
         let _ = psi_from_proportions(x, y);
         let _ = kl_divergence_from_proportions(x, y, None);
         let _ = jensen_shannon_from_proportions(x, y, Some(2.0));
+        let _ = hellinger_from_proportions(x, y);
     });
     run("spa_test", &mut || {
         let _ = spa_test(x, &[y.to_vec(), z.clone()], 30, 2.0, Some(1));
@@ -574,6 +576,7 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
             ),
             ("clark_west", clark_west(&x, &y, 1).err()),
             ("psi", psi(&x, &y, Binning::Auto).err()),
+            ("hellinger", hellinger(&x, &y, Binning::Auto).err()),
             (
                 "jensen_shannon",
                 jensen_shannon(&x, &y, Binning::Auto, None).err(),

@@ -32,6 +32,10 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   divergence, as `scipy.spatial.distance.jensenshannon`; no zero fill), optional log
   base (R `sqrt(philentropy::JSD(...))`), with `jensen_shannon_categorical` and
   `jensen_shannon_from_proportions`.
+- **`drift::hellinger` (#38)**, `sqrt(1 - sum sqrt(p q))` in `[0, 1]` (R
+  `philentropy` Hellinger / 2), with `hellinger_categorical` and
+  `hellinger_from_proportions`. `Binning::Auto` copies evidently's numeric rule:
+  Sturges bins whose count comes from the number of distinct pooled values.
 
 ## [0.4.11] - 2026-10-22
 

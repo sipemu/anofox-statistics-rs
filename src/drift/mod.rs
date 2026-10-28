@@ -1,17 +1,20 @@
 //! Data-drift measures between a reference and a current sample, as in
 //! evidently's `legacy/calculations/stattests`.
 //!
-//! The divergences ([`psi`], [`kl_divergence`], [`jensen_shannon`]) bin both samples on common bins
+//! The divergences ([`psi`], [`kl_divergence`], [`jensen_shannon`],
+//! [`hellinger`]) bin both samples on common bins
 //! ([`binned_proportions`], [`Binning`]) and compare the bin proportions `p`
 //! (reference) and `q` (current). Each has a `*_from_proportions` form for
 //! pre-binned data and a `*_categorical` form for labels of any ordered type.
 
 pub mod binning;
+pub mod hellinger;
 pub mod js;
 pub mod kl;
 pub mod psi;
 
 pub use binning::{binned_proportions, category_proportions, zero_fill, Binning};
+pub use hellinger::{hellinger, hellinger_categorical, hellinger_from_proportions};
 pub use js::{jensen_shannon, jensen_shannon_categorical, jensen_shannon_from_proportions};
 pub use kl::{kl_divergence, kl_divergence_categorical, kl_divergence_from_proportions};
 pub use psi::{psi, psi_categorical, psi_from_proportions};

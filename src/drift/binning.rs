@@ -203,6 +203,23 @@ pub fn binned_proportions(
     }
 }
 
+/// Proportions on equal-width Sturges bins over the pooled range whose count
+/// comes from the number of *distinct* pooled values: evidently's Hellinger
+/// binning (`histogram_bin_edges(unique(ref, cur), "sturges")`).
+pub(crate) fn sturges_distinct_proportions(
+    reference: &[f64],
+    current: &[f64],
+) -> Result<(Vec<f64>, Vec<f64>)> {
+    validate(reference, current)?;
+    let mut distinct = sorted(&[reference, current].concat());
+    distinct.dedup();
+    let edges = sturges_edges(&distinct, distinct.len())?;
+    Ok((
+        histogram_proportions(reference, &edges),
+        histogram_proportions(current, &edges),
+    ))
+}
+
 /// Proportions `(p, q)` of the reference and the current sample per category,
 /// over the sorted distinct categories of both samples. Errors on empty
 /// input.

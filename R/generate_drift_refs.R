@@ -125,6 +125,30 @@ for (nm in names(binnings)) {
 check("js num (issue)", jsd(binnings$num), 0.257847900615, 1e-11)
 check("js cat (issue)", jsd(binnings$cat), 0.27397012217, 1e-10)
 
+# ---------------------------------------------------------------------------
+# #38 Hellinger distance sqrt(1 - sum(sqrt(p q))), no zero fill
+# ---------------------------------------------------------------------------
+hell <- function(b) sqrt(1 - min(1, sum(sqrt(b$p * b$q))))
+for (nm in names(binnings)) {
+  b <- binnings[[nm]]
+  # philentropy's "hellinger" is 2 * sqrt(1 - sum(sqrt(p q))).
+  check(paste("hellinger", nm), hell(b),
+        suppressMessages(philentropy::distance(rbind(b$p, b$q), method = "hellinger")) / 2)
+  add(paste0("hellinger_", nm), "statistic", hell(b))
+}
+# evidently's numeric rule: Sturges bins whose count comes from the distinct
+# pooled values (histogram_bin_edges(unique(ref, cur), "sturges")).
+b <- sturges_props(x, y, unique(c(x, y)))
+add("hellinger_auto_num", "statistic", hell(b))
+check("hellinger num (issue)", hell(b), 0.262287362723, 1e-11)
+check("hellinger cat (issue)", hell(binnings$cat), 0.325194993744, 1e-11)
+b <- sturges_props(xt, yt, unique(c(xt, yt)))
+add("hellinger_auto_tie", "n_bins", length(b$p))
+add("hellinger_auto_tie", "statistic", hell(b))
+b <- sturges_props(xt, yt)
+add("hellinger_sturges_tie", "n_bins", length(b$p))
+add("hellinger_sturges_tie", "statistic", hell(b))
+
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)
 cat("wrote", nrow(out), "rows to R/data/drift_reference.csv\n")

@@ -29,7 +29,8 @@ pub use distributional::{
     ShapiroWilkResult,
 };
 pub use drift::{
-    binned_proportions, category_proportions, jensen_shannon, jensen_shannon_categorical,
+    binned_proportions, category_proportions, hellinger, hellinger_categorical,
+    hellinger_from_proportions, jensen_shannon, jensen_shannon_categorical,
     jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
     kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
     DivergenceResult,

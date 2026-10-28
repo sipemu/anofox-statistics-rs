@@ -2,7 +2,8 @@
 //! `R/generate_drift_refs.R` -> `R/data/drift_reference.csv`.
 
 use anofox_statistics::drift::{
-    binned_proportions, category_proportions, jensen_shannon, jensen_shannon_categorical,
+    binned_proportions, category_proportions, hellinger, hellinger_categorical,
+    hellinger_from_proportions, jensen_shannon, jensen_shannon_categorical,
     jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
     kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
 };
@@ -270,4 +271,68 @@ fn jensen_shannon_bounds() {
         epsilon = 1e-15
     );
     assert!(jensen_shannon_from_proportions(&p, &q, Some(1.0)).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// #38 Hellinger distance
+// ---------------------------------------------------------------------------
+
+#[test]
+fn hellinger_matches_r() {
+    for (name, r, c, binning) in binning_cases() {
+        // Auto means evidently's numeric Hellinger rule; the categorical
+        // case of the R script uses one bin per value.
+        let binning = match binning {
+            Binning::Auto => Binning::Categorical,
+            b => b,
+        };
+        if name == "num" {
+            continue;
+        }
+        let res = hellinger(r, c, binning).unwrap();
+        assert_relative_eq!(
+            res.statistic,
+            get1(&format!("hellinger_{}", name), "statistic"),
+            epsilon = 1e-10
+        );
+    }
+    let (x, y) = xy();
+    for b in [Binning::Auto, Binning::Sturges] {
+        let res = hellinger(x, y, b).unwrap();
+        assert_relative_eq!(
+            res.statistic,
+            get1("hellinger_num", "statistic"),
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(res.statistic, 0.262287362723, epsilon = 1e-11);
+    }
+    let (xc, yc) = xyc();
+    let cat = hellinger_categorical(&labels(xc), &labels(yc)).unwrap();
+    assert_relative_eq!(cat.statistic, 0.325194993744, epsilon = 1e-11);
+    assert_eq!(TestResult::from(&cat).method, "Hellinger distance");
+    // With ties, evidently's rule (bins from distinct values) differs from
+    // the pooled-size Sturges rule.
+    let (xt, yt) = xyt();
+    for (b, case) in [
+        (Binning::Auto, "hellinger_auto_tie"),
+        (Binning::Sturges, "hellinger_sturges_tie"),
+    ] {
+        let res = hellinger(xt, yt, b).unwrap();
+        assert_eq!(res.n_bins as f64, get1(case, "n_bins"));
+        assert_relative_eq!(res.statistic, get1(case, "statistic"), epsilon = 1e-10);
+    }
+}
+
+#[test]
+fn hellinger_bounds() {
+    assert_eq!(
+        hellinger_from_proportions(&[1.0, 0.0], &[0.0, 1.0]).unwrap(),
+        1.0
+    );
+    assert_eq!(
+        hellinger_from_proportions(&[0.3, 0.7], &[0.3, 0.7]).unwrap(),
+        0.0
+    );
+    assert!(hellinger_from_proportions(&[0.3, 0.7], &[1.0]).is_err());
+    assert!(hellinger(&[1.0], &[f64::NAN], Binning::Auto).is_err());
 }
