@@ -34,6 +34,7 @@ pub use drift::{
     jensen_shannon_divergence_from_proportions, jensen_shannon_from_proportions, kl_divergence,
     kl_divergence_categorical, kl_divergence_from_proportions, psi, psi_categorical,
     psi_from_proportions, tvd_test, tvd_test_numeric, Binning, DivergenceResult, TvdResult,
+    ZeroFill,
 };
 pub use error::{Result, StatError};
 pub use forecast::{

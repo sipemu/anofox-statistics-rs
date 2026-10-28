@@ -307,18 +307,18 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
         Binning::Categorical,
     ] {
         run("drift divergences", &mut || {
-            let _ = psi(x, y, b);
-            let _ = kl_divergence(x, y, b, Some(2.0));
+            let _ = psi(x, y, b, ZeroFill::Evidently);
+            let _ = kl_divergence(x, y, b, Some(2.0), ZeroFill::Evidently);
             let _ = jensen_shannon(x, y, b, None);
             let _ = hellinger(x, y, b);
         });
     }
     run("drift from proportions", &mut || {
-        let _ = psi_from_proportions(x, y);
+        let _ = psi_from_proportions(x, y, ZeroFill::Evidently);
         for p in SCALARS {
             let _ = wasserstein_distance_1d(x, y, p);
         }
-        let _ = kl_divergence_from_proportions(x, y, None);
+        let _ = kl_divergence_from_proportions(x, y, None, ZeroFill::Evidently);
         let _ = jensen_shannon_from_proportions(x, y, Some(2.0));
         let _ = hellinger_from_proportions(x, y);
     });
@@ -606,7 +606,7 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
                 mmd_test(&xv, &yv, Kernel::Linear, 30, Some(1)).err(),
             ),
             ("clark_west", clark_west(&x, &y, 1).err()),
-            ("psi", psi(&x, &y, Binning::Auto).err()),
+            ("psi", psi(&x, &y, Binning::Auto, ZeroFill::Evidently).err()),
             (
                 "tvd_test_numeric",
                 tvd_test_numeric(&x, &y, 20, Some(1)).err(),
@@ -626,7 +626,7 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
             ),
             (
                 "kl_divergence",
-                kl_divergence(&x, &y, Binning::Auto, None).err(),
+                kl_divergence(&x, &y, Binning::Auto, None, ZeroFill::Evidently).err(),
             ),
             (
                 "diebold_mariano",

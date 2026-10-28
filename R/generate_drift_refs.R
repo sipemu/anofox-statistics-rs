@@ -113,6 +113,20 @@ for (nm in names(binnings)) {
   add(paste0("kl_", nm), "statistic_log2", kl(b, 2))
 }
 check("kl num (issue)", kl(binnings$num), 0.264782319603, 1e-11)
+
+# #42: constant zero fill eps (PSI not renormalized, KL renormalized)
+fill_const <- function(a, eps) { a[a == 0] <- eps; a }
+for (nm in names(binnings)) {
+  b <- binnings[[nm]]
+  for (eps in c(1e-3, 0.01)) {
+    P <- fill_const(b$p, eps); Q <- fill_const(b$q, eps)
+    add(paste0("psi_", nm), paste0("statistic_eps", eps),
+        suppressMessages(philentropy::distance(rbind(P, Q), method = "jeffreys", unit = "log")))
+    P <- P / sum(P); Q <- Q / sum(Q)
+    add(paste0("kl_", nm), paste0("statistic_eps", eps),
+        suppressMessages(philentropy::KL(rbind(P, Q), unit = "log")))
+  }
+}
 check("kl cat (issue)", kl(binnings$cat), 0.223061363402, 1e-11)
 
 # ---------------------------------------------------------------------------

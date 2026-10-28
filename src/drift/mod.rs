@@ -23,7 +23,7 @@ pub mod kl;
 pub mod psi;
 pub mod tvd;
 
-pub use binning::{binned_proportions, category_proportions, zero_fill, Binning};
+pub use binning::{binned_proportions, category_proportions, zero_fill, Binning, ZeroFill};
 pub use hellinger::{hellinger, hellinger_categorical, hellinger_from_proportions};
 pub use js::{
     jensen_shannon, jensen_shannon_categorical, jensen_shannon_divergence_from_proportions,

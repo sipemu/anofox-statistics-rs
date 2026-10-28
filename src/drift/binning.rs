@@ -259,9 +259,48 @@ pub fn category_proportions<T: Ord>(
         .unzip())
 }
 
+/// How [`psi`](super::psi()) and [`kl_divergence`](super::kl_divergence())
+/// replace zero proportions before taking logarithms.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum ZeroFill {
+    /// evidently's rule ([`zero_fill`]): `1e-4`, or `min_nonzero / 1e6` when
+    /// the smallest non-zero proportion is `<= 1e-4`.
+    #[default]
+    Evidently,
+    /// Every zero proportion becomes this constant, which must be finite and
+    /// positive.
+    Constant(f64),
+}
+
+impl ZeroFill {
+    /// Apply the fill to a proportion vector. Errors unless a constant fill
+    /// is finite and positive.
+    ///
+    /// # Example
+    /// ```
+    /// use anofox_statistics::drift::ZeroFill;
+    /// assert_eq!(ZeroFill::Constant(0.01).apply(&[0.5, 0.0]).unwrap(), vec![0.5, 0.01]);
+    /// assert_eq!(ZeroFill::Evidently.apply(&[0.5, 0.0]).unwrap(), vec![0.5, 1e-4]);
+    /// ```
+    pub fn apply(&self, props: &[f64]) -> Result<Vec<f64>> {
+        match *self {
+            ZeroFill::Evidently => Ok(zero_fill(props)),
+            ZeroFill::Constant(eps) if eps.is_finite() && eps > 0.0 => Ok(props
+                .iter()
+                .map(|&v| if v == 0.0 { eps } else { v })
+                .collect()),
+            ZeroFill::Constant(eps) => Err(StatError::InvalidParameter(format!(
+                "zero fill must be finite and positive, got {}",
+                eps
+            ))),
+        }
+    }
+}
+
 /// evidently's zero fill: every zero proportion is replaced by `1e-4`, or by
 /// `min_nonzero / 1e6` when the smallest non-zero proportion is `<= 1e-4`.
-/// Used by PSI and the Kullback-Leibler divergence. A vector without
+/// The default ([`ZeroFill::Evidently`]) of PSI and the Kullback-Leibler
+/// divergence. A vector without
 /// non-zero entries is returned unchanged.
 pub fn zero_fill(props: &[f64]) -> Vec<f64> {
     let min_nonzero = props

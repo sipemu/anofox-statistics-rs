@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Configurable zero fill for PSI and KL (#42, breaking).** `psi`, `psi_categorical`,
+  `psi_from_proportions`, `kl_divergence`, `kl_divergence_categorical` and
+  `kl_divergence_from_proportions` take a final `drift::ZeroFill` argument:
+  `ZeroFill::Evidently` (the default, the previous behaviour) or
+  `ZeroFill::Constant(eps)`, which replaces zero proportions by `eps` (KL still
+  renormalizes). Validated against `philentropy` on manually filled proportions.
 - **`wasserstein_test_1d(reference, current, p, n_permutations, seed)` takes the order
   `p` (#43, breaking: callers add `1.0` for the old behaviour).** `distance` is `W_p`,
   `distance_normed = W_p / max(population sd(reference), 0.001)`, and the permutation

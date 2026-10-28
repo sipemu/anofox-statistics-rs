@@ -6,7 +6,7 @@ use anofox_statistics::drift::{
     hellinger_from_proportions, jensen_shannon, jensen_shannon_categorical,
     jensen_shannon_divergence_from_proportions, jensen_shannon_from_proportions, kl_divergence,
     kl_divergence_categorical, kl_divergence_from_proportions, psi, psi_categorical,
-    psi_from_proportions, tvd_test, tvd_test_numeric, Binning,
+    psi_from_proportions, tvd_test, tvd_test_numeric, Binning, ZeroFill,
 };
 use anofox_statistics::{
     ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_distance_1d,
@@ -150,7 +150,7 @@ fn binning_rejects_bad_input() {
 #[test]
 fn psi_matches_r() {
     for (name, r, c, binning) in binning_cases() {
-        let res = psi(r, c, binning).unwrap();
+        let res = psi(r, c, binning, ZeroFill::Evidently).unwrap();
         assert_relative_eq!(
             res.statistic,
             get1(&format!("psi_{}", name), "statistic"),
@@ -161,30 +161,80 @@ fn psi_matches_r() {
     // Issue values.
     let (x, y) = xy();
     assert_relative_eq!(
-        psi(x, y, Binning::Auto).unwrap().statistic,
+        psi(x, y, Binning::Auto, ZeroFill::Evidently)
+            .unwrap()
+            .statistic,
         0.570692693084,
         epsilon = 1e-11
     );
     let (xc, yc) = xyc();
-    let cat = psi_categorical(&labels(xc), &labels(yc)).unwrap();
+    let cat = psi_categorical(&labels(xc), &labels(yc), ZeroFill::Evidently).unwrap();
     assert_relative_eq!(cat.statistic, 1.56548983794, epsilon = 1e-10);
     assert_eq!(cat.n_bins, 5);
     let (p, q) = (get("bins_cat", "p"), get("bins_cat", "q"));
     assert_relative_eq!(
-        psi_from_proportions(p, q).unwrap(),
+        psi_from_proportions(p, q, ZeroFill::Evidently).unwrap(),
         1.56548983794,
         epsilon = 1e-10
     );
 }
 
 #[test]
+fn constant_zero_fill_matches_r() {
+    // #42: ZeroFill::Constant(eps), philentropy on manually filled proportions
+    for (name, r, c, binning) in binning_cases() {
+        for eps in [1e-3, 0.01] {
+            let key = format!("statistic_eps{}", eps);
+            let fill = ZeroFill::Constant(eps);
+            let res = psi(r, c, binning, fill).unwrap();
+            assert_relative_eq!(
+                res.statistic,
+                get1(&format!("psi_{}", name), &key),
+                epsilon = 1e-10
+            );
+            let res = kl_divergence(r, c, binning, None, fill).unwrap();
+            assert_relative_eq!(
+                res.statistic,
+                get1(&format!("kl_{}", name), &key),
+                epsilon = 1e-10
+            );
+        }
+    }
+    let (xc, yc) = xyc();
+    let fill = ZeroFill::Constant(0.01);
+    assert_relative_eq!(
+        psi_categorical(&labels(xc), &labels(yc), fill)
+            .unwrap()
+            .statistic,
+        get1("psi_cat", "statistic_eps0.01"),
+        epsilon = 1e-10
+    );
+    assert_relative_eq!(
+        kl_divergence_categorical(&labels(xc), &labels(yc), None, fill)
+            .unwrap()
+            .statistic,
+        get1("kl_cat", "statistic_eps0.01"),
+        epsilon = 1e-10
+    );
+    assert_eq!(ZeroFill::default(), ZeroFill::Evidently);
+    for eps in [0.0, -1e-3, f64::NAN, f64::INFINITY] {
+        let fill = ZeroFill::Constant(eps);
+        assert!(psi_from_proportions(&[0.5, 0.5], &[1.0, 0.0], fill).is_err());
+        assert!(kl_divergence_from_proportions(&[0.5, 0.5], &[1.0, 0.0], None, fill).is_err());
+    }
+}
+
+#[test]
 fn psi_categorical_str_labels() {
     let r = ["a", "a", "b", "c"];
     let c = ["a", "b", "b", "b", "d"];
-    let res = psi_categorical(&r, &c).unwrap();
+    let res = psi_categorical(&r, &c, ZeroFill::Evidently).unwrap();
     let (p, q) = category_proportions(&r, &c).unwrap();
     assert_eq!(res.n_bins, 4);
-    assert_eq!(res.statistic, psi_from_proportions(&p, &q).unwrap());
+    assert_eq!(
+        res.statistic,
+        psi_from_proportions(&p, &q, ZeroFill::Evidently).unwrap()
+    );
     let t = TestResult::from(&res);
     assert_eq!(t.method, "Population Stability Index");
     assert_eq!(t.statistic, Some(res.statistic));
@@ -194,11 +244,11 @@ fn psi_categorical_str_labels() {
 
 #[test]
 fn psi_from_proportions_rejects_bad_input() {
-    assert!(psi_from_proportions(&[0.5, 0.5], &[1.0]).is_err());
-    assert!(psi_from_proportions(&[], &[]).is_err());
-    assert!(psi_from_proportions(&[1.5, -0.5], &[0.5, 0.5]).is_err());
-    assert!(psi_from_proportions(&[0.0, 0.0], &[0.5, 0.5]).is_err());
-    assert!(psi_from_proportions(&[f64::NAN, 1.0], &[0.5, 0.5]).is_err());
+    assert!(psi_from_proportions(&[0.5, 0.5], &[1.0], ZeroFill::Evidently).is_err());
+    assert!(psi_from_proportions(&[], &[], ZeroFill::Evidently).is_err());
+    assert!(psi_from_proportions(&[1.5, -0.5], &[0.5, 0.5], ZeroFill::Evidently).is_err());
+    assert!(psi_from_proportions(&[0.0, 0.0], &[0.5, 0.5], ZeroFill::Evidently).is_err());
+    assert!(psi_from_proportions(&[f64::NAN, 1.0], &[0.5, 0.5], ZeroFill::Evidently).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -209,9 +259,9 @@ fn psi_from_proportions_rejects_bad_input() {
 fn kl_matches_r() {
     for (name, r, c, binning) in binning_cases() {
         let case = format!("kl_{}", name);
-        let ln = kl_divergence(r, c, binning, None).unwrap();
+        let ln = kl_divergence(r, c, binning, None, ZeroFill::Evidently).unwrap();
         assert_relative_eq!(ln.statistic, get1(&case, "statistic"), epsilon = 1e-10);
-        let log2 = kl_divergence(r, c, binning, Some(2.0)).unwrap();
+        let log2 = kl_divergence(r, c, binning, Some(2.0), ZeroFill::Evidently).unwrap();
         assert_relative_eq!(
             log2.statistic,
             get1(&case, "statistic_log2"),
@@ -220,13 +270,16 @@ fn kl_matches_r() {
     }
     let (x, y) = xy();
     assert_relative_eq!(
-        kl_divergence(x, y, Binning::Auto, None).unwrap().statistic,
+        kl_divergence(x, y, Binning::Auto, None, ZeroFill::Evidently)
+            .unwrap()
+            .statistic,
         0.264782319603,
         epsilon = 1e-11
     );
     // The categorical case needs the renormalization after the zero fill.
     let (xc, yc) = xyc();
-    let cat = kl_divergence_categorical(&labels(xc), &labels(yc), None).unwrap();
+    let cat =
+        kl_divergence_categorical(&labels(xc), &labels(yc), None, ZeroFill::Evidently).unwrap();
     assert_relative_eq!(cat.statistic, 0.223061363402, epsilon = 1e-11);
     assert_eq!(TestResult::from(&cat).method, "Kullback-Leibler divergence");
 }
@@ -235,11 +288,21 @@ fn kl_matches_r() {
 fn kl_rejects_bad_input() {
     let p = [0.5, 0.5];
     for b in [0.0, 1.0, -2.0, f64::NAN, f64::INFINITY] {
-        assert!(kl_divergence_from_proportions(&p, &p, Some(b)).is_err());
+        assert!(kl_divergence_from_proportions(&p, &p, Some(b), ZeroFill::Evidently).is_err());
     }
-    assert_eq!(kl_divergence_from_proportions(&p, &p, None).unwrap(), 0.0);
-    assert!(kl_divergence_from_proportions(&p, &[1.0], None).is_err());
-    assert!(kl_divergence(&[1.0, f64::NAN], &[1.0], Binning::Auto, None).is_err());
+    assert_eq!(
+        kl_divergence_from_proportions(&p, &p, None, ZeroFill::Evidently).unwrap(),
+        0.0
+    );
+    assert!(kl_divergence_from_proportions(&p, &[1.0], None, ZeroFill::Evidently).is_err());
+    assert!(kl_divergence(
+        &[1.0, f64::NAN],
+        &[1.0],
+        Binning::Auto,
+        None,
+        ZeroFill::Evidently
+    )
+    .is_err());
 }
 
 // ---------------------------------------------------------------------------
