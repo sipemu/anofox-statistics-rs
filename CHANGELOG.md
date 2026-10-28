@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-28
+
 ### Added
 
 - **Jensen-Shannon divergence (#44).** `drift::jensen_shannon_divergence_from_proportions`
