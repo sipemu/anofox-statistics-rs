@@ -280,10 +280,12 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     ] {
         run("drift divergences", &mut || {
             let _ = psi(x, y, b);
+            let _ = kl_divergence(x, y, b, Some(2.0));
         });
     }
     run("drift from proportions", &mut || {
         let _ = psi_from_proportions(x, y);
+        let _ = kl_divergence_from_proportions(x, y, None);
     });
     run("spa_test", &mut || {
         let _ = spa_test(x, &[y.to_vec(), z.clone()], 30, 2.0, Some(1));
@@ -570,6 +572,10 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
             ),
             ("clark_west", clark_west(&x, &y, 1).err()),
             ("psi", psi(&x, &y, Binning::Auto).err()),
+            (
+                "kl_divergence",
+                kl_divergence(&x, &y, Binning::Auto, None).err(),
+            ),
             (
                 "diebold_mariano",
                 diebold_mariano(

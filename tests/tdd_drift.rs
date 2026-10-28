@@ -2,7 +2,8 @@
 //! `R/generate_drift_refs.R` -> `R/data/drift_reference.csv`.
 
 use anofox_statistics::drift::{
-    binned_proportions, category_proportions, psi, psi_categorical, psi_from_proportions, Binning,
+    binned_proportions, category_proportions, kl_divergence, kl_divergence_categorical,
+    kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
 };
 use anofox_statistics::TestResult;
 use approx::assert_relative_eq;
@@ -174,4 +175,45 @@ fn psi_from_proportions_rejects_bad_input() {
     assert!(psi_from_proportions(&[1.5, -0.5], &[0.5, 0.5]).is_err());
     assert!(psi_from_proportions(&[0.0, 0.0], &[0.5, 0.5]).is_err());
     assert!(psi_from_proportions(&[f64::NAN, 1.0], &[0.5, 0.5]).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// #36 Kullback-Leibler
+// ---------------------------------------------------------------------------
+
+#[test]
+fn kl_matches_r() {
+    for (name, r, c, binning) in binning_cases() {
+        let case = format!("kl_{}", name);
+        let ln = kl_divergence(r, c, binning, None).unwrap();
+        assert_relative_eq!(ln.statistic, get1(&case, "statistic"), epsilon = 1e-10);
+        let log2 = kl_divergence(r, c, binning, Some(2.0)).unwrap();
+        assert_relative_eq!(
+            log2.statistic,
+            get1(&case, "statistic_log2"),
+            epsilon = 1e-10
+        );
+    }
+    let (x, y) = xy();
+    assert_relative_eq!(
+        kl_divergence(x, y, Binning::Auto, None).unwrap().statistic,
+        0.264782319603,
+        epsilon = 1e-11
+    );
+    // The categorical case needs the renormalization after the zero fill.
+    let (xc, yc) = xyc();
+    let cat = kl_divergence_categorical(&labels(xc), &labels(yc), None).unwrap();
+    assert_relative_eq!(cat.statistic, 0.223061363402, epsilon = 1e-11);
+    assert_eq!(TestResult::from(&cat).method, "Kullback-Leibler divergence");
+}
+
+#[test]
+fn kl_rejects_bad_input() {
+    let p = [0.5, 0.5];
+    for b in [0.0, 1.0, -2.0, f64::NAN, f64::INFINITY] {
+        assert!(kl_divergence_from_proportions(&p, &p, Some(b)).is_err());
+    }
+    assert_eq!(kl_divergence_from_proportions(&p, &p, None).unwrap(), 0.0);
+    assert!(kl_divergence_from_proportions(&p, &[1.0], None).is_err());
+    assert!(kl_divergence(&[1.0, f64::NAN], &[1.0], Binning::Auto, None).is_err());
 }

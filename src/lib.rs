@@ -29,7 +29,8 @@ pub use distributional::{
     ShapiroWilkResult,
 };
 pub use drift::{
-    binned_proportions, category_proportions, psi, psi_categorical, psi_from_proportions, Binning,
+    binned_proportions, category_proportions, kl_divergence, kl_divergence_categorical,
+    kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
     DivergenceResult,
 };
 pub use error::{Result, StatError};

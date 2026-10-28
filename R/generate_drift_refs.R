@@ -86,6 +86,25 @@ for (nm in names(binnings)) {
 check("psi num (issue)", psi(binnings$num), 0.570692693084, 1e-11)
 check("psi cat (issue)", psi(binnings$cat), 1.56548983794, 1e-10)
 
+# ---------------------------------------------------------------------------
+# #36 Kullback-Leibler KL(p || q): zero fill, then renormalize (as
+# scipy.stats.entropy), natural log and log2
+# ---------------------------------------------------------------------------
+kl <- function(b, base = exp(1)) {
+  P <- fill(b$p); P <- P / sum(P); Q <- fill(b$q); Q <- Q / sum(Q)
+  sum(P * log(P / Q)) / log(base)
+}
+for (nm in names(binnings)) {
+  b <- binnings[[nm]]
+  P <- fill(b$p); P <- P / sum(P); Q <- fill(b$q); Q <- Q / sum(Q)
+  check(paste("kl", nm), kl(b), suppressMessages(philentropy::KL(rbind(P, Q), unit = "log")))
+  check(paste("kl2", nm), kl(b, 2), suppressMessages(philentropy::KL(rbind(P, Q), unit = "log2")))
+  add(paste0("kl_", nm), "statistic", kl(b))
+  add(paste0("kl_", nm), "statistic_log2", kl(b, 2))
+}
+check("kl num (issue)", kl(binnings$num), 0.264782319603, 1e-11)
+check("kl cat (issue)", kl(binnings$cat), 0.223061363402, 1e-11)
+
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)
 cat("wrote", nrow(out), "rows to R/data/drift_reference.csv\n")

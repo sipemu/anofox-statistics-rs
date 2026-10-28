@@ -24,6 +24,10 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   zero-filled proportions (R `philentropy` Jeffreys divergence), with
   `psi_categorical` and `psi_from_proportions`. Returns the new `DivergenceResult`,
   which converts to `TestResult`.
+- **`drift::kl_divergence` (#36)**, `KL(p || q)` of the current bin proportions from
+  the reference ones, zero-filled and renormalized as `scipy.stats.entropy`, optional
+  log base (R `philentropy::KL`), with `kl_divergence_categorical` and
+  `kl_divergence_from_proportions`.
 
 ## [0.4.11] - 2026-10-22
 
