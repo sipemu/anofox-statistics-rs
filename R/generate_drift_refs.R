@@ -105,6 +105,26 @@ for (nm in names(binnings)) {
 check("kl num (issue)", kl(binnings$num), 0.264782319603, 1e-11)
 check("kl cat (issue)", kl(binnings$cat), 0.223061363402, 1e-11)
 
+# ---------------------------------------------------------------------------
+# #37 Jensen-Shannon distance: sqrt of the JS divergence, no zero fill
+# ---------------------------------------------------------------------------
+jsd <- function(b, base = exp(1)) {
+  p <- b$p / sum(b$p); q <- b$q / sum(b$q); m <- (p + q) / 2
+  re <- function(a, m) ifelse(a > 0, a * log(a / m), 0)
+  sqrt(sum(re(p, m) + re(q, m)) / 2 / log(base))
+}
+for (nm in names(binnings)) {
+  b <- binnings[[nm]]
+  check(paste("js", nm), jsd(b),
+        sqrt(suppressMessages(philentropy::JSD(rbind(b$p, b$q), unit = "log"))))
+  check(paste("js2", nm), jsd(b, 2),
+        sqrt(suppressMessages(philentropy::JSD(rbind(b$p, b$q), unit = "log2"))))
+  add(paste0("js_", nm), "statistic", jsd(b))
+  add(paste0("js_", nm), "statistic_log2", jsd(b, 2))
+}
+check("js num (issue)", jsd(binnings$num), 0.257847900615, 1e-11)
+check("js cat (issue)", jsd(binnings$cat), 0.27397012217, 1e-10)
+
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)
 cat("wrote", nrow(out), "rows to R/data/drift_reference.csv\n")

@@ -28,6 +28,10 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   the reference ones, zero-filled and renormalized as `scipy.stats.entropy`, optional
   log base (R `philentropy::KL`), with `kl_divergence_categorical` and
   `kl_divergence_from_proportions`.
+- **`drift::jensen_shannon` (#37)**, the Jensen-Shannon *distance* (square root of the
+  divergence, as `scipy.spatial.distance.jensenshannon`; no zero fill), optional log
+  base (R `sqrt(philentropy::JSD(...))`), with `jensen_shannon_categorical` and
+  `jensen_shannon_from_proportions`.
 
 ## [0.4.11] - 2026-10-22
 

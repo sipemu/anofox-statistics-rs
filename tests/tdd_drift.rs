@@ -2,7 +2,8 @@
 //! `R/generate_drift_refs.R` -> `R/data/drift_reference.csv`.
 
 use anofox_statistics::drift::{
-    binned_proportions, category_proportions, kl_divergence, kl_divergence_categorical,
+    binned_proportions, category_proportions, jensen_shannon, jensen_shannon_categorical,
+    jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
     kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
 };
 use anofox_statistics::TestResult;
@@ -216,4 +217,57 @@ fn kl_rejects_bad_input() {
     assert_eq!(kl_divergence_from_proportions(&p, &p, None).unwrap(), 0.0);
     assert!(kl_divergence_from_proportions(&p, &[1.0], None).is_err());
     assert!(kl_divergence(&[1.0, f64::NAN], &[1.0], Binning::Auto, None).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// #37 Jensen-Shannon distance
+// ---------------------------------------------------------------------------
+
+#[test]
+fn jensen_shannon_matches_r() {
+    for (name, r, c, binning) in binning_cases() {
+        let case = format!("js_{}", name);
+        let ln = jensen_shannon(r, c, binning, None).unwrap();
+        assert_relative_eq!(ln.statistic, get1(&case, "statistic"), epsilon = 1e-10);
+        let log2 = jensen_shannon(r, c, binning, Some(2.0)).unwrap();
+        assert_relative_eq!(
+            log2.statistic,
+            get1(&case, "statistic_log2"),
+            epsilon = 1e-10
+        );
+    }
+    let (x, y) = xy();
+    assert_relative_eq!(
+        jensen_shannon(x, y, Binning::Auto, None).unwrap().statistic,
+        0.257847900615,
+        epsilon = 1e-11
+    );
+    let (xc, yc) = xyc();
+    let cat = jensen_shannon_categorical(&labels(xc), &labels(yc), None).unwrap();
+    assert_relative_eq!(cat.statistic, 0.27397012217, epsilon = 1e-10);
+    assert_eq!(TestResult::from(&cat).method, "Jensen-Shannon distance");
+}
+
+#[test]
+fn jensen_shannon_bounds() {
+    // Disjoint supports: sqrt(ln 2), or 1 in base 2; identical: 0.
+    let (p, q) = ([1.0, 0.0], [0.0, 1.0]);
+    assert_relative_eq!(
+        jensen_shannon_from_proportions(&p, &q, None).unwrap(),
+        2f64.ln().sqrt(),
+        epsilon = 1e-15
+    );
+    assert_relative_eq!(
+        jensen_shannon_from_proportions(&p, &q, Some(2.0)).unwrap(),
+        1.0,
+        epsilon = 1e-15
+    );
+    assert_eq!(jensen_shannon_from_proportions(&p, &p, None).unwrap(), 0.0);
+    // Unnormalized input is normalized first.
+    assert_relative_eq!(
+        jensen_shannon_from_proportions(&[2.0, 6.0], &[1.0, 1.0], None).unwrap(),
+        jensen_shannon_from_proportions(&[0.25, 0.75], &[0.5, 0.5], None).unwrap(),
+        epsilon = 1e-15
+    );
+    assert!(jensen_shannon_from_proportions(&p, &q, Some(1.0)).is_err());
 }
