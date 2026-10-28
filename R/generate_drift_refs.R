@@ -354,6 +354,23 @@ for (nm in c("main", "close", "tie")) {
   a <- num_cases[[nm]][[1]]; b <- num_cases[[nm]][[2]]
   add(paste0("wass_", nm), "p_value_mc", twosamples::wass_test(a, b, nboots = 20000)[2])
 }
+# #43: W_p for p != 1. evidently's scaling W_p / max(sd, 0.001), and the
+# permutation p-value of W_p itself. twosamples::wass_test(p = 2) is not a
+# reference here: for p != 1 it permutes int |F - G|^p dt, not W_p.
+for (nm in names(num_cases)) {
+  a <- num_cases[[nm]][[1]]; b <- num_cases[[nm]][[2]]
+  add(paste0("wass_", nm), "distance_normed_p2",
+      transport::wasserstein1d(a, b, p = 2) / max(sdpop(a), 0.001))
+}
+set.seed(2)
+for (nm in c("main", "close", "tie")) {
+  a <- num_cases[[nm]][[1]]; b <- num_cases[[nm]][[2]]
+  z <- c(a, b); m <- length(a); B <- 20000
+  obs <- transport::wasserstein1d(a, b, p = 2)
+  perm <- replicate(B, { i <- sample.int(length(z), m)
+                         transport::wasserstein1d(z[i], z[-i], p = 2) })
+  add(paste0("wass_", nm), "p_value_mc_p2", mean(perm >= obs - 1e-12))
+}
 
 # ---------------------------------------------------------------------------
 # #39 total variation distance between category distributions, with a

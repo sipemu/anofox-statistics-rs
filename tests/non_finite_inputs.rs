@@ -282,7 +282,7 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     });
     run("wasserstein", &mut || {
         let _ = wasserstein_distance_1d(x, y, 2.0);
-        let _ = wasserstein_test_1d(x, y, 20, Some(1));
+        let _ = wasserstein_test_1d(x, y, 1.0, 20, Some(1));
     });
     run("epps_singleton_test", &mut || {
         let _ = epps_singleton_test(x, y, None);
@@ -613,7 +613,7 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
             ),
             (
                 "wasserstein_test_1d",
-                wasserstein_test_1d(&x, &y, 20, Some(1)).err(),
+                wasserstein_test_1d(&x, &y, 1.0, 20, Some(1)).err(),
             ),
             (
                 "epps_singleton_test",

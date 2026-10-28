@@ -225,7 +225,7 @@ samples.
 | `ad_test_ksamp()` | `kSamples::ad.test()`, `ad.pval()` | 1e-10 (statistic), 1e-9 (p) | versions 1 and 2, k = 2, 3, 4 |
 | `cvm_test_2sample()` | formula + `goftest::pCvM()`; full enumeration (exact, also with ties) | 1e-12 | larger untied exact case cross-checked against scipy |
 | `epps_singleton_test()` | R port of the paper as implemented by scipy (`MASS::ginv`, tol 1e-15) | 1e-10 relative | small-sample correction, rank-deficient case |
-| `wasserstein_distance_1d()` | `transport::wasserstein1d()` | 1e-12 | p = 1, 2, 3; permutation p-value vs `twosamples::wass_test` within Monte Carlo error |
+| `wasserstein_distance_1d()`, `wasserstein_test_1d()` | `transport::wasserstein1d()` | 1e-12 | p = 1, 2, 3; normed distance for p = 1, 2; permutation p-value within Monte Carlo error vs `twosamples::wass_test` (p = 1) and vs a permutation of `transport::wasserstein1d(p = 2)` (`twosamples::wass_test(p = 2)` permutes `∫\|F − G\|^p`, not W_p) |
 | `tvd_test()` | permutation test, B = 100000 | Monte Carlo | statistic exact |
 
 ## Example: Complete Validation Flow

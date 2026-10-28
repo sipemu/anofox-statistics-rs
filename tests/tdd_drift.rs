@@ -621,17 +621,26 @@ fn wasserstein_matches_transport() {
             }
         }
         if name != "equal" {
-            let r = wasserstein_test_1d(x, y, 0, None).unwrap();
+            let r = wasserstein_test_1d(x, y, 1.0, 0, None).unwrap();
             assert_relative_eq!(r.distance, get1(&case, "distance_p1"), epsilon = 1e-12);
             assert_relative_eq!(
                 r.distance_normed,
                 get1(&case, "distance_normed"),
                 epsilon = 1e-12
             );
+            // #43: W_2 and its normed score
+            let r = wasserstein_test_1d(x, y, 2.0, 0, None).unwrap();
+            assert_eq!(r.p, 2.0);
+            assert_relative_eq!(r.distance, get1(&case, "distance_p2"), epsilon = 1e-12);
+            assert_relative_eq!(
+                r.distance_normed,
+                get1(&case, "distance_normed_p2"),
+                epsilon = 1e-12
+            );
         }
     }
     let (x, y) = xy();
-    let r = wasserstein_test_1d(x, y, 0, None).unwrap();
+    let r = wasserstein_test_1d(x, y, 1.0, 0, None).unwrap();
     assert_relative_eq!(r.distance, 0.625792792352, epsilon = 1e-11);
     assert_relative_eq!(r.distance_normed, 0.43940285495, epsilon = 1e-10);
     assert_eq!(r.p_value, None);
@@ -647,14 +656,27 @@ fn wasserstein_permutation_p_value() {
     for name in ["main", "close", "tie"] {
         let (_, x, y) = num_cases().into_iter().find(|c| c.0 == name).unwrap();
         let case = format!("wass_{}", name);
-        let r = wasserstein_test_1d(x, y, 4000, Some(42)).unwrap();
+        let r = wasserstein_test_1d(x, y, 1.0, 4000, Some(42)).unwrap();
         let p = r.p_value.unwrap();
         let e = get1(&case, "p_value_mc");
         let se = (e * (1.0 - e) / 4000.0 + e * (1.0 - e) / 20000.0).sqrt();
         assert!((p - e).abs() < 4.0 * se + 1e-3, "{}: {} vs {}", name, p, e);
         assert_eq!(r.n_permutations, 4000);
         // reproducible with a seed
-        assert_eq!(r, wasserstein_test_1d(x, y, 4000, Some(42)).unwrap());
+        assert_eq!(r, wasserstein_test_1d(x, y, 1.0, 4000, Some(42)).unwrap());
+        // #43: permutation p-value of W_2 (R: 20000 permutations of
+        // transport::wasserstein1d(p = 2))
+        let r = wasserstein_test_1d(x, y, 2.0, 4000, Some(42)).unwrap();
+        let p = r.p_value.unwrap();
+        let e = get1(&case, "p_value_mc_p2");
+        let se = (e * (1.0 - e) / 4000.0 + e * (1.0 - e) / 20000.0).sqrt();
+        assert!(
+            (p - e).abs() < 4.0 * se + 1e-3,
+            "{} p=2: {} vs {}",
+            name,
+            p,
+            e
+        );
     }
 }
 
@@ -664,12 +686,16 @@ fn wasserstein_edge_cases() {
     assert!(wasserstein_distance_1d(&[1.0], &[f64::NAN], 1.0).is_err());
     assert!(wasserstein_distance_1d(&[1.0], &[2.0], 0.5).is_err());
     assert!(wasserstein_distance_1d(&[1.0], &[2.0], f64::INFINITY).is_err());
+    assert!(wasserstein_test_1d(&[1.0], &[2.0], 0.5, 10, Some(1)).is_err());
+    // identical samples: every split is at least as extreme
+    let r = wasserstein_test_1d(&[1.0, 2.0, 3.0], &[1.0, 2.0, 3.0], 2.0, 99, Some(1)).unwrap();
+    assert_eq!((r.distance, r.p_value), (0.0, Some(1.0)));
     assert_eq!(
         wasserstein_distance_1d(&[1.0, 2.0], &[2.0, 1.0], 1.0).unwrap(),
         0.0
     );
     // constant reference: the normed distance divides by 0.001
-    let r = wasserstein_test_1d(&[1.0, 1.0], &[2.0], 0, None).unwrap();
+    let r = wasserstein_test_1d(&[1.0, 1.0], &[2.0], 1.0, 0, None).unwrap();
     assert_relative_eq!(r.distance_normed, 1000.0, epsilon = 1e-9);
 }
 

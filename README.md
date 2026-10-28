@@ -415,7 +415,7 @@ let ks = ks_test_2sample(&reference, &current, Alternative::TwoSided, None)?; //
 let ad = ad_test_ksamp(&[&reference, &current], true)?;                     // T.AD = 3.61
 let cvm = cvm_test_2sample(&reference, &current, CvmMethod::Auto)?;          // p = 0.0469
 let es = epps_singleton_test(&reference, &current, None)?;                   // W = 19.25
-let w = wasserstein_test_1d(&reference, &current, 1000, Some(42))?;          // normed 0.439
+let w = wasserstein_test_1d(&reference, &current, 1.0, 1000, Some(42))?;     // normed 0.439
 
 // Binned divergences (evidently's binning with Binning::Auto)
 let p = psi(&reference, &current, Binning::Auto)?;                // 0.571

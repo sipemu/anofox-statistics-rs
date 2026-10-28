@@ -231,7 +231,7 @@ impl From<&TvdResult> for TestResult {
     }
 }
 
-/// 1-D Wasserstein: `statistic` is `W_1`, the effect size evidently's normed
+/// 1-D Wasserstein: `statistic` is `W_p`, the effect size evidently's normed
 /// distance (`"distance_normed"`), `p_value` the permutation p-value when
 /// computed.
 impl From<&WassersteinResult> for TestResult {

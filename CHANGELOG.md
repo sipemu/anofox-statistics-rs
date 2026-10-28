@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`wasserstein_test_1d(reference, current, p, n_permutations, seed)` takes the order
+  `p` (#43, breaking: callers add `1.0` for the old behaviour).** `distance` is `W_p`,
+  `distance_normed = W_p / max(population sd(reference), 0.001)`, and the permutation
+  p-value is on `W_p`; `WassersteinResult` gains `p`. Validated against
+  `transport::wasserstein1d(p = 2)` and an R permutation of it (`twosamples::wass_test`
+  with `p != 1` permutes `int |F - G|^p dt`, which is not `W_p`).
 - **`drift::hellinger(.., Binning::Auto)` follows the shared `Auto` rule (#45).**
   Data with at most 20 distinct reference values (e.g. integer category codes) now get
   one bin per value, as `psi`, `kl_divergence` and `jensen_shannon` do; above 20,
