@@ -47,6 +47,11 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   (critical-value table interpolated with smoothing splines, through a port of R's
   `smooth.spline`; not capped to `[0.001, 0.25]` like scipy). Returns
   `AndersonDarlingKResult`.
+- **`cvm_test_2sample(x, y, CvmMethod)` (#32)**, the two-sample Cramér-von Mises test
+  as `scipy.stats.cramervonmises_2samp` (midranks): exact p-value from the Xiao,
+  Gordon and Yakovlev (2006) recursion in integer arithmetic, or the limiting
+  distribution as `goftest::pCvM`; `CvmMethod::Auto` is exact when
+  `max(n_x, n_y) <= 20`. Returns `CvmTestResult`.
 
 ## [0.4.11] - 2026-10-22
 

@@ -230,6 +230,47 @@ for (spar in c(0.25, 0.4)) {
   add("smooth_spline", paste0("pred_", spar), predict(f, xp)$y)
 }
 
+# ---------------------------------------------------------------------------
+# #32 two-sample Cramer-von Mises (Anderson 1962), midranks. Asymptotic
+# p-value with the limiting CDF goftest::pCvM (as scipy); exact p-value by
+# full enumeration of the splits for small samples.
+# ---------------------------------------------------------------------------
+cvm_u <- function(rk, m, n) {
+  rx <- sort(rk[1:m]); ry <- sort(rk[(m + 1):(m + n)])
+  m * sum((rx - 1:m)^2) + n * sum((ry - 1:n)^2)
+}
+cvm2 <- function(x, y) {
+  m <- length(x); n <- length(y); N <- m + n
+  U  <- cvm_u(rank(c(x, y)), m, n)
+  T  <- U / (m * n * N) - (4 * m * n - 1) / (6 * N)
+  ET <- (1 + 1 / N) / 6
+  VT <- (N + 1) * (4 * m * n * N - 3 * (m^2 + n^2) - 2 * m * n) / (45 * N^2 * 4 * m * n)
+  Tn <- 1 / 6 + (T - ET) / sqrt(45 * VT)
+  c(statistic = T, p_value = 1 - goftest::pCvM(Tn))
+}
+for (nm in names(num_cases)) {
+  r <- cvm2(num_cases[[nm]][[1]], num_cases[[nm]][[2]])
+  add(paste0("cvm_", nm), "statistic", r[1]); add(paste0("cvm_", nm), "p_value", r[2])
+}
+r <- cvm2(x, y)
+check("cvm T (issue)", r[1], 0.4722592592593, 1e-12); check("cvm p (issue)", r[2], 0.0468933196396, 1e-12)
+cvm_exact <- function(x, y) {
+  m <- length(x); n <- length(y); N <- m + n; rk <- rank(c(x, y))
+  U <- cvm_u(rk, m, n)
+  us <- combn(N, m, function(ix) cvm_u(c(rk[ix], rk[-ix]), m, n))
+  c(statistic = U / (m * n * N) - (4 * m * n - 1) / (6 * N), p_value = mean(us >= U - 1e-9))
+}
+exact_cases <- list(e54 = c(5, 4), e76 = c(7, 6), e88 = c(8, 8), e107 = c(10, 7), e39 = c(3, 9))
+for (nm in names(exact_cases)) {
+  m <- exact_cases[[nm]][1]; n <- exact_cases[[nm]][2]
+  a <- sin(1.3 * (0:(m - 1))) ; b <- sin(0.9 * (0:(n - 1))) + 0.4
+  add(paste0("cvm_", nm), "in_x", a); add(paste0("cvm_", nm), "in_y", b)
+  r <- cvm_exact(a, b)
+  add(paste0("cvm_", nm), "statistic", r[1]); add(paste0("cvm_", nm), "p_value", r[2])
+}
+qgrid <- c(0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.461, 0.5, 0.75, 1, 1.5, 2, 3)
+add("pcvm", "in_q", qgrid); add("pcvm", "p", goftest::pCvM(qgrid))
+
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)
 cat("wrote", nrow(out), "rows to R/data/drift_reference.csv\n")

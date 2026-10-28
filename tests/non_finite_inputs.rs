@@ -272,6 +272,11 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     run("clark_west", &mut || {
         let _ = clark_west(x, y, 1);
     });
+    for method in [CvmMethod::Auto, CvmMethod::Exact, CvmMethod::Asymptotic] {
+        run("cvm_test_2sample", &mut || {
+            let _ = cvm_test_2sample(x, y, method);
+        });
+    }
     for midrank in [true, false] {
         run("ad_test_ksamp", &mut || {
             let _ = ad_test_ksamp(&[x, y], midrank);

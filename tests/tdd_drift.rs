@@ -7,7 +7,9 @@ use anofox_statistics::drift::{
     jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
     kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
 };
-use anofox_statistics::{ad_test_ksamp, ks_test_2sample, Alternative, TestResult};
+use anofox_statistics::{
+    ad_test_ksamp, cvm_test_2sample, ks_test_2sample, Alternative, CvmMethod, TestResult,
+};
 use approx::assert_relative_eq;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -461,4 +463,60 @@ fn ad_ksamp_edge_cases() {
     let r = ad_test_ksamp(&[&[1.0], &[2.0]], true).unwrap();
     assert!(r.statistic.is_nan());
     assert_eq!(r.p_value, 1.0);
+}
+
+// ---------------------------------------------------------------------------
+// #32 two-sample Cramer-von Mises
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cvm_asymptotic_matches_r() {
+    for (name, x, y) in num_cases() {
+        let case = format!("cvm_{}", name);
+        let r = cvm_test_2sample(x, y, CvmMethod::Asymptotic).unwrap();
+        assert_relative_eq!(r.statistic, get1(&case, "statistic"), epsilon = 1e-12);
+        assert_relative_eq!(r.p_value, get1(&case, "p_value"), epsilon = 1e-12);
+        assert!(!r.exact);
+        // All these cases have max(n_x, n_y) > 20: Auto is asymptotic.
+        assert_eq!(r, cvm_test_2sample(x, y, CvmMethod::Auto).unwrap());
+    }
+    let (x, y) = xy();
+    let r = cvm_test_2sample(x, y, CvmMethod::Auto).unwrap();
+    assert_relative_eq!(r.statistic, 0.4722592592593, epsilon = 1e-12);
+    assert_relative_eq!(r.p_value, 0.0468933196396, epsilon = 1e-12);
+    let t = TestResult::from(&r);
+    assert_eq!(t.method, "Asymptotic two-sample Cramer-von Mises test");
+    assert_eq!(t.n, Some(90));
+}
+
+#[test]
+fn cvm_exact_matches_enumeration() {
+    for name in ["e54", "e76", "e88", "e107", "e39"] {
+        let case = format!("cvm_{}", name);
+        let (x, y) = (get(&case, "in_x"), get(&case, "in_y"));
+        let r = cvm_test_2sample(x, y, CvmMethod::Auto).unwrap();
+        assert!(r.exact);
+        assert_relative_eq!(r.statistic, get1(&case, "statistic"), epsilon = 1e-12);
+        assert_relative_eq!(r.p_value, get1(&case, "p_value"), epsilon = 1e-12);
+    }
+    // scipy.stats.cramervonmises_2samp(method="exact") 1.17, for larger
+    // samples and for ties (midrank U against the no-ties distribution).
+    let (x, y) = xy();
+    let r = cvm_test_2sample(x, y, CvmMethod::Exact).unwrap();
+    assert_relative_eq!(r.p_value, 0.04728222743467917, epsilon = 1e-12);
+    let (xt, yt) = xyt();
+    let r = cvm_test_2sample(&xt[..12], &yt[..10], CvmMethod::Auto).unwrap();
+    assert!(r.exact);
+    assert_relative_eq!(r.statistic, 0.07102272727272707, epsilon = 1e-12);
+    assert_relative_eq!(r.p_value, 0.792741314413141, epsilon = 1e-12);
+}
+
+#[test]
+fn cvm_edge_cases() {
+    assert!(cvm_test_2sample(&[], &[1.0], CvmMethod::Auto).is_err());
+    assert!(cvm_test_2sample(&[1.0, f64::NAN], &[1.0], CvmMethod::Auto).is_err());
+    for method in [CvmMethod::Exact, CvmMethod::Asymptotic] {
+        let r = cvm_test_2sample(&[1.0], &[2.0], method).unwrap();
+        assert_eq!(r.p_value, 1.0);
+    }
 }
