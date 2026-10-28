@@ -307,6 +307,31 @@ for (nm in names(es_cases)) {
 r <- es2(x, y)
 check("es W (issue)", r[1], 19.25205304182, 1e-10); check("es p (issue)", r[2], 0.00070119804217, 1e-13)
 
+# ---------------------------------------------------------------------------
+# #34 1-D Wasserstein distance (transport::wasserstein1d), evidently's
+# normed value W1 / max(population sd of the reference, 0.001), and the
+# permutation p-value of twosamples::wass_test (Monte Carlo)
+# ---------------------------------------------------------------------------
+sdpop <- function(v) sqrt(mean((v - mean(v))^2))     # numpy std (ddof = 0)
+for (nm in names(num_cases)) {
+  a <- num_cases[[nm]][[1]]; b <- num_cases[[nm]][[2]]; key <- paste0("wass_", nm)
+  add(key, "distance_p1", transport::wasserstein1d(a, b, p = 1))
+  add(key, "distance_p2", transport::wasserstein1d(a, b, p = 2))
+  add(key, "distance_p3", transport::wasserstein1d(a, b, p = 3))
+  add(key, "distance_normed", transport::wasserstein1d(a, b, p = 1) / max(sdpop(a), 0.001))
+}
+# equal sizes take transport's other code path
+add("wass_equal", "in_x", x[1:40]); add("wass_equal", "in_y", y)
+add("wass_equal", "distance_p1", transport::wasserstein1d(x[1:40], y, p = 1))
+add("wass_equal", "distance_p2", transport::wasserstein1d(x[1:40], y, p = 2))
+check("wass (issue)", transport::wasserstein1d(x, y), 0.625792792352, 1e-12)
+check("wass normed (issue)", transport::wasserstein1d(x, y) / max(sdpop(x), 0.001), 0.43940285495, 1e-11)
+set.seed(1)
+for (nm in c("main", "close", "tie")) {
+  a <- num_cases[[nm]][[1]]; b <- num_cases[[nm]][[2]]
+  add(paste0("wass_", nm), "p_value_mc", twosamples::wass_test(a, b, nboots = 20000)[2])
+}
+
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)
 cat("wrote", nrow(out), "rows to R/data/drift_reference.csv\n")

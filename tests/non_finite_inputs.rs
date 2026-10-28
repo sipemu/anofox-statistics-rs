@@ -277,6 +277,10 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
             let _ = cvm_test_2sample(x, y, method);
         });
     }
+    run("wasserstein", &mut || {
+        let _ = wasserstein_distance_1d(x, y, 2.0);
+        let _ = wasserstein_test_1d(x, y, 20, Some(1));
+    });
     run("epps_singleton_test", &mut || {
         let _ = epps_singleton_test(x, y, None);
     });
@@ -308,6 +312,9 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     }
     run("drift from proportions", &mut || {
         let _ = psi_from_proportions(x, y);
+        for p in SCALARS {
+            let _ = wasserstein_distance_1d(x, y, p);
+        }
         let _ = kl_divergence_from_proportions(x, y, None);
         let _ = jensen_shannon_from_proportions(x, y, Some(2.0));
         let _ = hellinger_from_proportions(x, y);
@@ -597,6 +604,10 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
             ),
             ("clark_west", clark_west(&x, &y, 1).err()),
             ("psi", psi(&x, &y, Binning::Auto).err()),
+            (
+                "wasserstein_test_1d",
+                wasserstein_test_1d(&x, &y, 20, Some(1)).err(),
+            ),
             (
                 "epps_singleton_test",
                 epps_singleton_test(&x, &y, None).err(),

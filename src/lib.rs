@@ -42,8 +42,8 @@ pub use forecast::{
     SPAResult, VarEstimator,
 };
 pub use modern::{
-    energy_distance_test, energy_distance_test_1d, mmd_test, mmd_test_1d, EnergyDistanceResult,
-    Kernel, MMDResult,
+    energy_distance_test, energy_distance_test_1d, mmd_test, mmd_test_1d, wasserstein_distance_1d,
+    wasserstein_test_1d, EnergyDistanceResult, Kernel, MMDResult, WassersteinResult,
 };
 pub use nonparametric::{
     ad_test_ksamp, brunner_munzel, cvm_test_2sample, epps_singleton_test, kruskal_wallis,

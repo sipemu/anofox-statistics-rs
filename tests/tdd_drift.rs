@@ -8,8 +8,8 @@ use anofox_statistics::drift::{
     kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
 };
 use anofox_statistics::{
-    ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, Alternative, CvmMethod,
-    TestResult,
+    ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_distance_1d,
+    wasserstein_test_1d, Alternative, CvmMethod, TestResult,
 };
 use approx::assert_relative_eq;
 use std::collections::HashMap;
@@ -564,4 +564,78 @@ fn epps_singleton_rejects_bad_input() {
     // zero pooled IQR
     let c = [1.0; 10];
     assert!(epps_singleton_test(&c, &c, None).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// #34 1-D Wasserstein
+// ---------------------------------------------------------------------------
+
+#[test]
+fn wasserstein_matches_transport() {
+    let mut cases = num_cases();
+    cases.push((
+        "equal",
+        get("wass_equal", "in_x"),
+        get("wass_equal", "in_y"),
+    ));
+    for (name, x, y) in cases {
+        let case = format!("wass_{}", name);
+        for p in [1, 2, 3] {
+            let key = format!("distance_p{}", p);
+            if let Some(e) = refs().get(&(case.clone(), key)) {
+                let d = wasserstein_distance_1d(x, y, p as f64).unwrap();
+                assert_relative_eq!(d, e[0], epsilon = 1e-12);
+            }
+        }
+        if name != "equal" {
+            let r = wasserstein_test_1d(x, y, 0, None).unwrap();
+            assert_relative_eq!(r.distance, get1(&case, "distance_p1"), epsilon = 1e-12);
+            assert_relative_eq!(
+                r.distance_normed,
+                get1(&case, "distance_normed"),
+                epsilon = 1e-12
+            );
+        }
+    }
+    let (x, y) = xy();
+    let r = wasserstein_test_1d(x, y, 0, None).unwrap();
+    assert_relative_eq!(r.distance, 0.625792792352, epsilon = 1e-11);
+    assert_relative_eq!(r.distance_normed, 0.43940285495, epsilon = 1e-10);
+    assert_eq!(r.p_value, None);
+    let t = TestResult::from(&r);
+    assert_eq!(t.method, "Wasserstein distance");
+    assert_eq!(t.effect_size, Some(r.distance_normed));
+}
+
+#[test]
+fn wasserstein_permutation_p_value() {
+    // twosamples::wass_test with 20000 permutations; 4000 here: the two
+    // Monte Carlo standard errors combined are below 0.0085 for p ~ 0.5.
+    for name in ["main", "close", "tie"] {
+        let (_, x, y) = num_cases().into_iter().find(|c| c.0 == name).unwrap();
+        let case = format!("wass_{}", name);
+        let r = wasserstein_test_1d(x, y, 4000, Some(42)).unwrap();
+        let p = r.p_value.unwrap();
+        let e = get1(&case, "p_value_mc");
+        let se = (e * (1.0 - e) / 4000.0 + e * (1.0 - e) / 20000.0).sqrt();
+        assert!((p - e).abs() < 4.0 * se + 1e-3, "{}: {} vs {}", name, p, e);
+        assert_eq!(r.n_permutations, 4000);
+        // reproducible with a seed
+        assert_eq!(r, wasserstein_test_1d(x, y, 4000, Some(42)).unwrap());
+    }
+}
+
+#[test]
+fn wasserstein_edge_cases() {
+    assert!(wasserstein_distance_1d(&[], &[1.0], 1.0).is_err());
+    assert!(wasserstein_distance_1d(&[1.0], &[f64::NAN], 1.0).is_err());
+    assert!(wasserstein_distance_1d(&[1.0], &[2.0], 0.5).is_err());
+    assert!(wasserstein_distance_1d(&[1.0], &[2.0], f64::INFINITY).is_err());
+    assert_eq!(
+        wasserstein_distance_1d(&[1.0, 2.0], &[2.0, 1.0], 1.0).unwrap(),
+        0.0
+    );
+    // constant reference: the normed distance divides by 0.001
+    let r = wasserstein_test_1d(&[1.0, 1.0], &[2.0], 0, None).unwrap();
+    assert_relative_eq!(r.distance_normed, 1000.0, epsilon = 1e-9);
 }

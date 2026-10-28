@@ -58,6 +58,11 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   chi-squared p-value with `df` = rank of the covariance matrix). The pseudo-inverse
   uses a Jacobi eigen-decomposition (new `utils::math::symmetric_eigen`, crate
   private) with numpy's cutoff. Returns `EppsSingletonResult`.
+- **`wasserstein_distance_1d(x, y, p)` and `wasserstein_test_1d(reference, current,
+  n_permutations, seed)` (#34)**: the 1-D Wasserstein-`p` distance over the empirical
+  quantile functions (R `transport::wasserstein1d`), evidently's normed score
+  `W1 / max(population sd(reference), 0.001)`, and an optional seeded permutation
+  p-value (O(N) per permutation). Returns `WassersteinResult`.
 
 ## [0.4.11] - 2026-10-22
 

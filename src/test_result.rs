@@ -35,7 +35,7 @@ use crate::distributional::{DAgostinoResult, JarqueBeraResult, ShapiroWilkResult
 use crate::drift::DivergenceResult;
 use crate::equivalence::{OneSidedTestResult, TostResult};
 use crate::forecast::{CWResult, DMResult, MCSResult, MSPEAdjustedResult, SPAResult};
-use crate::modern::{EnergyDistanceResult, MMDResult};
+use crate::modern::{EnergyDistanceResult, MMDResult, WassersteinResult};
 use crate::nonparametric::{
     AndersonDarlingKResult, BrunnerMunzelResult, CvmTestResult, EppsSingletonResult, KruskalResult,
     KsTestResult, MannWhitneyResult, WilcoxonResult,
@@ -216,7 +216,21 @@ from_owned!(
     AndersonDarlingKResult,
     CvmTestResult,
     EppsSingletonResult,
+    WassersteinResult,
 );
+
+/// 1-D Wasserstein: `statistic` is `W_1`, the effect size evidently's normed
+/// distance (`"distance_normed"`), `p_value` the permutation p-value when
+/// computed.
+impl From<&WassersteinResult> for TestResult {
+    fn from(r: &WassersteinResult) -> Self {
+        let mut t = TestResult::new("Wasserstein distance")
+            .stat(r.distance)
+            .with_effect_size("distance_normed", r.distance_normed);
+        t.p_value = r.p_value;
+        t
+    }
+}
 
 /// Epps-Singleton: `statistic` is W, `df1` the rank of the covariance
 /// matrix, `n` the pooled sample size.
