@@ -272,6 +272,19 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     run("clark_west", &mut || {
         let _ = clark_west(x, y, 1);
     });
+    for b in [
+        Binning::Auto,
+        Binning::Sturges,
+        Binning::Quantile(4),
+        Binning::Categorical,
+    ] {
+        run("drift divergences", &mut || {
+            let _ = psi(x, y, b);
+        });
+    }
+    run("drift from proportions", &mut || {
+        let _ = psi_from_proportions(x, y);
+    });
     run("spa_test", &mut || {
         let _ = spa_test(x, &[y.to_vec(), z.clone()], 30, 2.0, Some(1));
         let _ = mspe_adjusted_spa(x, &[y.to_vec(), z.clone()], 30, 2.0, Some(1));
@@ -556,6 +569,7 @@ fn issue_17_non_finite_data_is_rejected_not_misreported() {
                 mmd_test(&xv, &yv, Kernel::Linear, 30, Some(1)).err(),
             ),
             ("clark_west", clark_west(&x, &y, 1).err()),
+            ("psi", psi(&x, &y, Binning::Auto).err()),
             (
                 "diebold_mariano",
                 diebold_mariano(

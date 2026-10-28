@@ -5,6 +5,7 @@ pub mod categorical;
 pub mod classification;
 pub mod correlation;
 pub mod distributional;
+pub mod drift;
 pub mod equivalence;
 pub mod error;
 pub mod forecast;
@@ -26,6 +27,10 @@ pub use correlation::{
 pub use distributional::{
     dagostino_k_squared, jarque_bera, shapiro_wilk, DAgostinoResult, JarqueBeraResult,
     ShapiroWilkResult,
+};
+pub use drift::{
+    binned_proportions, category_proportions, psi, psi_categorical, psi_from_proportions, Binning,
+    DivergenceResult,
 };
 pub use error::{Result, StatError};
 pub use forecast::{

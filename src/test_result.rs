@@ -32,6 +32,7 @@ use crate::correlation::{
     CorrelationMethod, CorrelationResult, DistanceCorResult, ICCResult, PartialCorResult,
 };
 use crate::distributional::{DAgostinoResult, JarqueBeraResult, ShapiroWilkResult};
+use crate::drift::DivergenceResult;
 use crate::equivalence::{OneSidedTestResult, TostResult};
 use crate::forecast::{CWResult, DMResult, MCSResult, MSPEAdjustedResult, SPAResult};
 use crate::modern::{EnergyDistanceResult, MMDResult};
@@ -207,7 +208,18 @@ from_owned!(
     MSPEAdjustedResult,
     MCSResult,
     PortmanteauResult,
+    DivergenceResult,
 );
+
+/// Binned divergence (PSI, KL, Jensen-Shannon, Hellinger): `statistic` is the
+/// divergence, `n` the reference plus current sample size; no p-value.
+impl From<&DivergenceResult> for TestResult {
+    fn from(r: &DivergenceResult) -> Self {
+        TestResult::new(r.method.clone())
+            .stat(r.statistic)
+            .with_n(r.n_reference + r.n_current)
+    }
+}
 
 /// Ljung-Box / Box-Pierce: `statistic` is Q, `df1 = lag - fitdf`.
 impl From<&PortmanteauResult> for TestResult {

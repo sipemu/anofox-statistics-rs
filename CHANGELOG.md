@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+evidently's data-drift tests (#40), upstream of DataZooDE/anofox-statistics#255.
+Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
+
+- **New `drift` module with shared binning (#35).** `drift::binned_proportions(reference,
+  current, Binning)` bins two samples on common bins: `Binning::Auto` is evidently's
+  rule (equal-width Sturges bins over the pooled sample, as numpy
+  `histogram_bin_edges(..., "sturges")`, when the reference has more than 20 distinct
+  values; one bin per distinct value otherwise), plus `Sturges`, `Quantile(n)`
+  (reference-quantile bins, R type 7, open outer edges) and `Categorical`.
+  `category_proportions` does the same for labels of any `Ord` type; `zero_fill` is
+  evidently's zero replacement.
+- **`drift::psi` (#35)**, the Population Stability Index `sum (p - q) ln(p / q)` on
+  zero-filled proportions (R `philentropy` Jeffreys divergence), with
+  `psi_categorical` and `psi_from_proportions`. Returns the new `DivergenceResult`,
+  which converts to `TestResult`.
+
 ## [0.4.11] - 2026-10-22
 
 ### Added
