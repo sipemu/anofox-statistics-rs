@@ -1,8 +1,8 @@
 //! Hellinger distance.
 
 use super::binning::{
-    binned_proportions, category_proportions, sturges_distinct_proportions, validate_proportions,
-    Binning,
+    binned_proportions, category_proportions, n_distinct, sturges_distinct_proportions,
+    validate_proportions, Binning,
 };
 use super::DivergenceResult;
 use crate::error::Result;
@@ -29,17 +29,19 @@ pub fn hellinger_from_proportions(p: &[f64], q: &[f64]) -> Result<f64> {
 /// proportions of a numeric reference and current sample, in `[0, 1]`.
 /// evidently's `"hellinger"` test flags drift at `>= 0.1`.
 ///
-/// Binning: [`Binning::Auto`] copies evidently's numeric Hellinger rule,
-/// which differs from the other divergences: always equal-width Sturges bins
-/// over the pooled range, but with the bin count `ceil(log2(k) + 1)` taken
-/// from the number `k` of *distinct* pooled values (evidently calls
+/// Binning: [`Binning::Auto`] applies the shared rule of
+/// [`binned_proportions`] first, so integer codes and other data with at most
+/// 20 distinct reference values get one bin per value, as in [`psi`](super::psi()),
+/// [`kl_divergence`](super::kl_divergence()) and
+/// [`jensen_shannon`](super::jensen_shannon()). Above 20 it uses evidently's
+/// numeric Hellinger bins: equal-width Sturges bins over the pooled range, but
+/// with the bin count `ceil(log2(k) + 1)` taken from the number `k` of
+/// *distinct* pooled values (evidently calls
 /// `histogram_bin_edges(unique(ref, cur), "sturges")`), not from the pooled
 /// sample size as [`Binning::Sturges`] does. Without ties the two agree. The
-/// other [`Binning`] variants behave as in [`binned_proportions`]; use
-/// [`hellinger_categorical`] (or [`Binning::Categorical`]) for evidently's
-/// categorical case.
+/// other [`Binning`] variants behave as in [`binned_proportions`].
 ///
-/// R equivalent (numeric, evidently's binning):
+/// R equivalent (more than 20 distinct reference values):
 /// ```text
 /// k  <- unique(c(x, y)); br <- seq(min(k), max(k), length.out = nclass.Sturges(k) + 1)
 /// p  <- tabulate(findInterval(x, br, rightmost.closed = TRUE), length(br) - 1) / length(x)
@@ -59,7 +61,9 @@ pub fn hellinger_from_proportions(p: &[f64], q: &[f64]) -> Result<f64> {
 /// ```
 pub fn hellinger(reference: &[f64], current: &[f64], binning: Binning) -> Result<DivergenceResult> {
     let (p, q) = match binning {
-        Binning::Auto => sturges_distinct_proportions(reference, current)?,
+        Binning::Auto if n_distinct(reference) > 20 => {
+            sturges_distinct_proportions(reference, current)?
+        }
         b => binned_proportions(reference, current, b)?,
     };
     Ok(DivergenceResult::new(

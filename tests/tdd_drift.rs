@@ -4,9 +4,9 @@
 use anofox_statistics::drift::{
     binned_proportions, category_proportions, hellinger, hellinger_categorical,
     hellinger_from_proportions, jensen_shannon, jensen_shannon_categorical,
-    jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
-    kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, tvd_test,
-    tvd_test_numeric, Binning,
+    jensen_shannon_divergence_from_proportions, jensen_shannon_from_proportions, kl_divergence,
+    kl_divergence_categorical, kl_divergence_from_proportions, psi, psi_categorical,
+    psi_from_proportions, tvd_test, tvd_test_numeric, Binning, ZeroFill,
 };
 use anofox_statistics::{
     ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_distance_1d,
@@ -150,7 +150,7 @@ fn binning_rejects_bad_input() {
 #[test]
 fn psi_matches_r() {
     for (name, r, c, binning) in binning_cases() {
-        let res = psi(r, c, binning).unwrap();
+        let res = psi(r, c, binning, ZeroFill::Evidently).unwrap();
         assert_relative_eq!(
             res.statistic,
             get1(&format!("psi_{}", name), "statistic"),
@@ -161,30 +161,80 @@ fn psi_matches_r() {
     // Issue values.
     let (x, y) = xy();
     assert_relative_eq!(
-        psi(x, y, Binning::Auto).unwrap().statistic,
+        psi(x, y, Binning::Auto, ZeroFill::Evidently)
+            .unwrap()
+            .statistic,
         0.570692693084,
         epsilon = 1e-11
     );
     let (xc, yc) = xyc();
-    let cat = psi_categorical(&labels(xc), &labels(yc)).unwrap();
+    let cat = psi_categorical(&labels(xc), &labels(yc), ZeroFill::Evidently).unwrap();
     assert_relative_eq!(cat.statistic, 1.56548983794, epsilon = 1e-10);
     assert_eq!(cat.n_bins, 5);
     let (p, q) = (get("bins_cat", "p"), get("bins_cat", "q"));
     assert_relative_eq!(
-        psi_from_proportions(p, q).unwrap(),
+        psi_from_proportions(p, q, ZeroFill::Evidently).unwrap(),
         1.56548983794,
         epsilon = 1e-10
     );
 }
 
 #[test]
+fn constant_zero_fill_matches_r() {
+    // #42: ZeroFill::Constant(eps), philentropy on manually filled proportions
+    for (name, r, c, binning) in binning_cases() {
+        for eps in [1e-3, 0.01] {
+            let key = format!("statistic_eps{}", eps);
+            let fill = ZeroFill::Constant(eps);
+            let res = psi(r, c, binning, fill).unwrap();
+            assert_relative_eq!(
+                res.statistic,
+                get1(&format!("psi_{}", name), &key),
+                epsilon = 1e-10
+            );
+            let res = kl_divergence(r, c, binning, None, fill).unwrap();
+            assert_relative_eq!(
+                res.statistic,
+                get1(&format!("kl_{}", name), &key),
+                epsilon = 1e-10
+            );
+        }
+    }
+    let (xc, yc) = xyc();
+    let fill = ZeroFill::Constant(0.01);
+    assert_relative_eq!(
+        psi_categorical(&labels(xc), &labels(yc), fill)
+            .unwrap()
+            .statistic,
+        get1("psi_cat", "statistic_eps0.01"),
+        epsilon = 1e-10
+    );
+    assert_relative_eq!(
+        kl_divergence_categorical(&labels(xc), &labels(yc), None, fill)
+            .unwrap()
+            .statistic,
+        get1("kl_cat", "statistic_eps0.01"),
+        epsilon = 1e-10
+    );
+    assert_eq!(ZeroFill::default(), ZeroFill::Evidently);
+    for eps in [0.0, -1e-3, f64::NAN, f64::INFINITY] {
+        let fill = ZeroFill::Constant(eps);
+        assert!(psi_from_proportions(&[0.5, 0.5], &[1.0, 0.0], fill).is_err());
+        assert!(kl_divergence_from_proportions(&[0.5, 0.5], &[1.0, 0.0], None, fill).is_err());
+    }
+}
+
+#[test]
 fn psi_categorical_str_labels() {
     let r = ["a", "a", "b", "c"];
     let c = ["a", "b", "b", "b", "d"];
-    let res = psi_categorical(&r, &c).unwrap();
+    let res = psi_categorical(&r, &c, ZeroFill::Evidently).unwrap();
     let (p, q) = category_proportions(&r, &c).unwrap();
     assert_eq!(res.n_bins, 4);
-    assert_eq!(res.statistic, psi_from_proportions(&p, &q).unwrap());
+    assert_eq!(
+        res.statistic,
+        psi_from_proportions(&p, &q, ZeroFill::Evidently).unwrap()
+    );
     let t = TestResult::from(&res);
     assert_eq!(t.method, "Population Stability Index");
     assert_eq!(t.statistic, Some(res.statistic));
@@ -194,11 +244,11 @@ fn psi_categorical_str_labels() {
 
 #[test]
 fn psi_from_proportions_rejects_bad_input() {
-    assert!(psi_from_proportions(&[0.5, 0.5], &[1.0]).is_err());
-    assert!(psi_from_proportions(&[], &[]).is_err());
-    assert!(psi_from_proportions(&[1.5, -0.5], &[0.5, 0.5]).is_err());
-    assert!(psi_from_proportions(&[0.0, 0.0], &[0.5, 0.5]).is_err());
-    assert!(psi_from_proportions(&[f64::NAN, 1.0], &[0.5, 0.5]).is_err());
+    assert!(psi_from_proportions(&[0.5, 0.5], &[1.0], ZeroFill::Evidently).is_err());
+    assert!(psi_from_proportions(&[], &[], ZeroFill::Evidently).is_err());
+    assert!(psi_from_proportions(&[1.5, -0.5], &[0.5, 0.5], ZeroFill::Evidently).is_err());
+    assert!(psi_from_proportions(&[0.0, 0.0], &[0.5, 0.5], ZeroFill::Evidently).is_err());
+    assert!(psi_from_proportions(&[f64::NAN, 1.0], &[0.5, 0.5], ZeroFill::Evidently).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -209,9 +259,9 @@ fn psi_from_proportions_rejects_bad_input() {
 fn kl_matches_r() {
     for (name, r, c, binning) in binning_cases() {
         let case = format!("kl_{}", name);
-        let ln = kl_divergence(r, c, binning, None).unwrap();
+        let ln = kl_divergence(r, c, binning, None, ZeroFill::Evidently).unwrap();
         assert_relative_eq!(ln.statistic, get1(&case, "statistic"), epsilon = 1e-10);
-        let log2 = kl_divergence(r, c, binning, Some(2.0)).unwrap();
+        let log2 = kl_divergence(r, c, binning, Some(2.0), ZeroFill::Evidently).unwrap();
         assert_relative_eq!(
             log2.statistic,
             get1(&case, "statistic_log2"),
@@ -220,13 +270,16 @@ fn kl_matches_r() {
     }
     let (x, y) = xy();
     assert_relative_eq!(
-        kl_divergence(x, y, Binning::Auto, None).unwrap().statistic,
+        kl_divergence(x, y, Binning::Auto, None, ZeroFill::Evidently)
+            .unwrap()
+            .statistic,
         0.264782319603,
         epsilon = 1e-11
     );
     // The categorical case needs the renormalization after the zero fill.
     let (xc, yc) = xyc();
-    let cat = kl_divergence_categorical(&labels(xc), &labels(yc), None).unwrap();
+    let cat =
+        kl_divergence_categorical(&labels(xc), &labels(yc), None, ZeroFill::Evidently).unwrap();
     assert_relative_eq!(cat.statistic, 0.223061363402, epsilon = 1e-11);
     assert_eq!(TestResult::from(&cat).method, "Kullback-Leibler divergence");
 }
@@ -235,11 +288,21 @@ fn kl_matches_r() {
 fn kl_rejects_bad_input() {
     let p = [0.5, 0.5];
     for b in [0.0, 1.0, -2.0, f64::NAN, f64::INFINITY] {
-        assert!(kl_divergence_from_proportions(&p, &p, Some(b)).is_err());
+        assert!(kl_divergence_from_proportions(&p, &p, Some(b), ZeroFill::Evidently).is_err());
     }
-    assert_eq!(kl_divergence_from_proportions(&p, &p, None).unwrap(), 0.0);
-    assert!(kl_divergence_from_proportions(&p, &[1.0], None).is_err());
-    assert!(kl_divergence(&[1.0, f64::NAN], &[1.0], Binning::Auto, None).is_err());
+    assert_eq!(
+        kl_divergence_from_proportions(&p, &p, None, ZeroFill::Evidently).unwrap(),
+        0.0
+    );
+    assert!(kl_divergence_from_proportions(&p, &[1.0], None, ZeroFill::Evidently).is_err());
+    assert!(kl_divergence(
+        &[1.0, f64::NAN],
+        &[1.0],
+        Binning::Auto,
+        None,
+        ZeroFill::Evidently
+    )
+    .is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -258,6 +321,23 @@ fn jensen_shannon_matches_r() {
             get1(&case, "statistic_log2"),
             epsilon = 1e-10
         );
+        // #44: the divergence, philentropy::JSD
+        assert_relative_eq!(
+            ln.divergence.unwrap(),
+            get1(&case, "divergence"),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(
+            log2.divergence.unwrap(),
+            get1(&case, "divergence_log2"),
+            epsilon = 1e-12
+        );
+        let (p, q) = binned_proportions(r, c, binning).unwrap();
+        assert_relative_eq!(
+            jensen_shannon_divergence_from_proportions(&p, &q, Some(2.0)).unwrap(),
+            get1(&case, "divergence_log2"),
+            epsilon = 1e-12
+        );
     }
     let (x, y) = xy();
     assert_relative_eq!(
@@ -268,7 +348,19 @@ fn jensen_shannon_matches_r() {
     let (xc, yc) = xyc();
     let cat = jensen_shannon_categorical(&labels(xc), &labels(yc), None).unwrap();
     assert_relative_eq!(cat.statistic, 0.27397012217, epsilon = 1e-10);
-    assert_eq!(TestResult::from(&cat).method, "Jensen-Shannon distance");
+    assert_relative_eq!(
+        cat.divergence.unwrap(),
+        get1("js_cat", "divergence"),
+        epsilon = 1e-12
+    );
+    let t = TestResult::from(&cat);
+    assert_eq!(t.method, "Jensen-Shannon distance");
+    assert_eq!(t.effect_name.as_deref(), Some("divergence"));
+    assert_eq!(t.effect_size, cat.divergence);
+    // Other divergences carry no secondary value.
+    let h = hellinger_categorical(&labels(xc), &labels(yc)).unwrap();
+    assert_eq!(h.divergence, None);
+    assert_eq!(TestResult::from(&h).effect_size, None);
 }
 
 #[test]
@@ -302,12 +394,7 @@ fn jensen_shannon_bounds() {
 #[test]
 fn hellinger_matches_r() {
     for (name, r, c, binning) in binning_cases() {
-        // Auto means evidently's numeric Hellinger rule; the categorical
-        // case of the R script uses one bin per value.
-        let binning = match binning {
-            Binning::Auto => Binning::Categorical,
-            b => b,
-        };
+        // The numeric Auto case uses evidently's Hellinger bins, checked below.
         if name == "num" {
             continue;
         }
@@ -332,14 +419,27 @@ fn hellinger_matches_r() {
     let cat = hellinger_categorical(&labels(xc), &labels(yc)).unwrap();
     assert_relative_eq!(cat.statistic, 0.325194993744, epsilon = 1e-11);
     assert_eq!(TestResult::from(&cat).method, "Hellinger distance");
-    // With ties, evidently's rule (bins from distinct values) differs from
-    // the pooled-size Sturges rule.
+    // Integer codes under Auto: one bin per code, as psi / kl / js (#45).
+    let auto = hellinger(xc, yc, Binning::Auto).unwrap();
+    assert_relative_eq!(auto.statistic, 0.325194993744, epsilon = 1e-11);
+    assert_eq!(auto.n_bins, cat.n_bins);
+    // xt has 20 distinct values: Auto bins per value.
     let (xt, yt) = xyt();
+    let res = hellinger(xt, yt, Binning::Auto).unwrap();
+    assert_eq!(res.n_bins as f64, get1("hellinger_auto_tie", "n_bins"));
+    assert_relative_eq!(
+        res.statistic,
+        get1("hellinger_auto_tie", "statistic"),
+        epsilon = 1e-10
+    );
+    // With ties and > 20 distinct values, evidently's rule (bins from
+    // distinct values) differs from the pooled-size Sturges rule.
+    let (xtl, ytl) = (get("data", "in_xtl"), get("data", "in_ytl"));
     for (b, case) in [
-        (Binning::Auto, "hellinger_auto_tie"),
-        (Binning::Sturges, "hellinger_sturges_tie"),
+        (Binning::Auto, "hellinger_auto_tiel"),
+        (Binning::Sturges, "hellinger_sturges_tiel"),
     ] {
-        let res = hellinger(xt, yt, b).unwrap();
+        let res = hellinger(xtl, ytl, b).unwrap();
         assert_eq!(res.n_bins as f64, get1(case, "n_bins"));
         assert_relative_eq!(res.statistic, get1(case, "statistic"), epsilon = 1e-10);
     }
@@ -584,17 +684,26 @@ fn wasserstein_matches_transport() {
             }
         }
         if name != "equal" {
-            let r = wasserstein_test_1d(x, y, 0, None).unwrap();
+            let r = wasserstein_test_1d(x, y, 1.0, 0, None).unwrap();
             assert_relative_eq!(r.distance, get1(&case, "distance_p1"), epsilon = 1e-12);
             assert_relative_eq!(
                 r.distance_normed,
                 get1(&case, "distance_normed"),
                 epsilon = 1e-12
             );
+            // #43: W_2 and its normed score
+            let r = wasserstein_test_1d(x, y, 2.0, 0, None).unwrap();
+            assert_eq!(r.p, 2.0);
+            assert_relative_eq!(r.distance, get1(&case, "distance_p2"), epsilon = 1e-12);
+            assert_relative_eq!(
+                r.distance_normed,
+                get1(&case, "distance_normed_p2"),
+                epsilon = 1e-12
+            );
         }
     }
     let (x, y) = xy();
-    let r = wasserstein_test_1d(x, y, 0, None).unwrap();
+    let r = wasserstein_test_1d(x, y, 1.0, 0, None).unwrap();
     assert_relative_eq!(r.distance, 0.625792792352, epsilon = 1e-11);
     assert_relative_eq!(r.distance_normed, 0.43940285495, epsilon = 1e-10);
     assert_eq!(r.p_value, None);
@@ -610,14 +719,27 @@ fn wasserstein_permutation_p_value() {
     for name in ["main", "close", "tie"] {
         let (_, x, y) = num_cases().into_iter().find(|c| c.0 == name).unwrap();
         let case = format!("wass_{}", name);
-        let r = wasserstein_test_1d(x, y, 4000, Some(42)).unwrap();
+        let r = wasserstein_test_1d(x, y, 1.0, 4000, Some(42)).unwrap();
         let p = r.p_value.unwrap();
         let e = get1(&case, "p_value_mc");
         let se = (e * (1.0 - e) / 4000.0 + e * (1.0 - e) / 20000.0).sqrt();
         assert!((p - e).abs() < 4.0 * se + 1e-3, "{}: {} vs {}", name, p, e);
         assert_eq!(r.n_permutations, 4000);
         // reproducible with a seed
-        assert_eq!(r, wasserstein_test_1d(x, y, 4000, Some(42)).unwrap());
+        assert_eq!(r, wasserstein_test_1d(x, y, 1.0, 4000, Some(42)).unwrap());
+        // #43: permutation p-value of W_2 (R: 20000 permutations of
+        // transport::wasserstein1d(p = 2))
+        let r = wasserstein_test_1d(x, y, 2.0, 4000, Some(42)).unwrap();
+        let p = r.p_value.unwrap();
+        let e = get1(&case, "p_value_mc_p2");
+        let se = (e * (1.0 - e) / 4000.0 + e * (1.0 - e) / 20000.0).sqrt();
+        assert!(
+            (p - e).abs() < 4.0 * se + 1e-3,
+            "{} p=2: {} vs {}",
+            name,
+            p,
+            e
+        );
     }
 }
 
@@ -627,12 +749,16 @@ fn wasserstein_edge_cases() {
     assert!(wasserstein_distance_1d(&[1.0], &[f64::NAN], 1.0).is_err());
     assert!(wasserstein_distance_1d(&[1.0], &[2.0], 0.5).is_err());
     assert!(wasserstein_distance_1d(&[1.0], &[2.0], f64::INFINITY).is_err());
+    assert!(wasserstein_test_1d(&[1.0], &[2.0], 0.5, 10, Some(1)).is_err());
+    // identical samples: every split is at least as extreme
+    let r = wasserstein_test_1d(&[1.0, 2.0, 3.0], &[1.0, 2.0, 3.0], 2.0, 99, Some(1)).unwrap();
+    assert_eq!((r.distance, r.p_value), (0.0, Some(1.0)));
     assert_eq!(
         wasserstein_distance_1d(&[1.0, 2.0], &[2.0, 1.0], 1.0).unwrap(),
         0.0
     );
     // constant reference: the normed distance divides by 0.001
-    let r = wasserstein_test_1d(&[1.0, 1.0], &[2.0], 0, None).unwrap();
+    let r = wasserstein_test_1d(&[1.0, 1.0], &[2.0], 1.0, 0, None).unwrap();
     assert_relative_eq!(r.distance_normed, 1000.0, epsilon = 1e-9);
 }
 

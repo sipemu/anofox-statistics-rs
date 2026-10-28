@@ -23,9 +23,12 @@ pub mod kl;
 pub mod psi;
 pub mod tvd;
 
-pub use binning::{binned_proportions, category_proportions, zero_fill, Binning};
+pub use binning::{binned_proportions, category_proportions, zero_fill, Binning, ZeroFill};
 pub use hellinger::{hellinger, hellinger_categorical, hellinger_from_proportions};
-pub use js::{jensen_shannon, jensen_shannon_categorical, jensen_shannon_from_proportions};
+pub use js::{
+    jensen_shannon, jensen_shannon_categorical, jensen_shannon_divergence_from_proportions,
+    jensen_shannon_from_proportions,
+};
 pub use kl::{kl_divergence, kl_divergence_categorical, kl_divergence_from_proportions};
 pub use psi::{psi, psi_categorical, psi_from_proportions};
 pub use tvd::{tvd_test, tvd_test_numeric, TvdResult};
@@ -52,6 +55,10 @@ pub struct DivergenceResult {
     pub method: String,
     /// Value of the measure.
     pub statistic: f64,
+    /// The divergence behind a distance, where the measure has one: the
+    /// Jensen-Shannon divergence (`statistic^2`) for
+    /// [`jensen_shannon()`]; `None` otherwise.
+    pub divergence: Option<f64>,
     /// Number of bins (categories) the proportions were computed on.
     pub n_bins: usize,
     /// Size of the reference sample.
@@ -71,6 +78,7 @@ impl DivergenceResult {
         DivergenceResult {
             method: method.to_string(),
             statistic,
+            divergence: None,
             n_bins,
             n_reference,
             n_current,

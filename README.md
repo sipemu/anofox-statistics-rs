@@ -153,7 +153,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anofox-statistics = "0.5"
+anofox-statistics = "0.6"
 ```
 
 ## Examples
@@ -401,7 +401,9 @@ let result = mmd_test(&sample1, &sample2, Kernel::GaussianMedian, 1000, Some(42)
 ### Data Drift (evidently's statistical tests)
 
 ```rust
-use anofox_statistics::drift::{hellinger, jensen_shannon_categorical, psi, tvd_test, Binning};
+use anofox_statistics::drift::{
+    hellinger, jensen_shannon_categorical, psi, tvd_test, Binning, ZeroFill,
+};
 use anofox_statistics::{
     ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_test_1d,
     Alternative, CvmMethod,
@@ -415,11 +417,11 @@ let ks = ks_test_2sample(&reference, &current, Alternative::TwoSided, None)?; //
 let ad = ad_test_ksamp(&[&reference, &current], true)?;                     // T.AD = 3.61
 let cvm = cvm_test_2sample(&reference, &current, CvmMethod::Auto)?;          // p = 0.0469
 let es = epps_singleton_test(&reference, &current, None)?;                   // W = 19.25
-let w = wasserstein_test_1d(&reference, &current, 1000, Some(42))?;          // normed 0.439
+let w = wasserstein_test_1d(&reference, &current, 1.0, 1000, Some(42))?;     // normed 0.439
 
 // Binned divergences (evidently's binning with Binning::Auto)
-let p = psi(&reference, &current, Binning::Auto)?;                // 0.571
-let h = hellinger(&reference, &current, Binning::Auto)?;          // 0.262
+let p = psi(&reference, &current, Binning::Auto, ZeroFill::Evidently)?; // 0.571
+let h = hellinger(&reference, &current, Binning::Auto)?;                 // 0.262
 let js = jensen_shannon_categorical(&["a", "b", "b"], &["b", "c"], None)?;
 let tvd = tvd_test(&["a", "a", "b"], &["b", "b", "c"], 1000, Some(1))?;
 ```

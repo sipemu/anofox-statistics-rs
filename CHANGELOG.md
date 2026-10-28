@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-28
+
+### Added
+
+- **Jensen-Shannon divergence (#44).** `drift::jensen_shannon_divergence_from_proportions`
+  returns the divergence (R `philentropy::JSD`, any log base), and `jensen_shannon` /
+  `jensen_shannon_categorical` fill the new `DivergenceResult::divergence` (`None` for
+  the other measures). `TestResult` reports it as the effect size `"divergence"`.
+
+### Changed
+
+- **Configurable zero fill for PSI and KL (#42, breaking).** `psi`, `psi_categorical`,
+  `psi_from_proportions`, `kl_divergence`, `kl_divergence_categorical` and
+  `kl_divergence_from_proportions` take a final `drift::ZeroFill` argument:
+  `ZeroFill::Evidently` (the default, the previous behaviour) or
+  `ZeroFill::Constant(eps)`, which replaces zero proportions by `eps` (KL still
+  renormalizes). Validated against `philentropy` on manually filled proportions.
+- **`wasserstein_test_1d(reference, current, p, n_permutations, seed)` takes the order
+  `p` (#43, breaking: callers add `1.0` for the old behaviour).** `distance` is `W_p`,
+  `distance_normed = W_p / max(population sd(reference), 0.001)`, and the permutation
+  p-value is on `W_p`; `WassersteinResult` gains `p`. Validated against
+  `transport::wasserstein1d(p = 2)` and an R permutation of it (`twosamples::wass_test`
+  with `p != 1` permutes `int |F - G|^p dt`, which is not `W_p`).
+- **`drift::hellinger(.., Binning::Auto)` follows the shared `Auto` rule (#45).**
+  Data with at most 20 distinct reference values (e.g. integer category codes) now get
+  one bin per value, as `psi`, `kl_divergence` and `jensen_shannon` do; above 20,
+  `Auto` still uses evidently's numeric Hellinger bins (Sturges count from the
+  distinct pooled values). The real-valued reference (0.262287362723) is unchanged;
+  integer codes now give the categorical 0.325194993744.
+
 ## [0.5.0] - 2026-10-28
 
 ### Added

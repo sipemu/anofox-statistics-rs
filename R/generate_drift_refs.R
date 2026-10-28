@@ -113,6 +113,20 @@ for (nm in names(binnings)) {
   add(paste0("kl_", nm), "statistic_log2", kl(b, 2))
 }
 check("kl num (issue)", kl(binnings$num), 0.264782319603, 1e-11)
+
+# #42: constant zero fill eps (PSI not renormalized, KL renormalized)
+fill_const <- function(a, eps) { a[a == 0] <- eps; a }
+for (nm in names(binnings)) {
+  b <- binnings[[nm]]
+  for (eps in c(1e-3, 0.01)) {
+    P <- fill_const(b$p, eps); Q <- fill_const(b$q, eps)
+    add(paste0("psi_", nm), paste0("statistic_eps", eps),
+        suppressMessages(philentropy::distance(rbind(P, Q), method = "jeffreys", unit = "log")))
+    P <- P / sum(P); Q <- Q / sum(Q)
+    add(paste0("kl_", nm), paste0("statistic_eps", eps),
+        suppressMessages(philentropy::KL(rbind(P, Q), unit = "log")))
+  }
+}
 check("kl cat (issue)", kl(binnings$cat), 0.223061363402, 1e-11)
 
 # ---------------------------------------------------------------------------
@@ -131,6 +145,11 @@ for (nm in names(binnings)) {
         sqrt(suppressMessages(philentropy::JSD(rbind(b$p, b$q), unit = "log2"))))
   add(paste0("js_", nm), "statistic", jsd(b))
   add(paste0("js_", nm), "statistic_log2", jsd(b, 2))
+  # #44: the divergence itself, philentropy::JSD
+  add(paste0("js_", nm), "divergence",
+      suppressMessages(philentropy::JSD(rbind(b$p, b$q), unit = "log")))
+  add(paste0("js_", nm), "divergence_log2",
+      suppressMessages(philentropy::JSD(rbind(b$p, b$q), unit = "log2")))
 }
 check("js num (issue)", jsd(binnings$num), 0.257847900615, 1e-11)
 check("js cat (issue)", jsd(binnings$cat), 0.27397012217, 1e-10)
@@ -152,12 +171,22 @@ b <- sturges_props(x, y, unique(c(x, y)))
 add("hellinger_auto_num", "statistic", hell(b))
 check("hellinger num (issue)", hell(b), 0.262287362723, 1e-11)
 check("hellinger cat (issue)", hell(binnings$cat), 0.325194993744, 1e-11)
-b <- sturges_props(xt, yt, unique(c(xt, yt)))
-add("hellinger_auto_tie", "n_bins", length(b$p))
-add("hellinger_auto_tie", "statistic", hell(b))
-b <- sturges_props(xt, yt)
-add("hellinger_sturges_tie", "n_bins", length(b$p))
-add("hellinger_sturges_tie", "statistic", hell(b))
+# Auto applies evidently's > 20 distinct reference values rule first (#45):
+# xt has 20 distinct values, so it is binned per value.
+stopifnot(length(unique(xt)) == 20)
+add("hellinger_auto_tie", "n_bins", length(binnings$tie_cat$p))
+add("hellinger_auto_tie", "statistic", hell(binnings$tie_cat))
+# Tied data with > 20 distinct reference values: Sturges bins whose count
+# comes from the distinct pooled values, unlike Binning::Sturges.
+xtl <- round(xl, 1); ytl <- round(yl, 1)
+stopifnot(length(unique(xtl)) > 20)
+add("data", "in_xtl", xtl); add("data", "in_ytl", ytl)
+b <- sturges_props(xtl, ytl, unique(c(xtl, ytl)))
+add("hellinger_auto_tiel", "n_bins", length(b$p))
+add("hellinger_auto_tiel", "statistic", hell(b))
+b <- sturges_props(xtl, ytl)
+add("hellinger_sturges_tiel", "n_bins", length(b$p))
+add("hellinger_sturges_tiel", "statistic", hell(b))
 
 # ---------------------------------------------------------------------------
 # #30 two-sample Kolmogorov-Smirnov: stats::ks.test, exact = NULL/TRUE/FALSE
@@ -338,6 +367,23 @@ set.seed(1)
 for (nm in c("main", "close", "tie")) {
   a <- num_cases[[nm]][[1]]; b <- num_cases[[nm]][[2]]
   add(paste0("wass_", nm), "p_value_mc", twosamples::wass_test(a, b, nboots = 20000)[2])
+}
+# #43: W_p for p != 1. evidently's scaling W_p / max(sd, 0.001), and the
+# permutation p-value of W_p itself. twosamples::wass_test(p = 2) is not a
+# reference here: for p != 1 it permutes int |F - G|^p dt, not W_p.
+for (nm in names(num_cases)) {
+  a <- num_cases[[nm]][[1]]; b <- num_cases[[nm]][[2]]
+  add(paste0("wass_", nm), "distance_normed_p2",
+      transport::wasserstein1d(a, b, p = 2) / max(sdpop(a), 0.001))
+}
+set.seed(2)
+for (nm in c("main", "close", "tie")) {
+  a <- num_cases[[nm]][[1]]; b <- num_cases[[nm]][[2]]
+  z <- c(a, b); m <- length(a); B <- 20000
+  obs <- transport::wasserstein1d(a, b, p = 2)
+  perm <- replicate(B, { i <- sample.int(length(z), m)
+                         transport::wasserstein1d(z[i], z[-i], p = 2) })
+  add(paste0("wass_", nm), "p_value_mc_p2", mean(perm >= obs - 1e-12))
 }
 
 # ---------------------------------------------------------------------------
