@@ -272,6 +272,12 @@ fn run_all(x: &[f64], y: &[f64]) -> Vec<String> {
     run("clark_west", &mut || {
         let _ = clark_west(x, y, 1);
     });
+    for midrank in [true, false] {
+        run("ad_test_ksamp", &mut || {
+            let _ = ad_test_ksamp(&[x, y], midrank);
+            let _ = ad_test_ksamp(&[x, y, &z], midrank);
+        });
+    }
     for alt in ALTS {
         for exact in [None, Some(true), Some(false)] {
             run("ks_test_2sample", &mut || {

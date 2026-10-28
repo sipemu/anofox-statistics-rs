@@ -41,6 +41,12 @@ Validated against R (`R/generate_drift_refs.R`, `tests/tdd_drift.rs`).
   (also with ties, as R >= 4.2) when `n_x * n_y < 10000`, otherwise the limiting
   Kolmogorov distribution (R's `exact = FALSE` value, not scipy's finite-n
   approximation). Returns `KsTestResult`.
+- **`ad_test_ksamp(groups, midrank)` (#31)**, the k-sample Anderson-Darling test
+  (Scholz and Stephens, 1987) as `kSamples::ad.test(method = "asymptotic")`: version 2
+  (midranks) or 1, standardized statistic `T.AD`, and kSamples' asymptotic p-value
+  (critical-value table interpolated with smoothing splines, through a port of R's
+  `smooth.spline`; not capped to `[0.001, 0.25]` like scipy). Returns
+  `AndersonDarlingKResult`.
 
 ## [0.4.11] - 2026-10-22
 

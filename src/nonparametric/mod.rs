@@ -1,3 +1,5 @@
+pub mod anderson_darling;
+mod anderson_darling_table;
 pub mod brunner_munzel;
 mod hodges_lehmann;
 pub mod kruskal;
@@ -6,6 +8,7 @@ pub mod ranks;
 pub mod wilcoxon;
 mod wilcoxon_dist;
 
+pub use anderson_darling::{ad_test_ksamp, AndersonDarlingKResult};
 pub use brunner_munzel::{brunner_munzel, BrunnerMunzelResult};
 pub use kruskal::{kruskal_wallis, KruskalResult};
 pub use ks::{ks_test_2sample, KsTestResult};

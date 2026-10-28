@@ -13,6 +13,7 @@
 # for ties, unequal sizes and small samples.
 suppressMessages({
   library(philentropy)
+  library(kSamples)
 })
 
 rows <- list()
@@ -176,6 +177,58 @@ for (nm in names(num_cases)) {
 }
 r <- ks.test(x, y); check("ks exact (issue)", r$p.value, 0.0574636491581, 1e-12)
 r <- ks.test(x, y, exact = FALSE); check("ks asymp (issue)", r$p.value, 0.0693904727347, 1e-12)
+
+# ---------------------------------------------------------------------------
+# #31 k-sample Anderson-Darling (Scholz & Stephens 1987): kSamples::ad.test.
+# ad.test rounds its table, so the unrounded statistics come from its C
+# routine and the asymptotic p-values from kSamples::ad.pval.
+# ---------------------------------------------------------------------------
+ad_k <- function(samples) {
+  k <- length(samples); ns <- sapply(samples, length); z <- unlist(samples)
+  n <- length(z); Z.star <- sort(unique(z))
+  a <- .C("adkTestStat0", ans = double(2), k = as.integer(k), x = as.double(z),
+          ns = as.integer(ns), Z.star = as.double(Z.star), L = as.integer(length(Z.star)),
+          PACKAGE = "kSamples")$ans
+  H <- sum(1 / ns); h <- sum(1 / (1:(n - 1))); g <- 0
+  for (i in 1:(n - 2)) g <- g + (1 / (n - i)) * sum(1 / ((i + 1):(n - 1)))
+  ca <- (4 * g - 6) * (k - 1) + (10 - 6 * g) * H
+  cb <- (2 * g - 4) * k^2 + 8 * h * k + (2 * g - 14 * h - 4) * H - 8 * h + 4 * g - 6
+  cc <- (6 * h + 2 * g - 2) * k^2 + (4 * h - 4 * g + 6) * k + (2 * h - 6) * H + 4 * h
+  cd <- (2 * h + 6) * k^2 - 4 * h * k
+  sig <- sqrt((ca * n^3 + cb * n^2 + cc * n + cd) / ((n - 1) * (n - 2) * (n - 3)))
+  t <- (a - (k - 1)) / sig
+  # Cross-check against the (rounded) ad.test table.
+  r <- ad.test(samples, method = "asymptotic")$ad
+  check("ad T v1", signif(t[1], 5), r[1, 2], 1e-12); check("ad T v2", signif(t[2], 5), r[2, 2], 1e-12)
+  list(ad = a, t = t, p = c(ad.pval(t[1], k - 1, 1), ad.pval(t[2], k - 1, 2)))
+}
+ad_cases <- list(main = list(x, y), tie = list(xt, yt), k3 = list(x, y, xt),
+                 close = list(xs, ys), large = list(xl, yl),
+                 k4 = list(x, y + 0.6, xt, yl), shift = list(x, y + 1.5))
+for (nm in names(ad_cases)) {
+  smp <- ad_cases[[nm]]
+  for (j in seq_along(smp)) add(paste0("ad_", nm), paste0("in_g", j), smp[[j]])
+  r <- ad_k(smp)
+  for (v in 1:2) {
+    add(paste0("ad_", nm), paste0("ad_v", v), r$ad[v])
+    add(paste0("ad_", nm), paste0("statistic_v", v), r$t[v])
+    add(paste0("ad_", nm), paste0("p_value_v", v), r$p[v])
+  }
+}
+r <- ad_k(list(x, y))
+check("ad T v2 (issue)", r$t[2], 3.61044012836, 1e-10)
+check("ad T v1 (issue)", r$t[1], 3.52653061328, 1e-10)
+check("ad p v2 (issue)", signif(r$p[2], 5), 0.011626, 1e-12)
+# smooth.spline as used by ad.pval, for a direct check of the port.
+set.seed(1); sx <- runif(35); sy <- sin(5 * sx) + rnorm(35, sd = 0.2)
+add("smooth_spline", "in_x", sx); add("smooth_spline", "in_y", sy)
+xp <- c(-0.2, 0.1, 0.5, 0.93, 1.3)
+add("smooth_spline", "in_xp", xp)
+for (spar in c(0.25, 0.4)) {
+  f <- smooth.spline(sx, sy, spar = spar)
+  add("smooth_spline", paste0("lambda_", spar), f$lambda)
+  add("smooth_spline", paste0("pred_", spar), predict(f, xp)$y)
+}
 
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)

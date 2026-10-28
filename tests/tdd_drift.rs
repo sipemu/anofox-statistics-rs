@@ -7,7 +7,7 @@ use anofox_statistics::drift::{
     jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
     kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, Binning,
 };
-use anofox_statistics::{ks_test_2sample, Alternative, TestResult};
+use anofox_statistics::{ad_test_ksamp, ks_test_2sample, Alternative, TestResult};
 use approx::assert_relative_eq;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -406,4 +406,59 @@ fn ks_edge_cases() {
     )
     .unwrap();
     assert_eq!(r.statistic, 1.0);
+}
+
+// ---------------------------------------------------------------------------
+// #31 k-sample Anderson-Darling
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ad_ksamp_matches_ksamples() {
+    for name in ["main", "tie", "k3", "close", "large", "k4", "shift"] {
+        let case = format!("ad_{}", name);
+        let groups: Vec<&[f64]> = (1..)
+            .map_while(|j| refs().get(&(case.clone(), format!("in_g{}", j))))
+            .map(|v| v.as_slice())
+            .collect();
+        for (v, midrank) in [(1, false), (2, true)] {
+            let r = ad_test_ksamp(&groups, midrank).unwrap();
+            assert_relative_eq!(r.ad, get1(&case, &format!("ad_v{}", v)), epsilon = 1e-10);
+            assert_relative_eq!(
+                r.statistic,
+                get1(&case, &format!("statistic_v{}", v)),
+                epsilon = 1e-10
+            );
+            let p = get1(&case, &format!("p_value_v{}", v));
+            assert_relative_eq!(r.p_value, p, epsilon = 1e-9, max_relative = 1e-7);
+            assert_eq!(
+                (r.k, r.n),
+                (groups.len(), groups.iter().map(|g| g.len()).sum())
+            );
+        }
+    }
+    // Issue values (kSamples, version 2 and 1).
+    let (x, y) = xy();
+    let r = ad_test_ksamp(&[x, y], true).unwrap();
+    assert_relative_eq!(r.statistic, 3.61044012836, epsilon = 1e-10);
+    assert_relative_eq!(r.p_value, 0.011626, epsilon = 1e-5);
+    let r1 = ad_test_ksamp(&[x, y], false).unwrap();
+    assert_relative_eq!(r1.statistic, 3.52653061328, epsilon = 1e-10);
+    assert_relative_eq!(r1.p_value, 0.012463, epsilon = 1e-5);
+    let t = TestResult::from(&r);
+    assert_eq!(t.method, "k-sample Anderson-Darling test");
+    assert_eq!(
+        (t.statistic, t.p_value, t.n),
+        (Some(r.statistic), Some(r.p_value), Some(90))
+    );
+}
+
+#[test]
+fn ad_ksamp_edge_cases() {
+    assert!(ad_test_ksamp(&[&[1.0, 2.0]], true).is_err());
+    assert!(ad_test_ksamp(&[&[1.0, 2.0], &[]], true).is_err());
+    assert!(ad_test_ksamp(&[&[1.0, f64::NAN], &[1.0]], true).is_err());
+    // N = 2: T undefined, p = 1 (kSamples).
+    let r = ad_test_ksamp(&[&[1.0], &[2.0]], true).unwrap();
+    assert!(r.statistic.is_nan());
+    assert_eq!(r.p_value, 1.0);
 }

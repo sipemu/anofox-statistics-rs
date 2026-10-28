@@ -37,7 +37,8 @@ use crate::equivalence::{OneSidedTestResult, TostResult};
 use crate::forecast::{CWResult, DMResult, MCSResult, MSPEAdjustedResult, SPAResult};
 use crate::modern::{EnergyDistanceResult, MMDResult};
 use crate::nonparametric::{
-    BrunnerMunzelResult, KruskalResult, KsTestResult, MannWhitneyResult, WilcoxonResult,
+    AndersonDarlingKResult, BrunnerMunzelResult, KruskalResult, KsTestResult, MannWhitneyResult,
+    WilcoxonResult,
 };
 use crate::parametric::anova::AnovaTableRow;
 use crate::parametric::{
@@ -212,7 +213,19 @@ from_owned!(
     PortmanteauResult,
     DivergenceResult,
     KsTestResult,
+    AndersonDarlingKResult,
 );
+
+/// k-sample Anderson-Darling: `statistic` is the standardized `T`, `n` the
+/// total sample size.
+impl From<&AndersonDarlingKResult> for TestResult {
+    fn from(r: &AndersonDarlingKResult) -> Self {
+        TestResult::new("k-sample Anderson-Darling test")
+            .stat(r.statistic)
+            .p(r.p_value)
+            .with_n(r.n)
+    }
+}
 
 /// Two-sample Kolmogorov-Smirnov: `statistic` is D (D+ / D- one-sided), `n`
 /// the pooled sample size; `method` says whether the p-value is exact.
