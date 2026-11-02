@@ -10,6 +10,7 @@ pub mod equivalence;
 pub mod error;
 pub mod forecast;
 pub mod modern;
+pub mod multivariate;
 pub mod nonparametric;
 pub mod parametric;
 pub mod posthoc;
@@ -70,8 +71,9 @@ pub use resampling::{
 pub use test_result::TestResult;
 
 pub use classification::{
-    auc, brier_score, calibration_curve, calibration_curve_with_conf_level, log_loss, pr_curve,
-    roc_curve, CalibrationBin, CalibrationCurve, PrCurve, RocCurve,
+    auc, auc_null_p_value, auc_null_quantile, brier_score, calibration_curve,
+    calibration_curve_with_conf_level, log_loss, pr_curve, roc_curve, CalibrationBin,
+    CalibrationCurve, PrCurve, RocCurve,
 };
 pub use survival::{kaplan_meier, log_rank, KaplanMeierResult, KmConfType, LogRankResult};
 pub use timeseries::{

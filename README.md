@@ -131,6 +131,14 @@ console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
   - Population Stability Index, Kullback-Leibler divergence, Jensen-Shannon distance,
     Hellinger distance (numeric, categorical, or from proportions)
   - Total variation distance with a permutation p-value
+  - Two-proportion z test and goodness-of-fit chi-squared / G tests on labels
+  - Per-column drift with evidently's tests, default test choice, thresholds and drift
+    rules (`column_drift_numeric`, `column_drift_categorical`), dataset drift share
+  - Embedding drift: distance between mean embeddings, share of drifted components,
+    MMD, each with a fixed or a bootstrap threshold
+
+- **Multivariate**
+  - Principal component analysis (`prcomp`), e.g. to reduce embeddings
 
 - **Forecast Evaluation**
   - Diebold-Mariano test for comparing predictive accuracy
@@ -402,7 +410,8 @@ let result = mmd_test(&sample1, &sample2, Kernel::GaussianMedian, 1000, Some(42)
 
 ```rust
 use anofox_statistics::drift::{
-    hellinger, jensen_shannon_categorical, psi, tvd_test, Binning, ZeroFill,
+    column_drift_numeric, dataset_drift, hellinger, jensen_shannon_categorical, psi, tvd_test,
+    Binning, DriftOptions, ZeroFill,
 };
 use anofox_statistics::{
     ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_test_1d,
@@ -424,6 +433,11 @@ let p = psi(&reference, &current, Binning::Auto, ZeroFill::Evidently)?; // 0.571
 let h = hellinger(&reference, &current, Binning::Auto)?;                 // 0.262
 let js = jensen_shannon_categorical(&["a", "b", "b"], &["b", "c"], None)?;
 let tvd = tvd_test(&["a", "a", "b"], &["b", "b", "c"], 1000, Some(1))?;
+
+// evidently's column drift: default test (here "ks"), threshold and drift rule
+let col = column_drift_numeric(&reference, &current, &DriftOptions::default())?;
+println!("{}: {} (drift: {})", col.test, col.score, col.drifted);
+let dataset = dataset_drift(&[col.drifted, false], 0.5)?;
 ```
 
 ### Correlation Analysis
@@ -706,6 +720,12 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `wasserstein_distance_1d()`, `wasserstein_test_1d()` | `wasserstein1d()`, `wass_test()` | transport, twosamples |
 | `drift::psi()`, `kl_divergence()`, `jensen_shannon()`, `hellinger()` | `distance()`, `KL()`, `JSD()` | philentropy |
 | `drift::tvd_test()` | permutation test | stats |
+| `drift::z_test()` | `prop.test(correct = FALSE)` | stats |
+| `drift::chisq_drift()`, `g_drift()` | `chisq.test(o, p = )`, G formula | stats |
+| `drift::column_drift_numeric()` scores | `wilcox.test()`, `t.test()`, energy / MMD formulas | stats |
+| `drift::embedding_*_drift()` | `dist()`, `colMeans()`, kernel sums, `wasserstein1d()` | stats, transport |
+| `multivariate::pca()` | `prcomp()`, `predict()` | stats |
+| `classification::auc_null_quantile()`, `auc_null_p_value()` | `qwilcox()`, `pwilcox()` | stats |
 
 All 303 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
 

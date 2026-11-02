@@ -1,5 +1,5 @@
 # Reference values for the data-drift tests (evidently's stattests; issues
-# #30-#39).
+# #30-#39, #47-#54).
 #
 #   Rscript R/generate_drift_refs.R      (run from the crate root)
 #
@@ -485,6 +485,75 @@ for (nm in c("main", "close")) {
   perm <- replicate(20000, { i <- sample.int(length(z), m); mmd2u(z[i], z[-i], sg) })
   add(paste0("col_", nm), "mmd_p_value_mc", mean(perm >= obs - 1e-12))
 }
+
+# ---------------------------------------------------------------------------
+# #50-#52 embedding drift (evidently embedding_drift_methods) on two
+# deterministic embedding samples (rows = observations, stored row-major)
+# ---------------------------------------------------------------------------
+emb <- function(n, f, shift) t(sapply(0:(n - 1), function(i) sin(f * i * (1:5) + 0:4) + shift))
+er <- emb(40, 0.3, 0); ec <- emb(30, 0.37, c(0.4, 0, 0, 0, 0))
+add("emb", "in_ref", t(er)); add("emb", "in_cur", t(ec))
+add("emb", "dims", c(nrow(er), nrow(ec), ncol(er)))
+a <- colMeans(er); b <- colMeans(ec)
+add("emb", "dist_euclidean", dist(rbind(a, b), method = "euclidean"))
+add("emb", "dist_cityblock", dist(rbind(a, b), method = "manhattan"))
+add("emb", "dist_chebyshev", dist(rbind(a, b), method = "maximum"))
+add("emb", "dist_cosine", 1 - sum(a * b) / sqrt(sum(a^2) * sum(b^2)))
+wn <- sapply(1:5, function(j) transport::wasserstein1d(er[, j], ec[, j]) / max(sdpop(er[, j]), 0.001))
+add("emb", "ratio_components", wn)
+add("emb", "ratio_share", mean(wn >= 0.1))
+m <- nrow(er); n <- nrow(ec)
+D <- as.matrix(dist(rbind(er, ec)))
+s2 <- median(D[1:m, m + 1:n])^2
+K <- exp(-D^2 / s2)
+mmd_u <- function(K, ix, iy) {
+  kx <- K[ix, ix]; ky <- K[iy, iy]; mx <- length(ix); my <- length(iy)
+  (sum(kx) - sum(diag(kx))) / (mx * (mx - 1)) + (sum(ky) - sum(diag(ky))) / (my * (my - 1)) -
+    2 * mean(K[ix, iy])
+}
+add("emb", "mmd_sigma2", s2)
+add("emb", "mmd", mmd_u(K, 1:m, m + 1:n))
+add("emb", "mmd_sigma2_ref", median(D[1:m, 1:m])^2)
+
+# ---------------------------------------------------------------------------
+# #53 PCA: prcomp, component signs with the largest |loading| positive
+# ---------------------------------------------------------------------------
+pca_ref <- function(key, X, newdata, k_scores) {
+  p <- prcomp(X, center = TRUE, scale. = FALSE)
+  k <- min(nrow(X) - 1, ncol(X))
+  rot <- p$rotation[, 1:k, drop = FALSE]
+  sg <- apply(rot, 2, function(v) sign(v[which.max(abs(v))]))
+  rot <- sweep(rot, 2, sg, "*")
+  add(key, "sdev", p$sdev[1:k])
+  add(key, "rotation", t(rot))                 # rotation[i][j], variable-major
+  add(key, "explained", p$sdev[1:k]^2 / sum(p$sdev^2))
+  sc <- sweep(predict(p, newdata)[, 1:k_scores, drop = FALSE], 2, sg[1:k_scores], "*")
+  add(key, "scores", t(sc))                    # row-major
+  add(key, "center", p$center)
+}
+pca_ref("pca_emb", er, ec, 3)
+wide <- matrix(sin(0.7 * (1:60)) + 0.3 * cos(0.11 * (1:60)^1.3), nrow = 6)
+add("pca_wide", "in_x", t(wide)); add("pca_wide", "dims", dim(wide))
+pca_ref("pca_wide", wide, wide, 2)
+
+# ---------------------------------------------------------------------------
+# #54 AUC of a random classifier: U / (n_pos n_neg), U ~ Mann-Whitney null
+# ---------------------------------------------------------------------------
+qcases <- rbind(c(10, 10, 0.95), c(5, 12, 0.9), c(30, 40, 0.95), c(3, 4, 0.5),
+                c(50, 60, 0.99), c(7, 9, 0.05), c(200, 150, 0.95), c(400, 300, 0.05))
+qv <- apply(qcases, 1, function(r) {
+  if (r[1] * r[2] <= 10000) qwilcox(r[3], r[1], r[2]) / (r[1] * r[2])
+  else 0.5 + qnorm(r[3]) * sqrt((r[1] + r[2] + 1) / (12 * r[1] * r[2]))
+})
+add("auc_null", "quantile_cases", t(qcases)); add("auc_null", "quantile", qv)
+pcases <- rbind(c(10, 10, 0.73), c(5, 12, 0.725), c(30, 40, 0.65), c(3, 4, 1),
+                c(7, 9, 0.2), c(200, 150, 0.56), c(400, 300, 0.47))
+pv <- apply(pcases, 1, function(r) {
+  N <- r[1] * r[2]; u <- r[3] * N
+  if (N <= 10000) pwilcox(ceiling(u - 1e-9) - 1, r[1], r[2], lower.tail = FALSE)
+  else pnorm((u - 0.5 - N / 2) / sqrt(N * (r[1] + r[2] + 1) / 12), lower.tail = FALSE)
+})
+add("auc_null", "p_value_cases", t(pcases)); add("auc_null", "p_value", pv)
 
 out <- do.call(rbind, rows)
 write.csv(out, "R/data/drift_reference.csv", row.names = FALSE)

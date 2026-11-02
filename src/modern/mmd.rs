@@ -110,7 +110,7 @@ fn sum_kernel_cross(x: &[&[f64]], y: &[&[f64]], kernel: Kernel) -> f64 {
 /// MMD^2 = 1/(m(m-1)) * sum_{i≠j} k(x_i, x_j)
 ///       + 1/(n(n-1)) * sum_{i≠j} k(y_i, y_j)
 ///       - 2/(mn) * sum_{i,j} k(x_i, y_j)
-fn mmd_squared(x: &[&[f64]], y: &[&[f64]], kernel: Kernel) -> f64 {
+pub(crate) fn mmd_squared(x: &[&[f64]], y: &[&[f64]], kernel: Kernel) -> f64 {
     let m = x.len();
     let n = y.len();
 

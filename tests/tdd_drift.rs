@@ -4,12 +4,14 @@
 use anofox_statistics::drift::{
     binned_proportions, category_proportions, chisq_drift, chisq_drift_numeric,
     column_drift_categorical, column_drift_numeric, dataset_drift, default_drift_test_categorical,
-    default_drift_test_numeric, empirical_mmd_bandwidth, energy_distance_1d, g_drift,
-    g_drift_numeric, hellinger, hellinger_categorical, hellinger_from_proportions, jensen_shannon,
+    default_drift_test_numeric, embedding_distance_drift, embedding_mmd_drift,
+    embedding_ratio_drift, empirical_mmd_bandwidth, energy_distance_1d, g_drift, g_drift_numeric,
+    hellinger, hellinger_categorical, hellinger_from_proportions, jensen_shannon,
     jensen_shannon_categorical, jensen_shannon_divergence_from_proportions,
     jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
     kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, tvd_test,
-    tvd_test_numeric, z_test, z_test_numeric, Binning, DriftOptions, DriftTest, ZeroFill,
+    tvd_test_numeric, z_test, z_test_numeric, Binning, DriftOptions, DriftTest, EmbeddingDistance,
+    EmbeddingThreshold, ZeroFill,
 };
 use anofox_statistics::{
     ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_distance_1d,
@@ -1182,4 +1184,234 @@ fn dataset_drift_share() {
     assert!(dataset_drift(&[true, false], 0.5).unwrap().dataset_drift);
     assert!(dataset_drift(&[], 0.5).is_err());
     assert!(dataset_drift(&[true], 1.5).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// #50-#52 embedding drift, #53 PCA, #54 AUC null distribution
+// ---------------------------------------------------------------------------
+
+fn rows(flat: &[f64], ncol: usize) -> Vec<Vec<f64>> {
+    flat.chunks(ncol).map(|c| c.to_vec()).collect()
+}
+
+/// Reference and current embedding samples of the R script.
+fn emb() -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
+    let d = get("emb", "dims")[2] as usize;
+    (rows(get("emb", "in_ref"), d), rows(get("emb", "in_cur"), d))
+}
+
+#[test]
+fn embedding_distance_matches_r() {
+    let (r, c) = emb();
+    for (metric, key) in [
+        (EmbeddingDistance::Euclidean, "dist_euclidean"),
+        (EmbeddingDistance::Cityblock, "dist_cityblock"),
+        (EmbeddingDistance::Chebyshev, "dist_chebyshev"),
+        (EmbeddingDistance::Cosine, "dist_cosine"),
+    ] {
+        let res = embedding_distance_drift(&r, &c, metric, EmbeddingThreshold::Fixed(0.2)).unwrap();
+        assert_relative_eq!(
+            res.score,
+            get1("emb", key),
+            epsilon = 1e-14,
+            max_relative = 1e-12
+        );
+        assert_eq!(res.method, "distance");
+        assert_eq!(res.drifted, res.score > 0.2);
+    }
+}
+
+#[test]
+fn embedding_distance_bootstrap() {
+    let (r, c) = emb();
+    let boot = |seed| EmbeddingThreshold::Bootstrap {
+        n_bootstrap: 200,
+        quantile: 0.95,
+        seed: Some(seed),
+    };
+    let res = embedding_distance_drift(&r, &c, EmbeddingDistance::Euclidean, boot(1)).unwrap();
+    assert_relative_eq!(
+        res.score,
+        get1("emb", "dist_euclidean"),
+        max_relative = 1e-14
+    );
+    // the mean shift of 0.4 in one dimension stays within the resampling
+    // null of resamples of 22 and 17 rows
+    assert!(!res.drifted && res.threshold > res.score, "{:?}", res);
+    let shifted: Vec<Vec<f64>> = c
+        .iter()
+        .map(|row| row.iter().map(|v| v + 1.0).collect())
+        .collect();
+    let s = embedding_distance_drift(&r, &shifted, EmbeddingDistance::Euclidean, boot(1)).unwrap();
+    assert!(s.drifted, "{:?}", s);
+    assert_eq!(s.threshold, res.threshold);
+    // reproducible with a seed
+    assert_eq!(
+        res,
+        embedding_distance_drift(&r, &c, EmbeddingDistance::Euclidean, boot(1)).unwrap()
+    );
+    // the reference against itself does not drift
+    let same = embedding_distance_drift(&r, &r, EmbeddingDistance::Euclidean, boot(2)).unwrap();
+    assert_eq!(same.score, 0.0);
+    assert!(!same.drifted);
+}
+
+#[test]
+fn embedding_ratio_matches_r() {
+    let (r, c) = emb();
+    let res = embedding_ratio_drift(&r, &c, DriftTest::Wasserstein, None, 0.2, None).unwrap();
+    assert_relative_eq!(res.score, get1("emb", "ratio_share"), epsilon = 1e-15);
+    assert_eq!(res.drifted, res.score > 0.2);
+    // per component: the normed Wasserstein distances of R
+    for (j, &w) in get("emb", "ratio_components").iter().enumerate() {
+        let a: Vec<f64> = r.iter().map(|row| row[j]).collect();
+        let b: Vec<f64> = c.iter().map(|row| row[j]).collect();
+        let o = DriftOptions {
+            test: Some(DriftTest::Wasserstein),
+            ..DriftOptions::default()
+        };
+        assert_relative_eq!(
+            column_drift_numeric(&a, &b, &o).unwrap().score,
+            w,
+            epsilon = 1e-12
+        );
+    }
+    // a different component test and threshold
+    // every KS p-value is <= 1: all components drift
+    let ks = embedding_ratio_drift(&r, &c, DriftTest::Ks, Some(1.0), 0.5, None).unwrap();
+    assert_eq!((ks.score, ks.drifted), (1.0, true));
+    assert!(embedding_ratio_drift(&r, &c, DriftTest::Ks, None, f64::NAN, None).is_err());
+}
+
+#[test]
+fn embedding_mmd_matches_r() {
+    let (r, c) = emb();
+    let res = embedding_mmd_drift(&r, &c, EmbeddingThreshold::Fixed(0.015)).unwrap();
+    let mmd = get1("emb", "mmd");
+    assert_relative_eq!(
+        res.score,
+        mmd.max(0.0),
+        epsilon = 1e-14,
+        max_relative = 1e-12
+    );
+    assert_eq!(res.drifted, mmd > 0.015);
+    assert_eq!(res.method, "mmd");
+    let boot = |seed| EmbeddingThreshold::Bootstrap {
+        n_bootstrap: 100,
+        quantile: 0.95,
+        seed: Some(seed),
+    };
+    let b = embedding_mmd_drift(&r, &c, boot(5)).unwrap();
+    assert_eq!(b.score, res.score);
+    assert_eq!(b, embedding_mmd_drift(&r, &c, boot(5)).unwrap());
+    // MMD^2 < 0 here: no drift
+    assert!(!b.drifted, "{:?}", b);
+    // a clearly shifted current sample drifts
+    let shifted: Vec<Vec<f64>> = c
+        .iter()
+        .map(|row| row.iter().map(|v| v + 1.0).collect())
+        .collect();
+    let s = embedding_mmd_drift(&r, &shifted, boot(5)).unwrap();
+    assert!(s.drifted && s.score > s.threshold, "{:?}", s);
+    let same = embedding_mmd_drift(&r, &r, boot(6)).unwrap();
+    assert!(!same.drifted, "{:?}", same);
+}
+
+#[test]
+fn embedding_drift_rejects_bad_input() {
+    let (r, c) = emb();
+    let fixed = EmbeddingThreshold::Fixed(0.2);
+    let e = EmbeddingDistance::Euclidean;
+    assert!(embedding_distance_drift(&[], &c, e, fixed).is_err());
+    assert!(embedding_distance_drift(&r, &[vec![1.0]], e, fixed).is_err());
+    assert!(embedding_distance_drift(&[vec![]], &[vec![]], e, fixed).is_err());
+    assert!(embedding_distance_drift(&r, &[vec![f64::NAN; 5]], e, fixed).is_err());
+    assert!(embedding_distance_drift(&r, &c, e, EmbeddingThreshold::Fixed(f64::INFINITY)).is_err());
+    let bad = EmbeddingThreshold::Bootstrap {
+        n_bootstrap: 0,
+        quantile: 0.5,
+        seed: None,
+    };
+    assert!(embedding_distance_drift(&r, &c, e, bad).is_err());
+    let bad = EmbeddingThreshold::Bootstrap {
+        n_bootstrap: 10,
+        quantile: 1.5,
+        seed: None,
+    };
+    assert!(embedding_mmd_drift(&r, &c, bad).is_err());
+    assert!(embedding_mmd_drift(&r[..1], &c, fixed).is_err());
+}
+
+fn check_pca(key: &str, data: &[Vec<f64>], newdata: &[Vec<f64>], k_scores: usize) {
+    let p = anofox_statistics::multivariate::pca(data).unwrap();
+    let k = p.n_components();
+    assert_vec(&p.sdev, get(key, "sdev"), 1e-12);
+    assert_vec(&p.center, get(key, "center"), 1e-14);
+    assert_vec(&p.explained_variance_ratio, get(key, "explained"), 1e-12);
+    // loadings of the well-determined leading components
+    let expected = get(key, "rotation");
+    assert_eq!(expected.len(), data[0].len() * k);
+    for (i, row) in p.rotation.iter().enumerate() {
+        assert_vec(&row[..k_scores], &expected[i * k..i * k + k_scores], 1e-9);
+    }
+    let scores: Vec<f64> = p
+        .transform(newdata, k_scores)
+        .unwrap()
+        .into_iter()
+        .flatten()
+        .collect();
+    assert_vec(&scores, get(key, "scores"), 1e-9);
+}
+
+#[test]
+fn pca_matches_prcomp() {
+    let (r, c) = emb();
+    check_pca("pca_emb", &r, &c, 3);
+    // more variables than rows: the Gram-matrix path
+    let dims = get("pca_wide", "dims");
+    let w = rows(get("pca_wide", "in_x"), dims[1] as usize);
+    check_pca("pca_wide", &w, &w, 2);
+    let p = anofox_statistics::multivariate::pca(&w).unwrap();
+    assert_eq!(p.n_components(), 5);
+}
+
+#[test]
+fn pca_rejects_bad_input() {
+    use anofox_statistics::multivariate::pca;
+    assert!(pca(&[vec![1.0, 2.0]]).is_err());
+    assert!(pca(&[vec![], vec![]]).is_err());
+    assert!(pca(&[vec![1.0, 2.0], vec![1.0]]).is_err());
+    assert!(pca(&[vec![1.0, f64::NAN], vec![1.0, 2.0]]).is_err());
+    let p = pca(&[vec![1.0, 2.0], vec![2.0, 1.0], vec![0.0, 0.5]]).unwrap();
+    assert!(p.transform(&[vec![1.0, 2.0]], 0).is_err());
+    assert!(p.transform(&[vec![1.0, 2.0]], 3).is_err());
+    assert!(p.transform(&[vec![1.0]], 1).is_err());
+    // constant data: zero variance, no NaN
+    let p = pca(&[vec![1.0, 1.0], vec![1.0, 1.0], vec![1.0, 1.0]]).unwrap();
+    assert!(p.sdev.iter().all(|&s| s == 0.0));
+    assert!(p.explained_variance_ratio.iter().all(|&s| s == 0.0));
+}
+
+#[test]
+fn auc_null_matches_wilcox() {
+    use anofox_statistics::classification::{auc_null_p_value, auc_null_quantile};
+    let cases = get("auc_null", "quantile_cases");
+    for (c, &q) in cases.chunks(3).zip(get("auc_null", "quantile")) {
+        let v = auc_null_quantile(c[0] as usize, c[1] as usize, c[2]).unwrap();
+        assert_relative_eq!(v, q, epsilon = 1e-12);
+    }
+    let cases = get("auc_null", "p_value_cases");
+    for (c, &p) in cases.chunks(3).zip(get("auc_null", "p_value")) {
+        let v = auc_null_p_value(c[2], c[0] as usize, c[1] as usize).unwrap();
+        assert_relative_eq!(v, p, epsilon = 1e-14, max_relative = 1e-9);
+    }
+    // the exact quantile is what simulating random scores estimates
+    let scores: Vec<f64> = (0..20).map(|i| ((i * 7) % 20) as f64).collect();
+    let labels: Vec<bool> = (0..20).map(|i| i < 10).collect();
+    let a = anofox_statistics::auc(&scores, &labels).unwrap();
+    assert!((0.0..=1.0).contains(&auc_null_p_value(a, 10, 10).unwrap()));
+    assert!(auc_null_quantile(0, 3, 0.5).is_err());
+    assert!(auc_null_quantile(3, 3, 1.5).is_err());
+    assert!(auc_null_p_value(-0.1, 3, 3).is_err());
+    assert!(auc_null_p_value(0.5, 3, 0).is_err());
 }

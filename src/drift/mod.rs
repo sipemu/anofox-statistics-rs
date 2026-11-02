@@ -18,6 +18,7 @@
 
 pub mod binning;
 pub mod column;
+pub mod embedding;
 pub mod gof;
 pub mod hellinger;
 pub mod js;
@@ -31,6 +32,10 @@ pub use column::{
     column_drift_categorical, column_drift_numeric, dataset_drift, default_drift_test_categorical,
     default_drift_test_numeric, empirical_mmd_bandwidth, energy_distance_1d, ColumnDrift,
     DatasetDrift, DriftOptions, DriftTest,
+};
+pub use embedding::{
+    embedding_distance_drift, embedding_mmd_drift, embedding_ratio_drift, EmbeddingDistance,
+    EmbeddingDriftResult, EmbeddingThreshold,
 };
 pub use gof::{chisq_drift, chisq_drift_numeric, g_drift, g_drift_numeric};
 pub use hellinger::{hellinger, hellinger_categorical, hellinger_from_proportions};

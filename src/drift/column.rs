@@ -21,22 +21,22 @@ use crate::utils::select::kth_abs_difference;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DriftTest {
     /// `"ks"`: two-sample Kolmogorov-Smirnov p-value
-    /// ([`ks_test_2sample`](crate::ks_test_2sample)).
+    /// ([`ks_test_2sample`]).
     Ks,
     /// `"anderson"`: k-sample Anderson-Darling p-value, midrank version
-    /// ([`ad_test_ksamp`](crate::ad_test_ksamp)).
+    /// ([`ad_test_ksamp`]).
     Anderson,
     /// `"cramer_von_mises"`: two-sample Cramér-von Mises p-value
-    /// ([`cvm_test_2sample`](crate::cvm_test_2sample)).
+    /// ([`cvm_test_2sample`]).
     CramerVonMises,
     /// `"es"`: Epps-Singleton p-value
-    /// ([`epps_singleton_test`](crate::epps_singleton_test)).
+    /// ([`epps_singleton_test`]).
     EppsSingleton,
     /// `"mannw"`: one-sided (`less`) Mann-Whitney p-value
-    /// ([`mann_whitney_u`](crate::mann_whitney_u)).
+    /// ([`mann_whitney_u`]).
     MannWhitney,
     /// `"t_test"`: Student two-sample t-test p-value
-    /// ([`t_test`](crate::t_test)).
+    /// ([`t_test`]).
     TTest,
     /// `"ed"`: energy distance ([`energy_distance_1d`]).
     EnergyDistance,
@@ -57,18 +57,18 @@ pub enum DriftTest {
     /// `"hellinger"`: Hellinger distance ([`hellinger`](super::hellinger())).
     Hellinger,
     /// `"chisquare"`: goodness-of-fit chi-squared p-value
-    /// ([`chisq_drift`](super::chisq_drift)).
+    /// ([`chisq_drift`]).
     ChiSquare,
     /// `"g_test"`: goodness-of-fit G-test p-value
-    /// ([`g_drift`](super::g_drift)).
+    /// ([`g_drift`]).
     GTest,
-    /// `"z"`: two-proportion z test p-value ([`z_test`](super::z_test)).
+    /// `"z"`: two-proportion z test p-value ([`z_test`]).
     Z,
     /// `"fisher_exact"`: Fisher's exact test p-value of the 2x2 table of a
-    /// binary column ([`fisher_exact`](crate::fisher_exact)).
+    /// binary column ([`fisher_exact`]).
     FisherExact,
     /// `"TVD"`: total variation distance permutation p-value
-    /// ([`tvd_test`](super::tvd_test)).
+    /// ([`tvd_test`]).
     Tvd,
 }
 
@@ -440,7 +440,7 @@ fn finish(test: DriftTest, score: f64, threshold: Option<f64>) -> Result<ColumnD
 ///   rules (`ks.test`, `wilcox.test` exact for `n < 50` without ties) and
 ///   scipy's rule for the Cramér-von Mises test;
 /// - `g_test`: expected counts scaled to the current size
-///   ([`g_drift`](super::g_drift));
+///   ([`g_drift`]);
 /// - `TVD`, `empirical_mmd`: permutation p-values `(1 + #) / (1 + B)` with
 ///   this crate's seeded RNG.
 ///

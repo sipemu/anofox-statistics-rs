@@ -227,6 +227,12 @@ samples.
 | `epps_singleton_test()` | R port of the paper as implemented by scipy (`MASS::ginv`, tol 1e-15) | 1e-10 relative | small-sample correction, rank-deficient case |
 | `wasserstein_distance_1d()`, `wasserstein_test_1d()` | `transport::wasserstein1d()` | 1e-12 | p = 1, 2, 3; normed distance for p = 1, 2; permutation p-value within Monte Carlo error vs `twosamples::wass_test` (p = 1) and vs a permutation of `transport::wasserstein1d(p = 2)` (`twosamples::wass_test(p = 2)` permutes `∫\|F − G\|^p`, not W_p) |
 | `tvd_test()` | permutation test, B = 100000 | Monte Carlo | statistic exact |
+| `z_test()` | `prop.test(correct = FALSE)` | 1e-12 (z), 1e-10 relative (p) | label vs smallest category; 3 alternatives |
+| `chisq_drift()`, `g_drift()` | `chisq.test(o, p = r / sum(r))`, `2 * sum(o log(o / e))` + `pchisq()` | 1e-12 | incl. a category missing from the reference (Inf, p = 0) |
+| `column_drift_numeric()` | `wilcox.test(alternative = "less")`, `t.test(var.equal = TRUE)`, scipy energy distance (V-statistic), empirical MMD bandwidth (numpy `nearest` median) | 1e-10 relative | other scores reuse the rows above; empirical MMD p-value within Monte Carlo error (B = 20000) |
+| `embedding_distance_drift()`, `embedding_ratio_drift()`, `embedding_mmd_drift()` | `dist()` of `colMeans()`, `transport::wasserstein1d()` per component, kernel sums of `exp(-D^2 / median(D)^2)` | 1e-12 relative | bootstrap thresholds checked for reproducibility and drift / no drift |
+| `multivariate::pca()` | `prcomp()`, `predict()` (signs: largest loading positive) | 1e-12 (sdev), 1e-9 (loadings, scores) | covariance and Gram-matrix (n <= d) paths |
+| `auc_null_quantile()`, `auc_null_p_value()` | `qwilcox()`, `pwilcox()`; normal approximation beyond 10000 pairs | 1e-12 | |
 
 ## Example: Complete Validation Flow
 
