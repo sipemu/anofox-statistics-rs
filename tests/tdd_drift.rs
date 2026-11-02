@@ -2,11 +2,14 @@
 //! `R/generate_drift_refs.R` -> `R/data/drift_reference.csv`.
 
 use anofox_statistics::drift::{
-    binned_proportions, category_proportions, hellinger, hellinger_categorical,
-    hellinger_from_proportions, jensen_shannon, jensen_shannon_categorical,
-    jensen_shannon_divergence_from_proportions, jensen_shannon_from_proportions, kl_divergence,
-    kl_divergence_categorical, kl_divergence_from_proportions, psi, psi_categorical,
-    psi_from_proportions, tvd_test, tvd_test_numeric, Binning, ZeroFill,
+    binned_proportions, category_proportions, chisq_drift, chisq_drift_numeric,
+    column_drift_categorical, column_drift_numeric, dataset_drift, default_drift_test_categorical,
+    default_drift_test_numeric, empirical_mmd_bandwidth, energy_distance_1d, g_drift,
+    g_drift_numeric, hellinger, hellinger_categorical, hellinger_from_proportions, jensen_shannon,
+    jensen_shannon_categorical, jensen_shannon_divergence_from_proportions,
+    jensen_shannon_from_proportions, kl_divergence, kl_divergence_categorical,
+    kl_divergence_from_proportions, psi, psi_categorical, psi_from_proportions, tvd_test,
+    tvd_test_numeric, z_test, z_test_numeric, Binning, DriftOptions, DriftTest, ZeroFill,
 };
 use anofox_statistics::{
     ad_test_ksamp, cvm_test_2sample, epps_singleton_test, ks_test_2sample, wasserstein_distance_1d,
@@ -814,4 +817,369 @@ fn tvd_edge_cases() {
     // disjoint categories: TVD 1
     let r = tvd_test(&["a", "a"], &["b", "b", "b"], 99, Some(3)).unwrap();
     assert_eq!(r.statistic, 1.0);
+}
+
+// ---------------------------------------------------------------------------
+// #47 two-proportion z test on labels
+// ---------------------------------------------------------------------------
+
+#[test]
+fn z_test_matches_prop_test() {
+    let (xc, yc) = xyc();
+    let (xt, yt) = xyt();
+    let cases = [
+        ("bin", get("data", "in_xb"), get("data", "in_yb")),
+        ("cat", xc, yc),
+        ("tie", xt, yt),
+    ];
+    for (name, a, b) in cases {
+        let case = format!("z_{}", name);
+        for (alt, alt_name) in ALTS {
+            let r = z_test_numeric(a, b, alt).unwrap();
+            assert_relative_eq!(r.statistic, get1(&case, "statistic"), epsilon = 1e-12);
+            let p = get1(&case, &format!("p_value_{}", alt_name));
+            assert_relative_eq!(r.p_value, p, epsilon = 1e-14, max_relative = 1e-10);
+            assert_vec(&r.estimate, get(&case, "estimate"), 1e-15);
+        }
+        // labels give the same result as numeric codes of the same order
+        let la: Vec<i64> = a.iter().map(|v| (v * 10.0).round() as i64).collect();
+        let lb: Vec<i64> = b.iter().map(|v| (v * 10.0).round() as i64).collect();
+        assert_eq!(
+            z_test(&la, &lb, Alternative::TwoSided).unwrap(),
+            z_test_numeric(a, b, Alternative::TwoSided).unwrap()
+        );
+    }
+}
+
+#[test]
+fn z_test_edge_cases() {
+    assert!(z_test::<i32>(&[], &[1], Alternative::TwoSided).is_err());
+    assert!(z_test_numeric(&[f64::NAN], &[1.0], Alternative::TwoSided).is_err());
+    // one category in both samples: z = 0, p = 1 (evidently)
+    let r = z_test(&[1, 1, 1], &[1, 1], Alternative::TwoSided).unwrap();
+    assert_eq!((r.statistic, r.p_value, r.n_categories), (0.0, 1.0, 1));
+    // -0.0 and 0.0 are one category
+    let r = z_test_numeric(&[0.0, -0.0], &[0.0], Alternative::TwoSided).unwrap();
+    assert_eq!(r.p_value, 1.0);
+    // disjoint constant samples: |z| = sqrt(m + n)
+    let r = z_test(&["a", "a"], &["b", "b"], Alternative::TwoSided).unwrap();
+    assert_relative_eq!(r.statistic, -2.0, epsilon = 1e-15);
+}
+
+// ---------------------------------------------------------------------------
+// #48 goodness-of-fit drift tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn gof_drift_matches_r() {
+    for name in ["rev", "mod", "bin", "main"] {
+        let case = format!("gof_{}", name);
+        let (a, b) = (get(&case, "in_x"), get(&case, "in_y"));
+        let c = chisq_drift_numeric(a, b).unwrap();
+        let g = g_drift_numeric(a, b).unwrap();
+        for (r, key) in [(&c, "chisq"), (&g, "g")] {
+            let stat = get1(&case, &format!("{}_statistic", key));
+            if stat.is_infinite() {
+                assert!(r.statistic.is_infinite(), "{} {}", case, key);
+            } else {
+                assert_relative_eq!(r.statistic, stat, epsilon = 1e-12, max_relative = 1e-12);
+            }
+            let p = get1(&case, &format!("{}_p_value", key));
+            assert_relative_eq!(r.p_value, p, epsilon = 1e-15, max_relative = 1e-11);
+            assert_eq!(r.df, get1(&case, "df"));
+            assert_vec(&r.expected[0], get(&case, "expected"), 1e-12);
+        }
+        let la = labels(a);
+        let lb = labels(b);
+        assert_eq!(chisq_drift(&la, &lb).unwrap().statistic, c.statistic);
+        assert_eq!(g_drift(&la, &lb).unwrap().statistic, g.statistic);
+    }
+}
+
+#[test]
+fn gof_drift_edge_cases() {
+    assert!(chisq_drift::<i32>(&[], &[1]).is_err());
+    assert!(g_drift_numeric(&[1.0], &[f64::INFINITY]).is_err());
+    // one category: statistic 0, p = 1
+    let r = chisq_drift(&[1, 1], &[1]).unwrap();
+    assert_eq!((r.statistic, r.p_value, r.df), (0.0, 1.0, 0.0));
+    // equal sizes: evidently's unscaled g_test is the same
+    let r = g_drift(&["a", "a", "b", "b"], &["a", "b", "b", "b"]).unwrap();
+    let g = 2.0 * ((0.5f64).ln() + 3.0 * (1.5f64).ln());
+    assert_relative_eq!(r.statistic, g, epsilon = 1e-14);
+}
+
+// ---------------------------------------------------------------------------
+// #49 per-column drift dispatcher
+// ---------------------------------------------------------------------------
+
+fn run(x: &[f64], y: &[f64], test: DriftTest) -> f64 {
+    let o = DriftOptions {
+        test: Some(test),
+        seed: Some(7),
+        ..DriftOptions::default()
+    };
+    column_drift_numeric(x, y, &o).unwrap().score
+}
+
+#[test]
+fn column_drift_scores_match_r() {
+    for (name, x, y) in num_cases() {
+        let col = format!("col_{}", name);
+        let close =
+            |a: f64, e: f64| assert_relative_eq!(a, e, epsilon = 1e-14, max_relative = 1e-10);
+        close(
+            run(x, y, DriftTest::Ks),
+            get1(&format!("ks_{}_two.sided_auto", name), "p_value"),
+        );
+        close(
+            run(x, y, DriftTest::Anderson),
+            get1(&format!("ad_{}", name), "p_value_v2"),
+        );
+        close(
+            run(x, y, DriftTest::CramerVonMises),
+            get1(&format!("cvm_{}", name), "p_value"),
+        );
+        close(run(x, y, DriftTest::MannWhitney), get1(&col, "mannw"));
+        close(run(x, y, DriftTest::TTest), get1(&col, "t_test"));
+        close(run(x, y, DriftTest::EnergyDistance), get1(&col, "ed"));
+        close(energy_distance_1d(x, y).unwrap(), get1(&col, "ed"));
+        close(empirical_mmd_bandwidth(x).unwrap(), get1(&col, "mmd_sigma"));
+        close(
+            run(x, y, DriftTest::Wasserstein),
+            get1(&format!("wass_{}", name), "distance_normed"),
+        );
+    }
+    let (x, y) = xy();
+    let close = |a: f64, e: f64| assert_relative_eq!(a, e, epsilon = 1e-14, max_relative = 1e-10);
+    close(
+        run(x, y, DriftTest::EppsSingleton),
+        get1("es_main", "p_value"),
+    );
+    close(run(x, y, DriftTest::Psi), get1("psi_num", "statistic"));
+    close(run(x, y, DriftTest::KlDiv), get1("kl_num", "statistic"));
+    close(
+        run(x, y, DriftTest::JensenShannon),
+        get1("js_num", "statistic"),
+    );
+    close(
+        run(x, y, DriftTest::Hellinger),
+        get1("hellinger_auto_num", "statistic"),
+    );
+    for name in ["odd", "zero"] {
+        let case = format!("col_{}", name);
+        close(
+            empirical_mmd_bandwidth(get(&case, "in_x")).unwrap(),
+            get1(&case, "mmd_sigma"),
+        );
+    }
+    // empirical MMD: the statistic equals R's with evidently's bandwidth, and
+    // the permutation p-value agrees with R's Monte Carlo value.
+    for name in ["main", "close"] {
+        let (x, y) = num_cases()
+            .into_iter()
+            .find(|c| c.0 == name)
+            .map(|c| (c.1, c.2))
+            .unwrap();
+        let o = DriftOptions {
+            test: Some(DriftTest::EmpiricalMmd),
+            n_permutations: 4000,
+            seed: Some(11),
+            ..DriftOptions::default()
+        };
+        let p = column_drift_numeric(x, y, &o).unwrap().score;
+        assert!(
+            (p - get1(&format!("col_{}", name), "mmd_p_value_mc")).abs() < 0.03,
+            "{name} {p}"
+        );
+        let xv: Vec<Vec<f64>> = x.iter().map(|&v| vec![v]).collect();
+        let yv: Vec<Vec<f64>> = y.iter().map(|&v| vec![v]).collect();
+        let bandwidth = empirical_mmd_bandwidth(x).unwrap();
+        let r = anofox_statistics::mmd_test(
+            &xv,
+            &yv,
+            anofox_statistics::Kernel::Gaussian { bandwidth },
+            1,
+            Some(1),
+        )
+        .unwrap();
+        assert_relative_eq!(
+            r.statistic,
+            get1(&format!("col_{}", name), "mmd_statistic"),
+            epsilon = 1e-14
+        );
+    }
+}
+
+#[test]
+fn column_drift_categorical_scores_match_r() {
+    let (xc, yc) = xyc();
+    let (lx, ly) = (labels(xc), labels(yc));
+    let run_c = |test| {
+        let o = DriftOptions {
+            test: Some(test),
+            seed: Some(1),
+            ..DriftOptions::default()
+        };
+        (
+            column_drift_categorical(&lx, &ly, &o).unwrap().score,
+            column_drift_numeric(xc, yc, &o).unwrap().score,
+        )
+    };
+    let close = |(a, b): (f64, f64), e: f64| {
+        assert_relative_eq!(a, e, epsilon = 1e-14, max_relative = 1e-10);
+        assert_eq!(a, b);
+    };
+    close(run_c(DriftTest::Psi), get1("psi_cat", "statistic"));
+    close(run_c(DriftTest::KlDiv), get1("kl_cat", "statistic"));
+    close(run_c(DriftTest::JensenShannon), get1("js_cat", "statistic"));
+    close(run_c(DriftTest::Z), get1("z_cat", "p_value_two.sided"));
+    close(
+        run_c(DriftTest::ChiSquare),
+        get1("gof_main", "chisq_p_value"),
+    );
+    close(run_c(DriftTest::GTest), get1("gof_main", "g_p_value"));
+    let (a, b) = run_c(DriftTest::Tvd);
+    assert_eq!(a, b);
+    // Fisher on a binary column: 2x2 table of sample x category
+    let (xb, yb) = (get("data", "in_xb"), get("data", "in_yb"));
+    let o = DriftOptions {
+        test: Some(DriftTest::FisherExact),
+        ..DriftOptions::default()
+    };
+    let s1 = xb.iter().filter(|&&v| v == 1.0).count();
+    let s2 = yb.iter().filter(|&&v| v == 1.0).count();
+    let table = [[xb.len() - s1, s1], [yb.len() - s2, s2]];
+    let p = anofox_statistics::fisher_exact(&table, Alternative::TwoSided)
+        .unwrap()
+        .p_value;
+    assert_eq!(column_drift_numeric(xb, yb, &o).unwrap().score, p);
+    assert!(column_drift_categorical(&lx, &ly, &o).is_err());
+    // numeric-only tests reject categorical columns
+    let o = DriftOptions {
+        test: Some(DriftTest::Ks),
+        ..DriftOptions::default()
+    };
+    assert!(column_drift_categorical(&lx, &ly, &o).is_err());
+}
+
+#[test]
+fn column_drift_defaults_follow_evidently() {
+    let (x, y) = xy();
+    let (xc, yc) = xyc();
+    let (xb, yb) = (get("data", "in_xb"), get("data", "in_yb"));
+    // reference of at most 1000 rows
+    assert_eq!(default_drift_test_numeric(x, y), DriftTest::Ks);
+    assert_eq!(default_drift_test_numeric(xc, yc), DriftTest::ChiSquare);
+    assert_eq!(default_drift_test_numeric(xb, yb), DriftTest::Z);
+    assert_eq!(
+        default_drift_test_categorical(&labels(xc), &labels(yc)),
+        DriftTest::ChiSquare
+    );
+    assert_eq!(
+        default_drift_test_categorical(&labels(xb), &labels(yb)),
+        DriftTest::Z
+    );
+    // u = 5 counts over both samples: 3 categories in the reference, 2 more
+    // in the current sample
+    assert_eq!(
+        default_drift_test_numeric(&[0.0, 1.0, 2.0], &[3.0, 4.0]),
+        DriftTest::ChiSquare
+    );
+    assert_eq!(
+        default_drift_test_numeric(&[0.0, 1.0, 2.0], &[3.0, 4.0, 5.0]),
+        DriftTest::Ks
+    );
+    // reference of more than 1000 rows
+    let big: Vec<f64> = (0..1001).map(|i| (i % 7) as f64).collect();
+    let big_cont: Vec<f64> = (0..1001).map(|i| i as f64).collect();
+    assert_eq!(
+        default_drift_test_numeric(&big, &[1.0]),
+        DriftTest::Wasserstein
+    );
+    let big5: Vec<f64> = (0..1001).map(|i| (i % 5) as f64).collect();
+    assert_eq!(
+        default_drift_test_numeric(&big5, &[1.0]),
+        DriftTest::JensenShannon
+    );
+    assert_eq!(
+        default_drift_test_numeric(&big_cont, &[1.0]),
+        DriftTest::Wasserstein
+    );
+    let big_lab: Vec<u8> = (0..1001).map(|i| (i % 2) as u8).collect();
+    assert_eq!(
+        default_drift_test_categorical(&big_lab, &[1u8]),
+        DriftTest::JensenShannon
+    );
+    let thousand: Vec<f64> = (0..1000).map(|i| i as f64).collect();
+    assert_eq!(default_drift_test_numeric(&thousand, &[1.0]), DriftTest::Ks);
+
+    // default run: Ks at 0.05 with drift at p <= 0.05
+    let r = column_drift_numeric(x, y, &DriftOptions::default()).unwrap();
+    assert_eq!((r.test, r.threshold), (DriftTest::Ks, 0.05));
+    assert_eq!(r.score, get1("ks_main_two.sided_auto", "p_value"));
+    assert_eq!(r.drifted, r.score <= 0.05);
+    // explicit threshold
+    let o = DriftOptions {
+        test: Some(DriftTest::Wasserstein),
+        threshold: Some(0.5),
+        ..DriftOptions::default()
+    };
+    let r = column_drift_numeric(x, y, &o).unwrap();
+    assert!(!r.drifted && r.score < 0.5);
+    let o = DriftOptions {
+        threshold: Some(f64::NAN),
+        ..DriftOptions::default()
+    };
+    assert!(column_drift_numeric(x, y, &o).is_err());
+    assert!(column_drift_numeric(&[], y, &DriftOptions::default()).is_err());
+    assert!(column_drift_numeric(&[f64::NAN], y, &DriftOptions::default()).is_err());
+}
+
+#[test]
+fn drift_test_metadata() {
+    let p_values = [
+        ("ks", 0.05, true),
+        ("anderson", 0.1, true),
+        ("cramer_von_mises", 0.1, true),
+        ("es", 0.05, true),
+        ("mannw", 0.05, true),
+        ("t_test", 0.05, true),
+        ("ed", 0.1, false),
+        ("empirical_mmd", 0.1, true),
+        ("wasserstein", 0.1, false),
+        ("psi", 0.1, false),
+        ("kl_div", 0.1, false),
+        ("jensenshannon", 0.1, false),
+        ("hellinger", 0.1, false),
+        ("chisquare", 0.05, true),
+        ("g_test", 0.1, true),
+        ("z", 0.05, true),
+        ("fisher_exact", 0.1, true),
+        ("TVD", 0.1, true),
+    ];
+    assert_eq!(p_values.len(), DriftTest::ALL.len());
+    for (name, t, is_p) in p_values {
+        let test = DriftTest::from_name(name).unwrap();
+        assert_eq!(test.name(), name);
+        assert_eq!(test.to_string(), name);
+        assert_eq!(test.default_threshold(), t);
+        assert_eq!(test.is_p_value(), is_p);
+    }
+    // evidently's comparison operators at the boundary
+    assert!(DriftTest::Ks.drifted(0.05, 0.05));
+    assert!(DriftTest::CramerVonMises.drifted(0.1, 0.1));
+    assert!(!DriftTest::ChiSquare.drifted(0.05, 0.05));
+    assert!(!DriftTest::EnergyDistance.drifted(0.1, 0.1));
+    assert!(DriftTest::Wasserstein.drifted(0.1, 0.1));
+}
+
+#[test]
+fn dataset_drift_share() {
+    let d = dataset_drift(&[true, false, false], 0.5).unwrap();
+    assert_eq!((d.n_columns, d.n_drifted, d.dataset_drift), (3, 1, false));
+    assert_relative_eq!(d.share_drifted, 1.0 / 3.0);
+    assert!(dataset_drift(&[true, false], 0.5).unwrap().dataset_drift);
+    assert!(dataset_drift(&[], 0.5).is_err());
+    assert!(dataset_drift(&[true], 1.5).is_err());
 }
