@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-03
+
+### Added
+
+Everything needed to reproduce evidently's data-drift and embedding-drift reports
+(statistics only; the TF-IDF / SGD domain classifiers stay out of scope, #55):
+
+- **Two-proportion z test on labels (#47).** `drift::z_test` / `z_test_numeric`:
+  evidently's `"z"` test (label vs. the smallest category, no continuity correction).
+  Validated against `prop.test(correct = FALSE)`.
+- **Goodness-of-fit drift tests (#48).** `drift::chisq_drift` / `g_drift` (+ `_numeric`):
+  current counts against the reference proportions, evidently's `"chisquare"` and
+  `"g_test"`. Validated against `chisq.test(o, p = )`.
+- **Column drift dispatcher (#49).** `drift::DriftTest` (evidently's names, default
+  thresholds and drift rules), `default_drift_test_numeric` / `_categorical`,
+  `column_drift_numeric` / `_categorical` with `DriftOptions`, `dataset_drift`,
+  `energy_distance_1d` (scipy's `energy_distance`) and `empirical_mmd_bandwidth`.
+- **Embedding drift (#50, #51, #52).** `drift::embedding_distance_drift`
+  (euclidean / cosine / cityblock / chebyshev between mean embeddings),
+  `embedding_ratio_drift` (share of drifted components) and `embedding_mmd_drift`,
+  with `EmbeddingThreshold::Fixed` or `::Bootstrap`.
+- **PCA (#53).** `multivariate::pca` and `Pca::transform`, validated against `prcomp`.
+- **AUC of a random classifier (#54).** `classification::auc_null_quantile` /
+  `auc_null_p_value`, exact from the Mann-Whitney distribution (`qwilcox`, `pwilcox`).
+
 ## [0.6.0] - 2026-10-28
 
 ### Added

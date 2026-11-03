@@ -1,5 +1,6 @@
 //! Total variation distance with a permutation p-value.
 
+use super::OrdF64;
 use crate::error::{Result, StatError};
 use crate::utils::finite::ensure_finite;
 use rand::seq::SliceRandom;
@@ -140,31 +141,10 @@ pub fn tvd_test_numeric(
 ) -> Result<TvdResult> {
     ensure_finite("reference", reference)?;
     ensure_finite("current", current)?;
-    // Finite values are totally ordered by their bits' total order; map
-    // -0.0 to 0.0 so that both are one category.
-    let key = |v: &f64| {
-        let v = if *v == 0.0 { 0.0 } else { *v };
-        OrdF64(v)
-    };
-    let r: Vec<OrdF64> = reference.iter().map(key).collect();
-    let c: Vec<OrdF64> = current.iter().map(key).collect();
-    tvd_test(&r, &c, n_permutations, seed)
-}
-
-/// `f64` with the total order (finite values only).
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct OrdF64(f64);
-
-impl Eq for OrdF64 {}
-
-impl PartialOrd for OrdF64 {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for OrdF64 {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.total_cmp(&other.0)
-    }
+    tvd_test(
+        &OrdF64::codes(reference),
+        &OrdF64::codes(current),
+        n_permutations,
+        seed,
+    )
 }

@@ -8,7 +8,7 @@ pub mod kruskal;
 pub mod ks;
 pub mod ranks;
 pub mod wilcoxon;
-mod wilcoxon_dist;
+pub(crate) mod wilcoxon_dist;
 
 pub use anderson_darling::{ad_test_ksamp, AndersonDarlingKResult};
 pub use brunner_munzel::{brunner_munzel, BrunnerMunzelResult};

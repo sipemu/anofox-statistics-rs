@@ -17,13 +17,27 @@
 //! ([`wasserstein_test_1d`](crate::wasserstein_test_1d)).
 
 pub mod binning;
+pub mod column;
+pub mod embedding;
+pub mod gof;
 pub mod hellinger;
 pub mod js;
 pub mod kl;
 pub mod psi;
 pub mod tvd;
+pub mod z;
 
 pub use binning::{binned_proportions, category_proportions, zero_fill, Binning, ZeroFill};
+pub use column::{
+    column_drift_categorical, column_drift_numeric, dataset_drift, default_drift_test_categorical,
+    default_drift_test_numeric, empirical_mmd_bandwidth, energy_distance_1d, ColumnDrift,
+    DatasetDrift, DriftOptions, DriftTest,
+};
+pub use embedding::{
+    embedding_distance_drift, embedding_mmd_drift, embedding_ratio_drift, EmbeddingDistance,
+    EmbeddingDriftResult, EmbeddingThreshold,
+};
+pub use gof::{chisq_drift, chisq_drift_numeric, g_drift, g_drift_numeric};
 pub use hellinger::{hellinger, hellinger_categorical, hellinger_from_proportions};
 pub use js::{
     jensen_shannon, jensen_shannon_categorical, jensen_shannon_divergence_from_proportions,
@@ -32,6 +46,7 @@ pub use js::{
 pub use kl::{kl_divergence, kl_divergence_categorical, kl_divergence_from_proportions};
 pub use psi::{psi, psi_categorical, psi_from_proportions};
 pub use tvd::{tvd_test, tvd_test_numeric, TvdResult};
+pub use z::{z_test, z_test_numeric, ZTestResult};
 
 use crate::error::{Result, StatError};
 
@@ -84,4 +99,47 @@ impl DivergenceResult {
             n_current,
         }
     }
+}
+
+/// `f64` with the total order, for using finite numbers as category labels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct OrdF64(pub(crate) f64);
+
+impl OrdF64 {
+    /// Category labels of finite values: one per distinct value (`-0.0` and
+    /// `0.0` are one category).
+    pub(crate) fn codes(values: &[f64]) -> Vec<OrdF64> {
+        values
+            .iter()
+            .map(|&v| OrdF64(if v == 0.0 { 0.0 } else { v }))
+            .collect()
+    }
+}
+
+impl Eq for OrdF64 {}
+
+impl PartialOrd for OrdF64 {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OrdF64 {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.total_cmp(&other.0)
+    }
+}
+
+/// Counts `(reference, current)` per category over the sorted distinct
+/// categories of both samples.
+pub(crate) fn category_counts<T: Ord>(reference: &[T], current: &[T]) -> (Vec<usize>, Vec<usize>) {
+    let mut counts: std::collections::BTreeMap<&T, (usize, usize)> =
+        std::collections::BTreeMap::new();
+    for v in reference {
+        counts.entry(v).or_default().0 += 1;
+    }
+    for v in current {
+        counts.entry(v).or_default().1 += 1;
+    }
+    counts.values().copied().unzip()
 }
