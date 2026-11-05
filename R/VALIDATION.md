@@ -199,8 +199,19 @@ Tests load the CSV files and compare Rust results against R references.
 |----------|-------------|-----------|------------|
 | `diebold_mariano()` | `forecast::dm.test()` | 1e-6 | SE/AE loss, h=1/h=3, alternative=two-sided/less/greater, varestimator=acf/bartlett, horizon, loss_function, varestimator (output fields) |
 | `clark_west()` | Manual HAC computation | 1e-6 | h=1, h=3 |
-| `spa_test()` | Manual computation | 1e-6 | 3 competing models |
-| `model_confidence_set()` | Manual computation | 1e-6 | 4 models |
+| `spa_test()`, `mspe_adjusted_spa()` | base-R Hansen (2005) SPA (`R/generate_spa_mcs_refs.R`) | 1e-10 (statistic, ω̂); exact p with shared bootstrap indices; ±0.025 Monte Carlo (B = 20000) | lower / consistent / upper p-values, 5 models |
+| `model_confidence_set()`, `model_confidence_set_with_method()` | `MCS::MCSprocedure()` | exact with shared indices; ±0.025 Monte Carlo (B = 20000) | T_max and T_R, k = 1 and 3, 5 models: elimination order, MCS p-values, surviving set |
+
+### 5b. ICC, t-tests and the block bootstrap
+
+Reference script `R/generate_icc_ttest_boot_refs.R` writes
+`R/data/icc_ttest_boot_reference.csv`, checked by `tests/icc_ttest_boot_reference.rs`.
+
+| Function | R Equivalent | Tolerance | Notes |
+|----------|-------------|-----------|-------|
+| `icc()` | `psych::ICC(lmer = FALSE)` | 1e-10 (ICC, F), 1e-7 (CI) | all six types; Shrout & Fleiss (1979) data and two more designs |
+| `t_test()`, `t_test_one_sample()` | `t.test()` | 1e-9 | one-sample, paired, Welch, Student; 3 alternatives (one-sided CIs), 2 levels |
+| `bootstrap_mean_ci_with_options()` | `boot::tsboot(sim = "geom" / "fixed")`, `boot::boot()` | SE 3 %, bounds 0.1 SE (B = 20000) | AR(1) series, block lengths 1, 5, 10 |
 
 ### 6. Modern Distribution Tests
 

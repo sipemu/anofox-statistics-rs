@@ -121,6 +121,7 @@ pub fn js_clark_west(e1: &[f64], e2: &[f64], horizon: usize) -> Result<JsValue, 
 #[derive(Serialize)]
 struct SPAResultJs {
     statistic: f64,
+    p_value_lower: f64,
     p_value_consistent: f64,
     p_value_upper: f64,
     n_bootstrap: usize,
@@ -165,6 +166,7 @@ pub fn js_spa_test(
 
     let js_result = SPAResultJs {
         statistic: result.statistic,
+        p_value_lower: result.p_value_lower,
         p_value_consistent: result.p_value_consistent,
         p_value_upper: result.p_value_upper,
         n_bootstrap: result.n_bootstrap,
@@ -177,6 +179,7 @@ pub fn js_spa_test(
 #[derive(Serialize)]
 struct MSPEAdjustedResultJs {
     statistic: f64,
+    p_value_lower: f64,
     p_value_consistent: f64,
     p_value_upper: f64,
     n_bootstrap: usize,
@@ -219,6 +222,7 @@ pub fn js_mspe_adjusted_spa(
 
     let js_result = MSPEAdjustedResultJs {
         statistic: result.statistic,
+        p_value_lower: result.p_value_lower,
         p_value_consistent: result.p_value_consistent,
         p_value_upper: result.p_value_upper,
         n_bootstrap: result.n_bootstrap,
@@ -251,6 +255,8 @@ struct MCSResultJs {
     eliminated_models: Vec<usize>,
     mcs_p_value: f64,
     elimination_sequence: Vec<EliminationStepJs>,
+    elimination_order: Vec<usize>,
+    mcs_p_values: Vec<f64>,
     n_bootstrap: usize,
 }
 
@@ -258,6 +264,7 @@ struct MCSResultJs {
 struct EliminationStepJs {
     model_idx: usize,
     p_value: f64,
+    mcs_p_value: f64,
     eliminated: bool,
 }
 
@@ -310,9 +317,12 @@ pub fn js_model_confidence_set(
             .map(|s| EliminationStepJs {
                 model_idx: s.model_idx,
                 p_value: s.p_value,
+                mcs_p_value: s.mcs_p_value,
                 eliminated: s.eliminated,
             })
             .collect(),
+        elimination_order: result.elimination_order,
+        mcs_p_values: result.mcs_p_values,
         n_bootstrap: result.n_bootstrap,
     };
 

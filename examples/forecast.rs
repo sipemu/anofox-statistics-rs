@@ -128,6 +128,7 @@ fn main() {
 
     println!("  Comparing 2 models against benchmark:");
     println!("  SPA statistic:        {:.4}", spa.statistic);
+    println!("  p-value (lower):      {:.4}", spa.p_value_lower);
     println!("  p-value (consistent): {:.4}", spa.p_value_consistent);
     println!("  p-value (upper):      {:.4}", spa.p_value_upper);
     println!("  Bootstrap samples:    {}", spa.n_bootstrap);
@@ -155,6 +156,7 @@ fn main() {
     let mspe = mspe_adjusted_spa(&benchmark_errors, &mspe_models, 499, 3.0, Some(42)).unwrap();
 
     println!("  MSPE statistic:       {:.4}", mspe.statistic);
+    println!("  p-value (lower):      {:.4}", mspe.p_value_lower);
     println!("  p-value (consistent): {:.4}", mspe.p_value_consistent);
     println!("  p-value (upper):      {:.4}", mspe.p_value_upper);
     if let Some(idx) = mspe.best_model_idx {

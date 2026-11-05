@@ -161,7 +161,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anofox-statistics = "0.7"
+anofox-statistics = "0.8"
 ```
 
 ## Examples
@@ -185,7 +185,7 @@ cargo run --example categorical     # Chi-square, Fisher, McNemar, Cramér's V, 
 ### T-Tests
 
 ```rust
-use anofox_statistics::{t_test, TTestKind, Alternative};
+use anofox_statistics::{t_test, t_test_one_sample, cohens_d_one_sample, TTestKind, Alternative};
 
 let group1 = vec![1.2, 2.3, 3.4, 4.5, 5.6];
 let group2 = vec![2.1, 3.2, 4.3, 5.4, 6.5];
@@ -212,6 +212,11 @@ let result = t_test(&group1, &group2, TTestKind::Welch, Alternative::TwoSided, 0
 if let Some(ci) = result.conf_int {
     println!("95% CI: [{:.3}, {:.3}]", ci.lower, ci.upper);
 }
+
+// One-sample t-test (R: t.test(x, mu = 5, alternative = "greater")); one-sided
+// alternatives give the one-sided interval, here [lower, inf)
+let result = t_test_one_sample(&group1, Alternative::Greater, 5.0, Some(0.95))?;
+let d = cohens_d_one_sample(&group1, 5.0)?;
 ```
 
 ### Yuen's Robust T-Test
@@ -534,7 +539,8 @@ println!("p-value = {:.4}", result.p_value);
 
 ```rust
 use anofox_statistics::{diebold_mariano, clark_west, spa_test, mspe_adjusted_spa,
-                        model_confidence_set, LossFunction, MCSStatistic, Alternative};
+                        model_confidence_set, model_confidence_set_with_method, BootstrapMethod,
+                        LossFunction, MCSStatistic, Alternative};
 
 // Forecast errors from two competing models
 let errors_model1 = vec![0.1, -0.2, 0.3, -0.1, 0.2];
@@ -560,7 +566,8 @@ let model_losses = vec![
 ];
 let result = spa_test(&benchmark_losses, &model_losses, 1000, 10.0, Some(42))?;
 println!("SPA statistic: {:.4}", result.statistic);
-println!("p-value: {:.4}", result.p_value_consistent);
+println!("p-values (lower, consistent, upper): {:.4} {:.4} {:.4}",
+         result.p_value_lower, result.p_value_consistent, result.p_value_upper);
 
 // MSPE-Adjusted SPA for multiple nested models
 // Combines Clark-West adjustment with bootstrap for multiple testing
@@ -582,6 +589,11 @@ let losses = vec![
 let result = model_confidence_set(&losses, 0.10, MCSStatistic::Range, 1000, 5.0, Some(42))?;
 println!("Models in MCS: {:?}", result.included_models);
 println!("Eliminated: {:?}", result.eliminated_models);
+println!("MCS p-values: {:?}", result.mcs_p_values);
+
+// Same with R's MCS::MCSprocedure(k = 3) bootstrap (moving blocks of length 3)
+let result = model_confidence_set_with_method(&losses, 0.10, MCSStatistic::Max, 1000,
+                                              BootstrapMethod::MovingBlock { block_length: 3 }, Some(42))?;
 ```
 
 ### Equivalence Testing (TOST)

@@ -48,7 +48,8 @@ pub struct TTestResult {
     pub mean_x: f64,
     /// Mean of second sample (None for one-sample or paired)
     pub mean_y: Option<f64>,
-    /// Confidence interval for the mean difference (if conf_level was specified)
+    /// Confidence interval for the mean (difference), if `conf_level` was
+    /// specified; one-sided (one infinite bound) for one-sided alternatives
     pub conf_int: Option<TTestConfInt>,
     /// Null hypothesis value (mu parameter)
     pub null_value: f64,
@@ -79,6 +80,54 @@ pub fn t_test(
         TTestKind::Student => student_t_test(x, y, alternative, mu, conf_level),
         TTestKind::Paired => paired_t_test(x, y, alternative, mu, conf_level),
     }
+}
+
+/// One-sample t-test of `H0: mean(x) = mu`.
+///
+/// Matches R's `t.test(x, mu = mu, alternative = ..., conf.level = ...)`:
+/// `t = (mean(x) - mu) / (sd(x) / sqrt(n))` with `n - 1` degrees of freedom.
+/// The confidence interval (if `conf_level` is given) is for the mean of `x`
+/// and one-sided for one-sided alternatives (an infinite bound, as in R).
+/// `mean_x` is the sample mean and `mean_y` is `None`. The matching effect
+/// size is [`cohens_d_one_sample`](crate::cohens_d_one_sample).
+///
+/// # Errors
+/// Fewer than 2 observations, or `conf_level` outside (0, 1).
+///
+/// # Examples
+/// ```
+/// use anofox_statistics::{t_test_one_sample, Alternative};
+///
+/// let x = [5.1, 4.9, 6.2, 5.8, 6.05, 5.5, 5.3, 6.1];
+/// let r = t_test_one_sample(&x, Alternative::Greater, 5.0, Some(0.95)).unwrap();
+/// let ci = r.conf_int.unwrap();
+/// assert!(ci.upper.is_infinite() && ci.lower < r.mean_x);
+/// ```
+pub fn t_test_one_sample(
+    x: &[f64],
+    alternative: Alternative,
+    mu: f64,
+    conf_level: Option<f64>,
+) -> Result<TTestResult> {
+    let n = x.len();
+    if n < 2 {
+        return Err(StatError::InsufficientData { needed: 2, got: n });
+    }
+    let mean_x = mean(x)?;
+    let se = (variance(x)? / n as f64).sqrt();
+    let t_stat = (mean_x - mu) / se;
+    let df = n as f64 - 1.0;
+    let p_value = compute_p_value(t_stat, df, alternative);
+    let conf_int = compute_conf_int(mean_x, se, df, conf_level, alternative)?;
+    Ok(TTestResult {
+        statistic: t_stat,
+        df,
+        p_value,
+        mean_x,
+        mean_y: None,
+        conf_int,
+        null_value: mu,
+    })
 }
 
 /// Welch's t-test for independent samples with unequal variances
@@ -123,7 +172,7 @@ fn welch_t_test(
     let p_value = compute_p_value(t_stat, df, alternative);
 
     // Confidence interval for the difference in means
-    let conf_int = compute_conf_int(mean_x - mean_y, se, df, conf_level)?;
+    let conf_int = compute_conf_int(mean_x - mean_y, se, df, conf_level, alternative)?;
 
     Ok(TTestResult {
         statistic: t_stat,
@@ -177,7 +226,7 @@ fn student_t_test(
     let p_value = compute_p_value(t_stat, df, alternative);
 
     // Confidence interval for the difference in means
-    let conf_int = compute_conf_int(mean_x - mean_y, se, df, conf_level)?;
+    let conf_int = compute_conf_int(mean_x - mean_y, se, df, conf_level, alternative)?;
 
     Ok(TTestResult {
         statistic: t_stat,
@@ -232,7 +281,7 @@ fn paired_t_test(
     let p_value = compute_p_value(t_stat, df, alternative);
 
     // Confidence interval for the mean difference
-    let conf_int = compute_conf_int(mean_diff, se, df, conf_level)?;
+    let conf_int = compute_conf_int(mean_diff, se, df, conf_level, alternative)?;
 
     Ok(TTestResult {
         statistic: t_stat,
@@ -273,12 +322,15 @@ fn compute_p_value(t_stat: f64, df: f64, alternative: Alternative) -> f64 {
     }
 }
 
-/// Compute confidence interval for mean difference
+/// Compute the confidence interval for the mean (difference), as R's
+/// `t.test`: two-sided `estimate ± t_{1-α/2} se`; for `Less`
+/// `(-inf, estimate + t_{1-α} se]`; for `Greater` `[estimate - t_{1-α} se, inf)`.
 fn compute_conf_int(
     estimate: f64,
     se: f64,
     df: f64,
     conf_level: Option<f64>,
+    alternative: Alternative,
 ) -> Result<Option<TTestConfInt>> {
     match conf_level {
         Some(level) => {
@@ -288,14 +340,23 @@ fn compute_conf_int(
                 ));
             }
             let alpha = 1.0 - level;
+            let q = match alternative {
+                Alternative::TwoSided => 1.0 - alpha / 2.0,
+                Alternative::Less | Alternative::Greater => level,
+            };
             let t_crit = match StudentsT::new(0.0, 1.0, df) {
-                Ok(t_dist) => t_dist.inverse_cdf(1.0 - alpha / 2.0),
+                Ok(t_dist) => t_dist.inverse_cdf(q),
                 Err(_) => f64::NAN,
             };
             let margin = t_crit * se;
+            let (lower, upper) = match alternative {
+                Alternative::TwoSided => (estimate - margin, estimate + margin),
+                Alternative::Less => (f64::NEG_INFINITY, estimate + margin),
+                Alternative::Greater => (estimate - margin, f64::INFINITY),
+            };
             Ok(Some(TTestConfInt {
-                lower: estimate - margin,
-                upper: estimate + margin,
+                lower,
+                upper,
                 conf_level: level,
             }))
         }

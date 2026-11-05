@@ -1,17 +1,21 @@
 use crate::error::Result;
 use crate::forecast::spa_common::{
-    compute_means, compute_spa_pvalues, compute_standardized, compute_variances, find_best_model,
-    validate_finite_data, validate_model_data,
+    spa_stationary, validate_finite_data, validate_model_data, validate_spa_parameters,
 };
 
 /// Result of the MSPE-Adjusted SPA test
 #[derive(Debug, Clone)]
 pub struct MSPEAdjustedResult {
-    /// The test statistic (maximum standardized Clark-West adjusted performance)
+    /// The test statistic `max(0, max_k sqrt(n) f̄_k / ω̂_k)` on the
+    /// Clark-West adjusted differentials
     pub statistic: f64,
-    /// The consistent p-value (Hansen, 2005 style)
+    /// Hansen's (2005) lower p-value (re-centring `max(d̄_k, 0)`; liberal)
+    pub p_value_lower: f64,
+    /// Hansen's (2005) consistent p-value (re-centring only models that are
+    /// not significantly worse than the benchmark)
     pub p_value_consistent: f64,
-    /// The upper p-value (more conservative)
+    /// Hansen's (2005) upper p-value (re-centring every model at the null
+    /// boundary, i.e. White's Reality Check; conservative)
     pub p_value_upper: f64,
     /// Number of bootstrap samples used
     pub n_bootstrap: usize,
@@ -40,8 +44,10 @@ pub struct MSPEAdjustedResult {
 /// For each alternative model k, computes Clark-West adjusted differentials:
 ///   f_{t,k} = (e_benchmark,t² - e_k,t²) + (e_benchmark,t - e_k,t)²
 ///
-/// Then uses stationary bootstrap to find the distribution of the maximum
-/// t-statistic across all K models.
+/// Then applies Hansen's (2005) SPA test to these differentials (see
+/// [`spa_test`](crate::spa_test)): one stationary-bootstrap index draw per
+/// replication shared by all K models, and the lower, consistent and upper
+/// p-values.
 ///
 /// # References
 /// * Clark, T.E. and McCracken, M.W. (2012) "Reality Checks and Comparisons
@@ -60,35 +66,20 @@ pub fn mspe_adjusted_spa(
 
     // Validate inputs
     validate_model_data(t, model_errors, "alternative model")?;
+    validate_spa_parameters(t, n_bootstrap, block_length)?;
     validate_finite_data(benchmark_errors, model_errors, "alternative model")?;
 
     // Compute Clark-West adjusted differentials
     let f = compute_clark_west_differentials(benchmark_errors, model_errors);
 
-    // Compute statistics
-    let f_bar = compute_means(&f);
-    let variances = compute_variances(&f, &f_bar);
-    let standardized = compute_standardized(&f_bar, &variances, t);
-
-    // Observed test statistic: max of standardized performance
-    let observed = standardized
-        .iter()
-        .cloned()
-        .fold(f64::NEG_INFINITY, f64::max);
-
-    // Find best model
-    let best_model_idx = find_best_model(&standardized);
-
-    // Bootstrap p-values
-    let (p_value_consistent, p_value_upper) =
-        compute_spa_pvalues(&f, &f_bar, observed, n_bootstrap, block_length, seed);
-
+    let out = spa_stationary(&f, n_bootstrap, block_length, seed);
     Ok(MSPEAdjustedResult {
-        statistic: observed,
-        p_value_consistent,
-        p_value_upper,
+        statistic: out.statistic,
+        p_value_lower: out.p_value_lower,
+        p_value_consistent: out.p_value_consistent,
+        p_value_upper: out.p_value_upper,
         n_bootstrap,
-        best_model_idx,
+        best_model_idx: out.best_model_idx,
     })
 }
 

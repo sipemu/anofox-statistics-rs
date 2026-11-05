@@ -1,7 +1,9 @@
 //! Percentile bootstrap confidence intervals.
 
 use crate::error::{Result, StatError};
-use crate::resampling::{CircularBlockBootstrap, StationaryBootstrap};
+use crate::resampling::{
+    BootstrapMethod, CircularBlockBootstrap, MovingBlockBootstrap, StationaryBootstrap,
+};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -130,6 +132,154 @@ pub fn bootstrap_ci<F: Fn(&[f64]) -> f64>(
     })
 }
 
+/// Options of [`bootstrap_ci_with_options`] / [`bootstrap_mean_ci_with_options`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BootstrapCIOptions {
+    /// Number of bootstrap replicates (`>= 2`). Default 1000.
+    pub n_bootstrap: usize,
+    /// Confidence level in (0, 1). Default 0.95.
+    pub conf_level: f64,
+    /// Resampling scheme and (expected) block length. Default
+    /// [`BootstrapMethod::Iid`].
+    pub method: BootstrapMethod,
+    /// Random seed; `None` seeds from entropy. Default `None`.
+    pub seed: Option<u64>,
+}
+
+impl Default for BootstrapCIOptions {
+    fn default() -> Self {
+        Self {
+            n_bootstrap: 1000,
+            conf_level: 0.95,
+            method: BootstrapMethod::Iid,
+            seed: None,
+        }
+    }
+}
+
+impl BootstrapMethod {
+    /// The scheme [`bootstrap_mean_ci`] uses for a `block_length` argument:
+    /// 0 is [`Iid`](Self::Iid), 1 is [`Stationary`](Self::Stationary) with
+    /// expected block length 1, larger values are
+    /// [`CircularBlock`](Self::CircularBlock) with that block length.
+    pub fn from_block_length(block_length: usize) -> Self {
+        match block_length {
+            0 => BootstrapMethod::Iid,
+            1 => BootstrapMethod::Stationary {
+                expected_block_length: 1.0,
+            },
+            l => BootstrapMethod::CircularBlock { block_length: l },
+        }
+    }
+}
+
+fn replicates<F: Fn(&[f64]) -> f64>(
+    data: &[f64],
+    statistic: &F,
+    n_bootstrap: usize,
+    method: BootstrapMethod,
+    seed: Option<u64>,
+) -> Vec<f64> {
+    let n = data.len();
+    let resample = |idx: Vec<usize>| -> f64 {
+        let s: Vec<f64> = idx.into_iter().map(|i| data[i]).collect();
+        statistic(&s)
+    };
+    match method {
+        BootstrapMethod::Iid => iid_replicates(data, statistic, n_bootstrap, seed),
+        BootstrapMethod::Stationary {
+            expected_block_length,
+        } => {
+            let mut b = StationaryBootstrap::new(expected_block_length, seed);
+            (0..n_bootstrap)
+                .map(|_| resample(b.sample_indices(n, n)))
+                .collect()
+        }
+        BootstrapMethod::CircularBlock { block_length } => {
+            let mut b = CircularBlockBootstrap::new(block_length, seed);
+            (0..n_bootstrap)
+                .map(|_| resample(b.sample_indices(n, n)))
+                .collect()
+        }
+        BootstrapMethod::MovingBlock { block_length } => {
+            let mut b = MovingBlockBootstrap::new(block_length, seed);
+            (0..n_bootstrap)
+                .map(|_| resample(b.sample_indices(n, n)))
+                .collect()
+        }
+    }
+}
+
+/// Percentile (block) bootstrap confidence interval for an arbitrary
+/// statistic, with the resampling scheme chosen by `options.method`.
+///
+/// [`BootstrapMethod::Iid`] reproduces [`bootstrap_ci`] exactly (same seed,
+/// same replicates). [`BootstrapMethod::Stationary`] corresponds to R's
+/// `boot::tsboot(x, statistic, R, l = expected_block_length, sim = "geom")`,
+/// [`BootstrapMethod::CircularBlock`] to `tsboot(..., sim = "fixed")` (both
+/// with the default `endcorr = TRUE`, i.e. wrapping around the end of the
+/// series). The interval and standard error are computed as in
+/// [`bootstrap_ci`].
+///
+/// # Errors
+/// Fewer than 2 observations, `n_bootstrap < 2`, `conf_level` outside (0, 1),
+/// or a block length below 1.
+pub fn bootstrap_ci_with_options<F: Fn(&[f64]) -> f64>(
+    data: &[f64],
+    statistic: F,
+    options: &BootstrapCIOptions,
+) -> Result<BootstrapCIResult> {
+    validate(data, options.n_bootstrap, options.conf_level)?;
+    options.method.validate()?;
+    let reps = replicates(
+        data,
+        &statistic,
+        options.n_bootstrap,
+        options.method,
+        options.seed,
+    );
+    let (lo, hi, se) = percentile_interval(reps, options.conf_level);
+    Ok(BootstrapCIResult {
+        estimate: statistic(data),
+        se,
+        conf_int_lower: lo,
+        conf_int_upper: hi,
+        conf_level: options.conf_level,
+        n_bootstrap: options.n_bootstrap,
+    })
+}
+
+/// Percentile (block) bootstrap confidence interval for the mean, with the
+/// resampling scheme and (expected) block length chosen by `options.method`.
+///
+/// See [`bootstrap_ci_with_options`]; validated against R's
+/// `boot::tsboot(sim = "geom")` / `tsboot(sim = "fixed")`.
+///
+/// # Examples
+/// ```
+/// use anofox_statistics::{bootstrap_mean_ci_with_options, BootstrapCIOptions, BootstrapMethod};
+///
+/// let x: Vec<f64> = (0..50).map(|i| (i as f64 * 0.3).sin()).collect();
+/// let opts = BootstrapCIOptions {
+///     n_bootstrap: 2000,
+///     method: BootstrapMethod::Stationary { expected_block_length: 5.0 },
+///     seed: Some(42),
+///     ..Default::default()
+/// };
+/// let r = bootstrap_mean_ci_with_options(&x, &opts).unwrap();
+/// assert!(r.conf_int_lower < r.estimate && r.estimate < r.conf_int_upper);
+/// ```
+pub fn bootstrap_mean_ci_with_options(
+    data: &[f64],
+    options: &BootstrapCIOptions,
+) -> Result<BootstrapCIResult> {
+    bootstrap_ci_with_options(
+        data,
+        |s: &[f64]| s.iter().sum::<f64>() / s.len() as f64,
+        options,
+    )
+}
+
 /// Percentile bootstrap confidence interval for the mean.
 ///
 /// * `block_length == 0`: IID bootstrap (same as [`bootstrap_ci`] with the mean);
@@ -137,7 +287,11 @@ pub fn bootstrap_ci<F: Fn(&[f64]) -> f64>(
 /// * `block_length > 1`: [`CircularBlockBootstrap`] with that block length
 ///   (for dependent data).
 ///
-/// The interval and standard error are computed as in [`bootstrap_ci`].
+/// This mapping is [`BootstrapMethod::from_block_length`]; use
+/// [`bootstrap_mean_ci_with_options`] to choose the scheme and the (expected)
+/// block length freely, e.g. a stationary bootstrap with expected block
+/// length 5. The interval and standard error are computed as in
+/// [`bootstrap_ci`].
 ///
 /// # Errors
 /// Fewer than 2 observations, `n_bootstrap < 2`, or `conf_level` outside (0, 1).
@@ -158,31 +312,15 @@ pub fn bootstrap_mean_ci(
     block_length: usize,
     seed: Option<u64>,
 ) -> Result<BootstrapCIResult> {
-    validate(data, n_bootstrap, conf_level)?;
-    let mean = |s: &[f64]| s.iter().sum::<f64>() / s.len() as f64;
-    let n = data.len();
-    let reps: Vec<f64> = match block_length {
-        0 => iid_replicates(data, &mean, n_bootstrap, seed),
-        1 => StationaryBootstrap::new(1.0, seed)
-            .samples(data, n, n_bootstrap)
-            .iter()
-            .map(|s| mean(s))
-            .collect(),
-        l => CircularBlockBootstrap::new(l, seed)
-            .samples(data, n, n_bootstrap)
-            .iter()
-            .map(|s| mean(s))
-            .collect(),
-    };
-    let (lo, hi, se) = percentile_interval(reps, conf_level);
-    Ok(BootstrapCIResult {
-        estimate: mean(data),
-        se,
-        conf_int_lower: lo,
-        conf_int_upper: hi,
-        conf_level,
-        n_bootstrap,
-    })
+    bootstrap_mean_ci_with_options(
+        data,
+        &BootstrapCIOptions {
+            n_bootstrap,
+            conf_level,
+            method: BootstrapMethod::from_block_length(block_length),
+            seed,
+        },
+    )
 }
 
 #[cfg(test)]

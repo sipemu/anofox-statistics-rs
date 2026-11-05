@@ -39,9 +39,9 @@ pub use drift::{
 };
 pub use error::{Result, StatError};
 pub use forecast::{
-    clark_west, diebold_mariano, model_confidence_set, mspe_adjusted_spa, spa_test, CWResult,
-    DMResult, LossFunction, MCSEliminationStep, MCSResult, MCSStatistic, MSPEAdjustedResult,
-    SPAResult, VarEstimator,
+    clark_west, diebold_mariano, model_confidence_set, model_confidence_set_with_method,
+    mspe_adjusted_spa, spa_test, CWResult, DMResult, LossFunction, MCSEliminationStep, MCSResult,
+    MCSStatistic, MSPEAdjustedResult, SPAResult, VarEstimator,
 };
 pub use modern::{
     energy_distance_test, energy_distance_test_1d, mmd_test, mmd_test_1d, wasserstein_distance_1d,
@@ -56,17 +56,19 @@ pub use nonparametric::{
 };
 pub use parametric::{
     brown_forsythe, cohens_d, cohens_d_one_sample, one_way_anova, repeated_measures_anova, t_test,
-    two_way_anova, yuen_test, Alternative, AnovaKind, AnovaTableRow, CorrectedResult, LeveneResult,
-    OneWayAnovaResult, RmAnovaResult, SphericityResult, TTestKind, TTestResult, TwoWayAnovaResult,
-    YuenConfInt, YuenResult,
+    t_test_one_sample, two_way_anova, yuen_test, Alternative, AnovaKind, AnovaTableRow,
+    CorrectedResult, LeveneResult, OneWayAnovaResult, RmAnovaResult, SphericityResult,
+    TTestConfInt, TTestKind, TTestResult, TwoWayAnovaResult, YuenConfInt, YuenResult,
 };
 pub use posthoc::{
     dunn_test, p_adjust, p_adjust_n, pairwise_t_test, pairwise_t_test_with_conf_level, ptukey,
     qtukey, tukey_hsd, PAdjustMethod, PairwiseComparison, PairwiseResult,
 };
 pub use resampling::{
-    bootstrap_ci, bootstrap_mean_ci, permutation_t_test, BootstrapCIResult, CircularBlockBootstrap,
-    PermutationEngine, PermutationResult, StationaryBootstrap,
+    bootstrap_ci, bootstrap_ci_with_options, bootstrap_mean_ci, bootstrap_mean_ci_with_options,
+    permutation_t_test, BootstrapCIOptions, BootstrapCIResult, BootstrapMethod,
+    CircularBlockBootstrap, MovingBlockBootstrap, PermutationEngine, PermutationResult,
+    StationaryBootstrap,
 };
 pub use test_result::TestResult;
 

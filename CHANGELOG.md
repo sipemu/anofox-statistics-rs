@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-05
+
+### Fixed
+
+- **SPA / MSPE-adjusted SPA follow Hansen (2005).** `spa_test` and `mspe_adjusted_spa`
+  now (a) draw one stationary-bootstrap index vector per replication and apply it to
+  all models jointly (before, every model was resampled independently, destroying the
+  cross-model dependence); (b) report `T_SPA = max(0, max_k sqrt(n) d̄_k / ω̂_k)` with
+  Hansen's stationary-bootstrap variance `ω̂_k` (before, the statistic was `sqrt(n)`
+  times too large and used the IID variance); (c) compute the p-values with Hansen's
+  re-centrings, `p = #{T* > T_SPA} / B`. The previous `p_value_consistent` was in fact
+  the upper p-value and `p_value_upper` the lower one; both fields now carry the
+  standard definitions and the new `p_value_lower` is added (`p_l <= p_c <= p_u`).
+  Validated against a base-R implementation of Hansen (2005) (exact with shared
+  bootstrap indices, and within Monte-Carlo error). `n_bootstrap == 0`, fewer than two
+  observations and a non-positive block length are now errors.
+- **Model Confidence Set is reproducible and follows Hansen, Lunde & Nason (2011).**
+  `model_confidence_set` no longer iterates model pairs in `HashMap` order (a fixed seed
+  gave different results with three or more models). It now draws one bootstrap index
+  vector per replication for all models, standardises with bootstrap variances, and
+  computes the MCS p-values as the running maximum of the step p-values
+  (`#{T* >= T} / B`), as R's `MCS::MCSprocedure`. Validated against `MCSprocedure`
+  (T_max and T_R; exact with shared indices and within Monte-Carlo error).
+- **ICC(2,1) / ICC(2,k) confidence intervals.** They used the ICC(3) interval; they now
+  use the Shrout-Fleiss / McGraw-Wong absolute-agreement interval with Satterthwaite
+  degrees of freedom, as `psych::ICC`. All six types validated against `psych::ICC` on
+  the Shrout & Fleiss (1979) data and two more designs.
+
+### Added
+
+- `t_test_one_sample(x, alternative, mu, conf_level)`: one-sample t-test (R
+  `t.test(x, mu = )`); pairs with the existing `cohens_d_one_sample`. `TTestConfInt` is
+  now re-exported.
+- `bootstrap_mean_ci_with_options` / `bootstrap_ci_with_options` with
+  `BootstrapCIOptions { n_bootstrap, conf_level, method, seed }` and
+  `BootstrapMethod::{Iid, Stationary { expected_block_length }, CircularBlock
+  { block_length }, MovingBlock { block_length }}`: choose the resampling scheme and the
+  (expected) block length (R `boot::tsboot(sim = "geom")` / `"fixed"`). `bootstrap_mean_ci`
+  keeps its behaviour (`BootstrapMethod::from_block_length`).
+- `MovingBlockBootstrap`, and `sample_indices` on all bootstrap engines (joint resampling
+  of several series).
+- `model_confidence_set_with_method(losses, alpha, statistic, n_bootstrap, method, seed)`;
+  `BootstrapMethod::MovingBlock { block_length: k }` reproduces `MCSprocedure(k = k)`.
+- `MCSResult::elimination_order` (full order, best model last) and
+  `MCSResult::mcs_p_values` (per model); `MCSEliminationStep::mcs_p_value`.
+
+### Changed (behaviour)
+
+- **One-sided t-test confidence intervals.** For `Alternative::Less` / `Greater`,
+  `t_test` (paired, Welch, Student) and `t_test_one_sample` now return R's one-sided
+  interval, `(-inf, est + t_{1-a} se]` / `[est - t_{1-a} se, inf)`, instead of the
+  two-sided one.
+- SPA / MSPE-adjusted SPA statistics and p-values and MCS p-values change (see Fixed);
+  MCS p-values no longer use the `(count + 1) / (B + 1)` correction.
+
 ## [0.7.0] - 2026-11-03
 
 ### Added
