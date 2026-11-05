@@ -628,7 +628,12 @@ compute_rm_anova <- function(data, n_subjects, n_conditions) {
     correction <- (2 * k^2 - 3 * k + 3) / (6 * (k - 1))
     chi_sq <- -(n - 1 - correction) * log(mauchly_w)
     df_chi <- p * (p + 1) / 2 - 1
-    mauchly_p <- 1 - pchisq(chi_sq, df_chi)
+    # Second-order term as stats::mauchly.test (incl. its `3 * k`)
+    nu <- n - 1
+    rho <- 1 - (2 * p^2 + p + 2) / (6 * p * nu)
+    w2 <- (p + 2) * (p - 1) * (p - 2) * (2 * p^3 + 6 * p^2 + 3 * k + 2) / (288 * (nu * p * rho)^2)
+    pr1 <- 1 - pchisq(chi_sq, df_chi)
+    mauchly_p <- pr1 + w2 * ((1 - pchisq(chi_sq, df_chi + 4)) - pr1)
 
     # Greenhouse-Geisser epsilon
     eigenvalues <- eigen(CSC, symmetric = TRUE, only.values = TRUE)$values
@@ -638,8 +643,9 @@ compute_rm_anova <- function(data, n_subjects, n_conditions) {
     gg_epsilon <- max(1/(k-1), min(1, gg_epsilon))
 
     # Huynh-Feldt epsilon
-    hf_epsilon <- ((n - 1) * (k - 1) * gg_epsilon - 2) / ((k - 1) * (n - 1 - (k - 1) * gg_epsilon))
-    hf_epsilon <- max(gg_epsilon, min(1, hf_epsilon))
+    # Huynh-Feldt (Lecoutre-corrected, as car / afex / ez), capped at 1
+    hf_epsilon <- (n * (k - 1) * gg_epsilon - 2) / ((k - 1) * (n - 1 - (k - 1) * gg_epsilon))
+    hf_epsilon <- min(1, hf_epsilon)
 
     # Corrected p-values
     gg_p <- 1 - pf(f_stat, df_conditions * gg_epsilon, df_error * gg_epsilon)

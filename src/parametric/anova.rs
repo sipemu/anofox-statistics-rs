@@ -1060,11 +1060,13 @@ pub fn two_way_anova(
 pub struct SphericityResult {
     /// Mauchly's W statistic.
     pub w: f64,
-    /// Chi-square approximation.
+    /// Chi-square approximation `-(n - 1) rho ln W` (the statistic of
+    /// `stats::mauchly.test`'s p-value).
     pub chi_square: f64,
     /// Degrees of freedom.
     pub df: f64,
-    /// P-value (small p = sphericity violated).
+    /// P-value with the second-order correction, as `stats::mauchly.test`
+    /// (small p = sphericity violated).
     pub p_value: f64,
 }
 
@@ -1370,16 +1372,19 @@ fn compute_sphericity_corrections(
     // Bound GG epsilon between 1/(k-1) and 1.0
     let epsilon_gg = epsilon_gg.max(1.0 / (k - 1) as f64).min(1.0);
 
-    // Huynh-Feldt epsilon (correction for bias in GG)
+    // Huynh-Feldt epsilon with the Lecoutre (1991) correction, as reported
+    // by car::Anova / afex / ez: (n p eps_GG - 2) / (p (n - 1 - p eps_GG)),
+    // p = k - 1, capped at 1 (R treats HF eps > 1 as 1).
     let n_f = n as f64;
     let k_f = k as f64;
-    let epsilon_hf = if (n_f - 1.0) * (k_f - 1.0) * epsilon_gg - 2.0 > 1e-15 {
-        ((n_f - 1.0) * (k_f - 1.0) * epsilon_gg - 2.0)
-            / ((k_f - 1.0) * (n_f - 1.0 - (k_f - 1.0) * epsilon_gg))
+    let p_f = k_f - 1.0;
+    let hf_raw = (n_f * p_f * epsilon_gg - 2.0) / (p_f * (n_f - 1.0 - p_f * epsilon_gg));
+    let epsilon_hf = if hf_raw.is_finite() && hf_raw > 0.0 {
+        hf_raw.min(1.0)
     } else {
-        1.0
+        // Degenerate (tiny n): fall back to the Greenhouse-Geisser epsilon.
+        epsilon_gg
     };
-    let epsilon_hf = epsilon_hf.max(epsilon_gg).min(1.0);
 
     // Mauchly's W
     // W = det(C * S * C') / (trace(C * S * C') / p)^p
@@ -1404,12 +1409,30 @@ fn compute_sphericity_corrections(
     // Degrees of freedom for chi-square
     let df_chi = (p * (p + 1)) as f64 / 2.0 - 1.0;
 
-    // P-value for Mauchly's test
+    // P-value for Mauchly's test with the second-order term of the
+    // chi-square approximation (Anderson, 1958), as stats::mauchly.test:
+    // with nu = n - 1 residual df, rho = 1 - (2p^2 + p + 2) / (6 p nu),
+    // w2 = (p+2)(p-1)(p-2)(2p^3 + 6p^2 + 3k + 2) / (288 (nu p rho)^2),
+    // P = P1 + w2 (P2 - P1), P1 = P(chi2_f > z), P2 = P(chi2_{f+4} > z).
     let p_mauchly = if chi_sq.is_finite() && df_chi > 0.0 {
         let chi_dist = ChiSquared::new(df_chi).map_err(|e| {
             StatError::InvalidParameter(format!("Failed to create chi-square distribution: {}", e))
         })?;
-        sf_or_nan(&chi_dist, chi_sq)
+        let chi_dist4 = ChiSquared::new(df_chi + 4.0).map_err(|e| {
+            StatError::InvalidParameter(format!("Failed to create chi-square distribution: {}", e))
+        })?;
+        let nu = n_f - 1.0;
+        let rho = 1.0 - (2.0 * p_f * p_f + p_f + 2.0) / (6.0 * p_f * nu);
+        let w2 = (p_f + 2.0)
+            * (p_f - 1.0)
+            * (p_f - 2.0)
+            // R's mauchly.test (and car / afex) use `3 * k` (the number of
+            // conditions) here where Anderson's term has `3 p`; we match R.
+            * (2.0 * p_f.powi(3) + 6.0 * p_f * p_f + 3.0 * k_f + 2.0)
+            / (288.0 * (nu * p_f * rho).powi(2));
+        let pr1 = sf_or_nan(&chi_dist, chi_sq);
+        let pr2 = sf_or_nan(&chi_dist4, chi_sq);
+        pr1 + w2 * (pr2 - pr1)
     } else {
         0.0
     };

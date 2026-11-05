@@ -213,6 +213,17 @@ Reference script `R/generate_icc_ttest_boot_refs.R` writes
 | `t_test()`, `t_test_one_sample()` | `t.test()` | 1e-9 | one-sample, paired, Welch, Student; 3 alternatives (one-sided CIs), 2 levels |
 | `bootstrap_mean_ci_with_options()` | `boot::tsboot(sim = "geom" / "fixed")`, `boot::boot()` | SE 3 %, bounds 0.1 SE (B = 20000) | AR(1) series, block lengths 1, 5, 10 |
 
+### 5c. Partial correlation and the AUC null quantile
+
+`R/generate_partial_auc_refs.R` -> `R/data/partial_auc_reference.csv`, checked by
+`tests/partial_auc_reference.rs`.
+
+| Function | R Equivalent | Tolerance | Notes |
+|----------|-------------|-----------|-------|
+| `partial_cor()`, `semi_partial_cor()` | `ppcor::pcor.test()`, `spcor.test()` | 1e-10 (estimate, t), 1e-8 (p) | 1, 2, 3 correlated controls; Pearson and Spearman (ranks) |
+| `auc_null_quantile()` | `qwilcox(p, m, n) / (m n)` | 1e-12 | p in {0, 1e-12, ..., 1 - 1e-12, 1}, sizes up to (50, 40) |
+| `repeated_measures_anova()` sphericity | `afex::aov_ez()`, `stats::mauchly.test()` (`R/generate_rm_sphericity_refs.R`, `tests/rm_sphericity_reference.rs`) | 1e-9 (W, eps), 1e-8 (p) | k = 3, 4; two datasets each; HF eps capped at 1 as R |
+
 ### 6. Modern Distribution Tests
 
 | Function | R Equivalent | Tolerance | Notes |

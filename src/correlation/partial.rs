@@ -49,6 +49,12 @@ pub struct PartialCorResult {
 /// println!("p-value = {:.4}", result.p_value);
 /// ```
 ///
+/// The estimate is the correlation of the residuals of `x` and `y` from a
+/// joint least-squares regression (with intercept) on all controls; the test
+/// is `t = r sqrt((n - 2 - k) / (1 - r^2))` with `n - 2 - k` degrees of
+/// freedom. For the Spearman version (`method = "spearman"` in ppcor), pass
+/// the ranks of `x`, `y` and the controls.
+///
 /// # R equivalent
 /// `ppcor::pcor.test(x, y, z)`
 pub fn partial_cor(x: &[f64], y: &[f64], z: &[&[f64]]) -> Result<PartialCorResult> {
@@ -90,34 +96,11 @@ pub fn partial_cor(x: &[f64], y: &[f64], z: &[&[f64]]) -> Result<PartialCorResul
         });
     }
 
-    // Use recursive formula for partial correlation
-    // r_xy.z = (r_xy.z' - r_xzk.z' * r_yzk.z') / sqrt((1 - r_xzk.z'^2)(1 - r_yzk.z'^2))
-    // where z' = z without the last variable zk
-
-    let partial_r = if k == 1 {
-        // Base case: one control variable
-        compute_partial_cor_single(x, y, z[0])?
-    } else {
-        // Recursive case: use the last control variable
-        let z_rest: Vec<&[f64]> = z[..k - 1].to_vec();
-        let zk = z[k - 1];
-
-        // Compute partial correlations with z' (all but last control)
-        let r_xy_zrest = partial_cor(x, y, &z_rest)?.estimate;
-        let r_xzk_zrest = partial_cor(x, zk, &z_rest)?.estimate;
-        let r_yzk_zrest = partial_cor(y, zk, &z_rest)?.estimate;
-
-        // Apply the recursive formula
-        let numerator = r_xy_zrest - r_xzk_zrest * r_yzk_zrest;
-        let denom1 = (1.0 - r_xzk_zrest * r_xzk_zrest).sqrt();
-        let denom2 = (1.0 - r_yzk_zrest * r_yzk_zrest).sqrt();
-
-        if denom1 * denom2 > 1e-10 {
-            numerator / (denom1 * denom2)
-        } else {
-            0.0
-        }
-    };
+    // Correlation of the residuals of x and y after a joint least-squares
+    // regression (with intercept) on all controls, as ppcor::pcor.
+    let x_res = compute_residuals(x, z);
+    let y_res = compute_residuals(y, z);
+    let partial_r = pearson_r(&x_res, &y_res);
 
     // Clamp to [-1, 1]
     let partial_r = partial_r.clamp(-1.0, 1.0);
@@ -151,23 +134,6 @@ pub fn partial_cor(x: &[f64], y: &[f64], z: &[&[f64]]) -> Result<PartialCorResul
         n_controls: k,
         method: format!("Partial correlation (controlling for {} variable(s))", k),
     })
-}
-
-/// Compute partial correlation with a single control variable.
-fn compute_partial_cor_single(x: &[f64], y: &[f64], z: &[f64]) -> Result<f64> {
-    let r_xy = pearson_r(x, y);
-    let r_xz = pearson_r(x, z);
-    let r_yz = pearson_r(y, z);
-
-    let numerator = r_xy - r_xz * r_yz;
-    let denom1 = (1.0 - r_xz * r_xz).sqrt();
-    let denom2 = (1.0 - r_yz * r_yz).sqrt();
-
-    if denom1 * denom2 > 1e-10 {
-        Ok(numerator / (denom1 * denom2))
-    } else {
-        Ok(0.0)
-    }
 }
 
 /// Compute simple Pearson correlation coefficient (no control variables).
@@ -240,8 +206,12 @@ fn pearson_r(x: &[f64], y: &[f64]) -> f64 {
 /// # Returns
 /// * `PartialCorResult` containing the semi-partial correlation
 ///
+/// `y` is residualized on all controls jointly (least squares with
+/// intercept), as ppcor does; the test is `t = r sqrt((n - 2 - k) / (1 - r^2))`
+/// with `n - 2 - k` degrees of freedom. For the Spearman version, pass ranks.
+///
 /// # R equivalent
-/// `ppcor::spcor.test(x, y, z)`
+/// `ppcor::spcor.test(x, y, z)` (which removes `z` from `y` only)
 pub fn semi_partial_cor(x: &[f64], y: &[f64], z: &[&[f64]]) -> Result<PartialCorResult> {
     let n = validate_correlation_input(x, y)?;
 
@@ -310,70 +280,40 @@ pub fn semi_partial_cor(x: &[f64], y: &[f64], z: &[&[f64]]) -> Result<PartialCor
     })
 }
 
-/// Compute residuals after regressing y on z variables using OLS.
+/// Residuals of the least-squares regression of `y` on an intercept and all
+/// control variables in `z` jointly (modified Gram-Schmidt QR of
+/// `[1, z_1, ..., z_k]`; a control that is (numerically) a linear combination
+/// of the intercept and the previous controls is dropped, like a pivoted QR).
 fn compute_residuals(y: &[f64], z: &[&[f64]]) -> Vec<f64> {
     let n = y.len();
-    let k = z.len();
-
-    if k == 0 {
-        return y.to_vec();
-    }
-
-    // Simple case: one predictor
-    if k == 1 {
-        let z0 = z[0];
-        let mean_y = mean(y);
-        let mean_z = mean(z0);
-
-        let mut sum_zy = 0.0;
-        let mut sum_zz = 0.0;
-
-        for i in 0..n {
-            let dz = z0[i] - mean_z;
-            sum_zy += dz * (y[i] - mean_y);
-            sum_zz += dz * dz;
-        }
-
-        let beta = if sum_zz > 0.0 { sum_zy / sum_zz } else { 0.0 };
-        let alpha = mean_y - beta * mean_z;
-
-        return y
-            .iter()
-            .zip(z0.iter())
-            .map(|(&yi, &zi)| yi - alpha - beta * zi)
-            .collect();
-    }
-
-    // Multiple predictors: use normal equations
-    // This is a simplified approach; for production, use proper linear algebra
-    // y = Z * beta + residuals
-    // beta = (Z'Z)^(-1) * Z'y
-
-    // For simplicity, we use sequential orthogonalization
-    let mut residuals = y.to_vec();
-
+    let mut basis: Vec<Vec<f64>> = Vec::with_capacity(z.len() + 1);
+    let inv = 1.0 / (n as f64).sqrt();
+    basis.push(vec![inv; n]);
     for zi in z {
-        let mean_r: f64 = residuals.iter().sum::<f64>() / n as f64;
-        let mean_z = mean(zi);
-
-        let mut sum_rz = 0.0;
-        let mut sum_zz = 0.0;
-
-        for i in 0..n {
-            let dz = zi[i] - mean_z;
-            sum_rz += dz * (residuals[i] - mean_r);
-            sum_zz += dz * dz;
+        let mut v = zi.to_vec();
+        let norm0 = v.iter().map(|a| a * a).sum::<f64>().sqrt();
+        for q in &basis {
+            let d: f64 = v.iter().zip(q).map(|(a, b)| a * b).sum();
+            for (a, b) in v.iter_mut().zip(q) {
+                *a -= d * b;
+            }
         }
-
-        let beta = if sum_zz > 0.0 { sum_rz / sum_zz } else { 0.0 };
-        let alpha = mean_r - beta * mean_z;
-
-        for i in 0..n {
-            residuals[i] -= alpha + beta * zi[i];
+        let norm = v.iter().map(|a| a * a).sum::<f64>().sqrt();
+        if norm > 1e-10 * norm0.max(f64::MIN_POSITIVE) {
+            for a in v.iter_mut() {
+                *a /= norm;
+            }
+            basis.push(v);
         }
     }
-
-    residuals
+    let mut r = y.to_vec();
+    for q in &basis {
+        let d: f64 = r.iter().zip(q).map(|(a, b)| a * b).sum();
+        for (a, b) in r.iter_mut().zip(q) {
+            *a -= d * b;
+        }
+    }
+    r
 }
 
 #[cfg(test)]

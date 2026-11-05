@@ -126,8 +126,19 @@ pub(crate) fn cdf_ge(pmf: &[f64], q: f64) -> f64 {
 
 /// Quantile as R's `qwilcox` / `qsignrank`: the smallest `q` with
 /// `P(S <= q) >= p` (with R's `10 * DBL_EPSILON` fuzz).
+///
+/// `p <= 0` and `p >= 1` are exact boundaries (the support minimum 0 and
+/// maximum), as in R; otherwise the upper half is searched from the top
+/// tail, so the result does not depend on the cumulative sum reaching 1 in
+/// floating point.
 pub(crate) fn quantile(pmf: &[f64], p: f64) -> usize {
     let max_q = pmf.len() - 1;
+    if p <= 0.0 {
+        return 0;
+    }
+    if p >= 1.0 {
+        return max_q;
+    }
     let mut acc = 0.0;
     if p <= 0.5 {
         let x = p - 10.0 * f64::EPSILON;

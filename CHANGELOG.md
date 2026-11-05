@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-05
+
+### Fixed
+
+- **`semi_partial_cor` with more than one control (behaviour change).** `y` was
+  residualized on the controls one at a time, which equals the regression residual only
+  for uncorrelated controls. It is now residualized on all controls jointly (least
+  squares with intercept), as `ppcor::spcor.test`; results change whenever two or more
+  correlated controls are given. `partial_cor` now uses the same joint residualization
+  (its previous recursive formula was algebraically equivalent; the estimate is unchanged
+  up to rounding, but no longer falls back to 0 for near-collinear controls). Validated
+  against `ppcor::pcor.test` / `spcor.test` with 1, 2 and 3 correlated controls, Pearson
+  and Spearman (ranks), estimate, statistic, p-value and df.
+- **`auc_null_quantile` at `p = 1`.** For e.g. `(50, 40)` it returned 0.93 instead of 1:
+  `p = 0` and `p = 1` are now exact boundaries (0 and 1), as R's `qwilcox`; this also
+  applies to the internal Wilcoxon / Mann-Whitney quantile used by the Hodges-Lehmann
+  intervals. Validated against `qwilcox` over a grid of `p` (incl. `1e-12`, `1 - 1e-12`)
+  and sizes up to `(50, 40)`.
+- **Huynh-Feldt epsilon of `repeated_measures_anova` (behaviour change).** It used
+  `n - 1` instead of `n` in the numerator; it is now the Lecoutre-corrected
+  Huynh-Feldt epsilon `(n p ε_GG - 2) / (p (n - 1 - p ε_GG))`, `p = k - 1`, reported by
+  car / afex / ez, capped at 1 (no longer floored at the GG epsilon). The HF-corrected
+  p-values change accordingly.
+- **Mauchly's test p-value.** It now includes the second-order term of the chi-square
+  approximation, as `stats::mauchly.test` (unchanged for `k = 3`, where the term
+  vanishes). Validated against `afex::aov_ez` and `stats::mauchly.test` with `k = 3`
+  and `k = 4` (W, p-value, GG / HF epsilons and corrected p-values).
+
 ## [0.8.0] - 2026-11-05
 
 ### Fixed
