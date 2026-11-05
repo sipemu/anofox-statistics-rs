@@ -22,7 +22,15 @@
 //! * consistent: `g(x) = x · 1{x >= -sqrt(ω̂_k² / n · 2 ln ln n)}`,
 //! * upper:      `g(x) = x` (White's Reality Check centring),
 //!
-//! and the p-values `p = #{T*_b > T_SPA} / B`, so that `p_l <= p_c <= p_u`.
+//! and the p-values `p = #{T*_b >= T_SPA} / B`, so that `p_l <= p_c <= p_u`.
+//!
+//! `T_SPA` and `T*` have an atom at 0 (no model beats the benchmark), so the
+//! p-value is `P(T* >= T_SPA)`: with `T_SPA = 0` (no evidence against the
+//! null) all three p-values are 1. For `T_SPA > 0` this equals Hansen's
+//! `#{T* > T_SPA} / B` (ties have probability zero). Python's `arch` (`SPA`)
+//! does not floor the statistic at 0 and reports `P(max_k Z*_k > max_k d̄_k)`
+//! instead, which differs only when no model has a positive t-ratio (it then
+//! gives some p-value in (0, 1], here 1; neither rejects).
 
 use crate::error::{Result, StatError};
 use crate::resampling::bootstrap::StationaryBootstrap;
@@ -211,7 +219,7 @@ pub(crate) fn spa_core<D: FnMut() -> Vec<usize>>(
                     t_star = t_star.max(sqrt_n * (boot_mean[k] - g[k]) / omega[k]);
                 }
             }
-            if t_star > statistic {
+            if t_star >= statistic {
                 *c += 1;
             }
         }

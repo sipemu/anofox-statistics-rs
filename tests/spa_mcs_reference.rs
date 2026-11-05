@@ -159,3 +159,35 @@ fn mcs_is_reproducible_with_many_models() {
         }
     }
 }
+
+#[test]
+fn spa_without_evidence_has_p_values_of_one() {
+    // Two clearly worse models: T_SPA = 0 and, as in R (mean(T* >= T_SPA)),
+    // all three p-values are 1 (before 0.8.2 the lower and consistent
+    // p-values were ~0, a spurious rejection).
+    let m = refs();
+    let bench = get(&m, "spa_worse", "in_bench");
+    let l = get(&m, "mc_spa_worse", "block_length")[0];
+    let r = spa_test(bench, &models(&m, "spa_worse"), 2000, l, Some(5)).unwrap();
+    assert_eq!(r.statistic, get(&m, "mc_spa_worse", "statistic")[0]);
+    assert_eq!(r.statistic, 0.0);
+    let p = get(&m, "mc_spa_worse", "p");
+    assert_eq!(
+        [r.p_value_lower, r.p_value_consistent, r.p_value_upper],
+        [p[0], p[1], p[2]]
+    );
+    assert_eq!(p, &[1.0, 1.0, 1.0]);
+
+    // MSPE-adjusted SPA: models whose errors are 2x and 3x the benchmark's
+    // have negative Clark-West differentials everywhere.
+    let e0 = get(&m, "mspe", "in_bench");
+    let worse: Vec<Vec<f64>> = [2.0, 3.0]
+        .iter()
+        .map(|&c| e0.iter().map(|e| c * e).collect())
+        .collect();
+    let r = mspe_adjusted_spa(e0, &worse, 500, 3.0, Some(1)).unwrap();
+    assert_eq!(r.statistic, 0.0);
+    assert_eq!(r.p_value_lower, 1.0);
+    assert_eq!(r.p_value_consistent, 1.0);
+    assert_eq!(r.p_value_upper, 1.0);
+}

@@ -35,7 +35,8 @@ pub struct SPAResult {
 /// replication draws one set of stationary-bootstrap time indices and applies
 /// it to all K series jointly (preserving their dependence); the lower,
 /// consistent and upper p-values use Hansen's three re-centrings
-/// (`p_l <= p_c <= p_u`, `p = #{T* > T_SPA} / B`). Validated against a
+/// (`p_l <= p_c <= p_u`, `p = #{T* >= T_SPA} / B`; all three are 1 when
+/// `T_SPA = 0`, i.e. no model beats the benchmark). Validated against a
 /// base-R implementation of Hansen (2005).
 ///
 /// # Arguments
