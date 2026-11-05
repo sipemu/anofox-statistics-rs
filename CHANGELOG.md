@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-05
+
+### Fixed
+
+- **SPA p-values when no model beats the benchmark.** `spa_test` / `mspe_adjusted_spa`
+  computed `p = #{T* > T_SPA} / B`; with `T_SPA = 0` (all t-ratios <= 0) the bootstrap
+  statistics, floored at 0 too, tie with it, so `p_value_lower` and
+  `p_value_consistent` came out ~0, a spurious rejection. The p-values are now
+  `#{T* >= T_SPA} / B` = `P(T* >= T_SPA)`: all three are 1 when `T_SPA = 0`, and
+  unchanged (ties have probability zero) when `T_SPA > 0`. Python's `arch` does not
+  floor the statistic and reports a p-value in (0, 1] in that case; neither rejects.
+  Validated against the base-R Hansen (2005) implementation, incl. a case with two
+  clearly worse models. No API change.
+
 ## [0.8.1] - 2026-11-05
 
 ### Fixed
@@ -45,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cross-model dependence); (b) report `T_SPA = max(0, max_k sqrt(n) d̄_k / ω̂_k)` with
   Hansen's stationary-bootstrap variance `ω̂_k` (before, the statistic was `sqrt(n)`
   times too large and used the IID variance); (c) compute the p-values with Hansen's
-  re-centrings, `p = #{T* > T_SPA} / B`. The previous `p_value_consistent` was in fact
+  re-centrings, `p = #{T* > T_SPA} / B` (`>=` since 0.8.2). The previous `p_value_consistent` was in fact
   the upper p-value and `p_value_upper` the lower one; both fields now carry the
   standard definitions and the new `p_value_lower` is added (`p_l <= p_c <= p_u`).
   Validated against a base-R implementation of Hansen (2005) (exact with shared

@@ -43,7 +43,9 @@ spa_omega2 <- function(d, l) {
 # T_SPA = max(0, max_k sqrt(n) dbar_k / omega_k); bootstrap
 # T*_b = max(0, max_k sqrt(n) (dbar*_k - g(dbar_k)) / omega_k) with
 # g_l = max(x, 0), g_c = x 1{x >= -sqrt(omega^2/n 2 log log n)}, g_u = x;
-# p = mean(T* > T_SPA).
+# p = mean(T* >= T_SPA): T_SPA and T* have an atom at 0, so with T_SPA = 0
+# (no model beats the benchmark) all p-values are 1; for T_SPA > 0 this is
+# Hansen's mean(T* > T_SPA).
 spa <- function(D, l, idx_list) {
   n <- nrow(D)
   dbar <- colMeans(D)
@@ -55,7 +57,7 @@ spa <- function(D, l, idx_list) {
     m <- colMeans(D[idx, , drop = FALSE])
     vapply(g, function(gg) max(0, sqrt(n) * (m - gg) / om), 0)
   }, numeric(3))
-  list(stat = stat, p = rowMeans(Tb > stat), omega = om)
+  list(stat = stat, p = rowMeans(Tb >= stat), omega = om)
 }
 # Stationary bootstrap indices (geometric block lengths, wrap-around), as
 # boot::tsboot(sim = "geom").
@@ -102,6 +104,21 @@ add("mc_spa", "block_length", l_spa)
 add("mc_spa", "statistic", r$stat)
 add("mc_spa", "p", r$p)
 cat("SPA:", r$stat, r$p, "\n")
+
+# Degenerate case: two clearly worse models (T_SPA = 0, no evidence against
+# the null): all three p-values must be 1.
+set.seed(2006)
+Dw <- sapply(c(-0.8, -1.5), function(m) m + 0.6 * z + 0.6 * ar1(n, 0.3))
+add("spa_worse", "in_bench", L0)
+for (k in 1:2) add("spa_worse", paste0("in_model", k - 1), L0 - Dw[, k])
+Dw <- L0 - (L0 - Dw)
+set.seed(9)
+r <- spa(Dw, l_spa, lapply(1:2000, function(b) stat_idx(n, l_spa)))
+add("mc_spa_worse", "block_length", l_spa)
+add("mc_spa_worse", "statistic", r$stat)
+add("mc_spa_worse", "p", r$p)
+cat("SPA (worse models):", r$stat, r$p, "\n")
+stopifnot(r$stat == 0, all(r$p == 1))
 
 # MSPE-adjusted SPA: Clark-West differentials f = e0^2 - ek^2 + (e0 - ek)^2.
 set.seed(2012)
