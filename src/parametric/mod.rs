@@ -10,5 +10,5 @@ pub use anova::{
 };
 pub use effect_size::{cohens_d, cohens_d_one_sample};
 pub use levene::{brown_forsythe, LeveneResult};
-pub use ttest::{t_test, Alternative, TTestKind, TTestResult};
+pub use ttest::{t_test, t_test_one_sample, Alternative, TTestConfInt, TTestKind, TTestResult};
 pub use yuen::{yuen_test, YuenConfInt, YuenResult};

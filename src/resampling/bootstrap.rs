@@ -36,11 +36,24 @@ impl StationaryBootstrap {
     /// * `data` - The original time series data
     /// * `length` - Length of the bootstrap sample to generate
     pub fn sample(&mut self, data: &[f64], length: usize) -> Vec<f64> {
-        if data.is_empty() || length == 0 {
+        self.sample_indices(data.len(), length)
+            .into_iter()
+            .map(|i| data[i])
+            .collect()
+    }
+
+    /// Draw the time indices (0-based, into a series of length `n`) of one
+    /// bootstrap resample of the given length.
+    ///
+    /// Applying the same index vector to several series resamples them
+    /// jointly, preserving their cross-sectional dependence (as required by
+    /// the SPA test and the Model Confidence Set). [`sample`](Self::sample)
+    /// is `sample_indices` applied to one series, with the same random stream.
+    pub fn sample_indices(&mut self, n: usize, length: usize) -> Vec<usize> {
+        if n == 0 || length == 0 {
             return vec![];
         }
 
-        let n = data.len();
         let q = 1.0 / self.expected_block_length;
         let mut result = Vec::with_capacity(length);
 
@@ -48,7 +61,7 @@ impl StationaryBootstrap {
         let mut current_idx = self.rng.gen_range(0..n);
 
         for _ in 0..length {
-            result.push(data[current_idx]);
+            result.push(current_idx);
 
             // With probability q, start a new block (random jump)
             // Otherwise, continue to next index (wrap around)
@@ -97,11 +110,20 @@ impl CircularBlockBootstrap {
 
     /// Generate a bootstrap sample of the specified length.
     pub fn sample(&mut self, data: &[f64], length: usize) -> Vec<f64> {
-        if data.is_empty() || length == 0 {
+        self.sample_indices(data.len(), length)
+            .into_iter()
+            .map(|i| data[i])
+            .collect()
+    }
+
+    /// Draw the time indices (0-based, into a series of length `n`) of one
+    /// bootstrap resample of the given length; see
+    /// [`StationaryBootstrap::sample_indices`].
+    pub fn sample_indices(&mut self, n: usize, length: usize) -> Vec<usize> {
+        if n == 0 || length == 0 {
             return vec![];
         }
 
-        let n = data.len();
         let mut result = Vec::with_capacity(length);
 
         while result.len() < length {
@@ -113,8 +135,7 @@ impl CircularBlockBootstrap {
                 if result.len() >= length {
                     break;
                 }
-                let idx = (start + offset) % n;
-                result.push(data[idx]);
+                result.push((start + offset) % n);
             }
         }
 
@@ -124,6 +145,147 @@ impl CircularBlockBootstrap {
     /// Generate multiple bootstrap samples.
     pub fn samples(&mut self, data: &[f64], length: usize, n_samples: usize) -> Vec<Vec<f64>> {
         (0..n_samples).map(|_| self.sample(data, length)).collect()
+    }
+}
+
+/// A moving (non-circular) block bootstrap engine.
+///
+/// Blocks of fixed length `block_length` start uniformly at one of the
+/// `n - block_length + 1` positions that keep the block inside the series;
+/// `ceil(length / block_length)` blocks are concatenated and truncated to
+/// `length` (Kuensch, 1989). This is the scheme of R's `MCS::MCSprocedure`.
+/// A block length of 1 (or a block longer than the series) degenerates to
+/// the IID bootstrap / a single block.
+pub struct MovingBlockBootstrap {
+    block_length: usize,
+    rng: ChaCha8Rng,
+}
+
+impl MovingBlockBootstrap {
+    /// Create a new moving block bootstrap engine.
+    pub fn new(block_length: usize, seed: Option<u64>) -> Self {
+        let rng = match seed {
+            Some(s) => ChaCha8Rng::seed_from_u64(s),
+            None => ChaCha8Rng::from_entropy(),
+        };
+        Self {
+            block_length: block_length.max(1),
+            rng,
+        }
+    }
+
+    /// Generate a bootstrap sample of the specified length.
+    pub fn sample(&mut self, data: &[f64], length: usize) -> Vec<f64> {
+        self.sample_indices(data.len(), length)
+            .into_iter()
+            .map(|i| data[i])
+            .collect()
+    }
+
+    /// Draw the time indices of one bootstrap resample; see
+    /// [`StationaryBootstrap::sample_indices`].
+    pub fn sample_indices(&mut self, n: usize, length: usize) -> Vec<usize> {
+        if n == 0 || length == 0 {
+            return vec![];
+        }
+        let k = self.block_length.min(n);
+        let n_starts = n - k + 1;
+        let mut result = Vec::with_capacity(length);
+        while result.len() < length {
+            let start = self.rng.gen_range(0..n_starts);
+            for offset in 0..k {
+                if result.len() >= length {
+                    break;
+                }
+                result.push(start + offset);
+            }
+        }
+        result
+    }
+}
+
+/// Resampling scheme of a (block) bootstrap.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BootstrapMethod {
+    /// IID (nonparametric) bootstrap: draw single observations with replacement.
+    Iid,
+    /// Stationary bootstrap (Politis & Romano, 1994): blocks of geometric
+    /// length with the given mean, wrapping around the end of the series
+    /// (R `boot::tsboot(sim = "geom")`).
+    Stationary {
+        /// Expected block length (`>= 1`; 1 is the IID bootstrap).
+        expected_block_length: f64,
+    },
+    /// Circular block bootstrap: fixed-length blocks starting anywhere,
+    /// wrapping around (R `boot::tsboot(sim = "fixed")`).
+    CircularBlock {
+        /// Block length (`>= 1`).
+        block_length: usize,
+    },
+    /// Moving (non-circular) block bootstrap, see [`MovingBlockBootstrap`].
+    MovingBlock {
+        /// Block length (`>= 1`).
+        block_length: usize,
+    },
+}
+
+impl BootstrapMethod {
+    /// Validate the block length.
+    pub(crate) fn validate(&self) -> crate::error::Result<()> {
+        let ok = match *self {
+            BootstrapMethod::Iid => true,
+            BootstrapMethod::Stationary {
+                expected_block_length: l,
+            } => l.is_finite() && l >= 1.0,
+            BootstrapMethod::CircularBlock { block_length }
+            | BootstrapMethod::MovingBlock { block_length } => block_length >= 1,
+        };
+        if ok {
+            Ok(())
+        } else {
+            Err(crate::error::StatError::InvalidParameter(format!(
+                "invalid bootstrap block length in {:?} (must be >= 1)",
+                self
+            )))
+        }
+    }
+}
+
+/// Draws bootstrap index vectors for any [`BootstrapMethod`].
+pub(crate) enum IndexSampler {
+    Iid(ChaCha8Rng),
+    Stationary(StationaryBootstrap),
+    Circular(CircularBlockBootstrap),
+    Moving(MovingBlockBootstrap),
+}
+
+impl IndexSampler {
+    pub(crate) fn new(method: BootstrapMethod, seed: Option<u64>) -> Self {
+        match method {
+            BootstrapMethod::Iid => IndexSampler::Iid(match seed {
+                Some(s) => ChaCha8Rng::seed_from_u64(s),
+                None => ChaCha8Rng::from_entropy(),
+            }),
+            BootstrapMethod::Stationary {
+                expected_block_length,
+            } => IndexSampler::Stationary(StationaryBootstrap::new(expected_block_length, seed)),
+            BootstrapMethod::CircularBlock { block_length } => {
+                IndexSampler::Circular(CircularBlockBootstrap::new(block_length, seed))
+            }
+            BootstrapMethod::MovingBlock { block_length } => {
+                IndexSampler::Moving(MovingBlockBootstrap::new(block_length, seed))
+            }
+        }
+    }
+
+    /// Indices of one resample of length `n` from a series of length `n`.
+    pub(crate) fn draw(&mut self, n: usize) -> Vec<usize> {
+        match self {
+            IndexSampler::Iid(rng) => (0..n).map(|_| rng.gen_range(0..n)).collect(),
+            IndexSampler::Stationary(b) => b.sample_indices(n, n),
+            IndexSampler::Circular(b) => b.sample_indices(n, n),
+            IndexSampler::Moving(b) => b.sample_indices(n, n),
+        }
     }
 }
 

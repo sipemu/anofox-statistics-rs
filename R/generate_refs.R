@@ -1328,7 +1328,9 @@ var1 <- var(d1) / spa_n
 var2 <- var(d2) / spa_n
 var3 <- var(d3) / spa_n
 
-# Standardized statistics
+# Standardized statistics. NOTE: var* is already the variance of the mean, so
+# these are sqrt(n) times the usual t-ratios (the pre-0.8.0 scaling); the
+# Hansen (2005) SPA references are in R/generate_spa_mcs_refs.R.
 t1 <- d1_bar * sqrt(spa_n) / sqrt(var1)
 t2 <- d2_bar * sqrt(spa_n) / sqrt(var2)
 t3 <- d3_bar * sqrt(spa_n) / sqrt(var3)
@@ -1337,8 +1339,21 @@ t3 <- d3_bar * sqrt(spa_n) / sqrt(var3)
 spa_stat <- max(t1, t2, t3)
 best_idx <- which.max(c(t1, t2, t3)) - 1  # 0-indexed
 
+# Hansen (2005) statistic sqrt(n) dbar / omega_hat with the stationary-bootstrap
+# variance estimator for expected block length 5 (see
+# R/generate_spa_mcs_refs.R for the full test).
+spa_omega2 <- function(d, l) {
+  n <- length(d); q <- 1 / l; cc <- d - mean(d)
+  g <- vapply(0:(n - 1), function(i) sum(cc[1:(n - i)] * cc[(1 + i):n]) / n, 0)
+  i <- 1:(n - 1)
+  g[1] + 2 * sum(((n - i) / n * (1 - q)^i + i / n * (1 - q)^(n - i)) * g[-1])
+}
+hansen_stat <- max(0, sqrt(spa_n) * c(d1_bar, d2_bar, d3_bar) /
+                     sqrt(sapply(list(d1, d2, d3), spa_omega2, l = 5)))
+
 save_ref("spa.csv", list(
   statistic = spa_stat,
+  hansen_statistic_l5 = hansen_stat,
   t1 = t1,
   t2 = t2,
   t3 = t3,

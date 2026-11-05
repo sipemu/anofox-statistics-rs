@@ -1,17 +1,21 @@
 use crate::error::Result;
 use crate::forecast::spa_common::{
-    compute_means, compute_spa_pvalues, compute_standardized, compute_variances, find_best_model,
-    validate_finite_data, validate_model_data,
+    spa_stationary, validate_finite_data, validate_model_data, validate_spa_parameters,
 };
 
 /// Result of the Superior Predictive Ability (SPA) test
 #[derive(Debug, Clone)]
 pub struct SPAResult {
-    /// The SPA test statistic (maximum standardized performance)
+    /// The SPA test statistic `T_SPA = max(0, max_k sqrt(n) d̄_k / ω̂_k)`
+    /// (Hansen, 2005)
     pub statistic: f64,
-    /// The consistent p-value (Hansen, 2005)
+    /// Hansen's (2005) lower p-value (re-centring `max(d̄_k, 0)`; liberal)
+    pub p_value_lower: f64,
+    /// Hansen's (2005) consistent p-value (re-centring only models that are
+    /// not significantly worse than the benchmark)
     pub p_value_consistent: f64,
-    /// The upper p-value (more conservative)
+    /// Hansen's (2005) upper p-value (re-centring every model at the null
+    /// boundary, i.e. White's Reality Check; conservative)
     pub p_value_upper: f64,
     /// Number of bootstrap samples used
     pub n_bootstrap: usize,
@@ -24,6 +28,15 @@ pub struct SPAResult {
 /// Tests whether any of K competing forecast models has superior predictive
 /// ability compared to a benchmark model. The null hypothesis is that no
 /// model outperforms the benchmark.
+///
+/// With `d_{k,t} = L_benchmark,t - L_k,t`, the statistic is
+/// `T_SPA = max(0, max_k sqrt(n) d̄_k / ω̂_k)` with Hansen's
+/// stationary-bootstrap long-run variance `ω̂_k²`. Each bootstrap
+/// replication draws one set of stationary-bootstrap time indices and applies
+/// it to all K series jointly (preserving their dependence); the lower,
+/// consistent and upper p-values use Hansen's three re-centrings
+/// (`p_l <= p_c <= p_u`, `p = #{T* > T_SPA} / B`). Validated against a
+/// base-R implementation of Hansen (2005).
 ///
 /// # Arguments
 /// * `benchmark_losses` - Loss values from the benchmark model (length T)
@@ -49,36 +62,21 @@ pub fn spa_test(
 
     // Validate inputs
     validate_model_data(t, model_losses, "competing model")?;
+    validate_spa_parameters(t, n_bootstrap, block_length)?;
     validate_finite_data(benchmark_losses, model_losses, "competing model")?;
 
     // Compute loss differentials: d_ki = L_benchmark - L_model_k
     // Positive values mean the model outperforms the benchmark
     let d: Vec<Vec<f64>> = compute_loss_differentials(benchmark_losses, model_losses);
 
-    // Compute statistics
-    let d_bar = compute_means(&d);
-    let variances = compute_variances(&d, &d_bar);
-    let standardized = compute_standardized(&d_bar, &variances, t);
-
-    // Observed test statistic: max of standardized performance
-    let observed = standardized
-        .iter()
-        .cloned()
-        .fold(f64::NEG_INFINITY, f64::max);
-
-    // Find best model
-    let best_model_idx = find_best_model(&standardized);
-
-    // Bootstrap p-values
-    let (p_value_consistent, p_value_upper) =
-        compute_spa_pvalues(&d, &d_bar, observed, n_bootstrap, block_length, seed);
-
+    let out = spa_stationary(&d, n_bootstrap, block_length, seed);
     Ok(SPAResult {
-        statistic: observed,
-        p_value_consistent,
-        p_value_upper,
+        statistic: out.statistic,
+        p_value_lower: out.p_value_lower,
+        p_value_consistent: out.p_value_consistent,
+        p_value_upper: out.p_value_upper,
         n_bootstrap,
-        best_model_idx,
+        best_model_idx: out.best_model_idx,
     })
 }
 

@@ -169,8 +169,10 @@ pub fn icc(data: &[Vec<f64>], icc_type: ICCType) -> Result<ICCResult> {
     };
 
     // Compute confidence interval using F-distribution
-    let (conf_int_lower, conf_int_upper) =
-        compute_icc_ci(icc_value, f_value, df1, df2, n, k, icc_type);
+    let (conf_int_lower, conf_int_upper) = match icc_type {
+        ICCType::ICC2 | ICCType::ICC2k => compute_icc2_ci(ms_r, ms_c, ms_e, n, k, icc_type, 0.05),
+        _ => compute_icc_ci(f_value, df1, df2, k, icc_type),
+    };
 
     Ok(ICCResult {
         icc: icc_value,
@@ -292,19 +294,9 @@ fn compute_anova_components(data: &[Vec<f64>]) -> (f64, f64, f64, f64) {
     (ms_r, ms_c, ms_e, ms_w)
 }
 
-/// Compute confidence interval for ICC.
-fn compute_icc_ci(
-    _icc: f64,
-    f_value: f64,
-    df1: f64,
-    df2: f64,
-    n: usize,
-    k: usize,
-    icc_type: ICCType,
-) -> (f64, f64) {
-    // Use F-based confidence interval
-    // For ICC, the CI is typically derived from the F-distribution
-
+/// F-based confidence interval of ICC(1), ICC(3), ICC(1,k) and ICC(3,k)
+/// (Shrout & Fleiss, 1979; as `psych::ICC`).
+fn compute_icc_ci(f_value: f64, df1: f64, df2: f64, k: usize, icc_type: ICCType) -> (f64, f64) {
     if df1 <= 0.0 || df2 <= 0.0 || !f_value.is_finite() {
         return (f64::NEG_INFINITY, f64::INFINITY);
     }
@@ -316,35 +308,71 @@ fn compute_icc_ci(
     let f_lower = f_dist.inverse_cdf(alpha / 2.0);
     let f_upper = f_dist.inverse_cdf(1.0 - alpha / 2.0);
 
-    let _n = n; // Suppress unused warning - kept for potential future use
     let k_f = k as f64;
+    let f_l = f_value / f_upper;
+    let f_u = f_value / f_lower;
 
-    // The CI formulas depend on the ICC type
-    // Using simplified approximation based on F-ratio
     let (lower, upper) = match icc_type {
-        ICCType::ICC1 | ICCType::ICC2 | ICCType::ICC3 => {
-            // For single rater ICC
-            let f_l = f_value / f_upper;
-            let f_u = f_value / f_lower;
-
-            let lower = (f_l - 1.0) / (f_l + k_f - 1.0);
-            let upper = (f_u - 1.0) / (f_u + k_f - 1.0);
-
-            (lower.max(-1.0), upper.min(1.0))
-        }
-        ICCType::ICC1k | ICCType::ICC2k | ICCType::ICC3k => {
-            // For average of k raters
-            let f_l = f_value / f_upper;
-            let f_u = f_value / f_lower;
-
-            let lower = 1.0 - 1.0 / f_l;
-            let upper = 1.0 - 1.0 / f_u;
-
-            (lower.max(-1.0), upper.min(1.0))
-        }
+        ICCType::ICC1k | ICCType::ICC3k | ICCType::ICC2k => (1.0 - 1.0 / f_l, 1.0 - 1.0 / f_u),
+        _ => (
+            (f_l - 1.0) / (f_l + k_f - 1.0),
+            (f_u - 1.0) / (f_u + k_f - 1.0),
+        ),
     };
 
-    (lower, upper)
+    (lower.max(-1.0), upper.min(1.0))
+}
+
+/// Confidence interval of the absolute-agreement ICC(2,1) and ICC(2,k):
+/// the Satterthwaite-type interval of Shrout & Fleiss (1979, eq. 9) /
+/// McGraw & Wong (1996, Table 7, case 2A), as reported by `psych::ICC`.
+///
+/// With `F_J = MS_C / MS_E` and the single-rater estimate `ρ = ICC(2,1)`,
+/// the approximate degrees of freedom are
+/// `v = (k-1)(n-1) [k ρ F_J + n (1 + (k-1) ρ) - k ρ]² /
+///      [(n-1) k² ρ² F_J² + (n (1 + (k-1) ρ) - k ρ)²]`,
+/// `F* = F_{1-α/2}(n-1, v)`, `F_* = F_{1-α/2}(v, n-1)` and
+/// `L = n (MS_R - F* MS_E) / (F* (k MS_C + (k n - k - n) MS_E) + n MS_R)`,
+/// `U = n (F_* MS_R - MS_E) / (k MS_C + (k n - k - n) MS_E + n F_* MS_R)`.
+/// ICC(2,k) uses the Spearman-Brown step-up `L k / (1 + (k-1) L)`.
+fn compute_icc2_ci(
+    ms_r: f64,
+    ms_c: f64,
+    ms_e: f64,
+    n: usize,
+    k: usize,
+    icc_type: ICCType,
+    alpha: f64,
+) -> (f64, f64) {
+    let (n_f, k_f) = (n as f64, k as f64);
+    // The interval is built from the (unclamped) single-rater ICC(2,1).
+    let rho = (ms_r - ms_e) / (ms_r + (k_f - 1.0) * ms_e + k_f * (ms_c - ms_e) / n_f);
+    let f_j = ms_c / ms_e;
+    let a = n_f * (1.0 + (k_f - 1.0) * rho) - k_f * rho;
+    let vn = (k_f - 1.0) * (n_f - 1.0) * (k_f * rho * f_j + a).powi(2);
+    let vd = (n_f - 1.0) * k_f * k_f * rho * rho * f_j * f_j + a * a;
+    let v = vn / vd;
+    if !(v.is_finite() && v > 0.0 && rho.is_finite() && ms_e > 0.0) {
+        return (f64::NAN, f64::NAN);
+    }
+    let (Ok(f1), Ok(f2)) = (
+        FisherSnedecor::new(n_f - 1.0, v),
+        FisherSnedecor::new(v, n_f - 1.0),
+    ) else {
+        return (f64::NAN, f64::NAN);
+    };
+    let f_star_u = f1.inverse_cdf(1.0 - alpha / 2.0);
+    let f_star_l = f2.inverse_cdf(1.0 - alpha / 2.0);
+    let c = k_f * ms_c + (k_f * n_f - k_f - n_f) * ms_e;
+    let lower = n_f * (ms_r - f_star_u * ms_e) / (f_star_u * c + n_f * ms_r);
+    let upper = n_f * (f_star_l * ms_r - ms_e) / (c + n_f * f_star_l * ms_r);
+    match icc_type {
+        ICCType::ICC2k => (
+            lower * k_f / (1.0 + lower * (k_f - 1.0)),
+            upper * k_f / (1.0 + upper * (k_f - 1.0)),
+        ),
+        _ => (lower, upper),
+    }
 }
 
 #[cfg(test)]

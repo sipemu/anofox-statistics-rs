@@ -471,8 +471,13 @@ fn test_spa_statistic_and_best_model() {
     let result =
         spa_test(&benchmark, &models, 499, 5.0, Some(42)).expect("spa_test should succeed");
 
-    // Verify the test statistic matches R
-    assert_relative_eq!(result.statistic, refs["statistic"], epsilon = 0.01);
+    // Hansen's (2005) statistic sqrt(n) d̄ / ω̂ (block length 5); the legacy
+    // `statistic` column is the pre-0.8.0 sqrt(n)-inflated IID t-ratio.
+    assert_relative_eq!(
+        result.statistic,
+        refs["hansen_statistic_l5"],
+        max_relative = 1e-10
+    );
 
     // Verify best model index (model 1 with index 0 should be best)
     assert_eq!(
