@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-11-06
+
+### Fixed
+
+- **Seeded resampling is now identical on 32- and 64-bit targets (wasm32).** `rand`'s
+  `gen_range` over `usize` samples with the pointer width, so seeded bootstrap index
+  draws differed between x86_64 and wasm32 (e.g. `model_confidence_set_with_method`
+  MCS p-values). All index draws now sample a `u64` (stationary / circular / moving
+  block / IID bootstrap, `bootstrap_mean_ci` / `bootstrap_ci`, MCS, SPA, embedding-drift
+  bootstrap thresholds), and `distance_cor_test`'s permutation shuffle reduces its
+  64-bit draw before converting to `usize`. **Seeded results on 64-bit targets are
+  unchanged**; on 32-bit targets (wasm32, i686) they change and now equal the 64-bit
+  ones. Permutation tests using `shuffle` were already portable. Pinned seeded outputs
+  in `tests/rng_portability.rs`; CI now runs the test suite on i686-unknown-linux-gnu.
+- **32-bit overflow in rank tests.** `mann_whitney_u`, `tost_wilcoxon_two_sample`,
+  `auc_null_quantile` / `auc_null_p_value` and the distance-correlation permutation
+  computed `n1 * n2`-type products in `usize`, which overflows on 32-bit targets for
+  large samples (e.g. 100 000 per group); they are now computed in `f64`.
+
 ## [0.8.2] - 2026-11-05
 
 ### Fixed

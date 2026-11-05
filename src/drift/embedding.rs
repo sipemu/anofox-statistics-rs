@@ -14,8 +14,9 @@ use crate::error::{Result, StatError};
 use crate::modern::mmd::mmd_squared;
 use crate::modern::Kernel;
 use crate::utils::finite::ensure_finite;
+use crate::utils::rng::index;
 use rand::seq::index::sample;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
 /// Distance between the mean embeddings for [`embedding_distance_drift`]
@@ -211,8 +212,8 @@ pub fn embedding_distance_drift(
             let mut rng = rng(seed);
             let null: Vec<f64> = (0..n_bootstrap)
                 .map(|_| {
-                    let ia: Vec<usize> = (0..a).map(|_| rng.gen_range(0..m)).collect();
-                    let ib: Vec<usize> = (0..b).map(|_| rng.gen_range(0..m)).collect();
+                    let ia: Vec<usize> = (0..a).map(|_| index(&mut rng, m)).collect();
+                    let ib: Vec<usize> = (0..b).map(|_| index(&mut rng, m)).collect();
                     metric.eval(
                         &mean_of(ia.iter().map(|&i| &reference[i]), d),
                         &mean_of(ib.iter().map(|&i| &reference[i]), d),
@@ -409,8 +410,8 @@ pub fn embedding_mmd_drift(
             };
             let null: Vec<f64> = (0..n_bootstrap)
                 .map(|_| {
-                    let ia: Vec<usize> = (0..a).map(|_| rng.gen_range(0..m)).collect();
-                    let ib: Vec<usize> = (0..b).map(|_| rng.gen_range(0..m)).collect();
+                    let ia: Vec<usize> = (0..a).map(|_| index(&mut rng, m)).collect();
+                    let ib: Vec<usize> = (0..b).map(|_| index(&mut rng, m)).collect();
                     let cross: f64 = ia
                         .iter()
                         .map(|&i| ib.iter().map(|&j| k[i][j]).sum::<f64>())
