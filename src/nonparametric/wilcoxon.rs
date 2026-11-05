@@ -146,7 +146,7 @@ pub fn mann_whitney_u(
 
     // U statistic for first sample
     // U1 = R1 - n1(n1+1)/2
-    let u1 = r1 - (nx * (nx + 1)) as f64 / 2.0;
+    let u1 = r1 - nx as f64 * (nx as f64 + 1.0) / 2.0;
 
     // Expected value and variance under null
     let nx_f = nx as f64;
@@ -407,7 +407,7 @@ fn mann_whitney_exact_p(n1: usize, n2: usize, u: f64, alternative: &Alternative)
             // R wilcox.test: use the tail on the side of the observed U
             // (P(U >= u) above the centre n1*n2/2, P(U <= u) otherwise),
             // double it and cap at 1.
-            let p = if 2.0 * u > (n1 * n2) as f64 {
+            let p = if 2.0 * u > n1 as f64 * n2 as f64 {
                 cdf_ge(&pmf, u)
             } else {
                 cdf_le(&pmf, u)

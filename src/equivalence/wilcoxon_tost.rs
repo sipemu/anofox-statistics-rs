@@ -364,7 +364,7 @@ fn mann_whitney_test(x: &[f64], y: &[f64], greater: bool) -> Result<(f64, f64)> 
     let r1: f64 = ranks[..nx].iter().sum();
 
     // U statistic for x
-    let u1 = r1 - (nx * (nx + 1)) as f64 / 2.0;
+    let u1 = r1 - nx as f64 * (nx as f64 + 1.0) / 2.0;
 
     // Normal approximation
     let nx_f = nx as f64;

@@ -56,7 +56,7 @@ pub fn auc_null_quantile(n_pos: usize, n_neg: usize, prob: f64) -> Result<f64> {
             prob
         )));
     }
-    let pairs = (n_pos * n_neg) as f64;
+    let pairs = n_pos as f64 * n_neg as f64;
     if mann_whitney_exact_feasible(n_pos, n_neg) {
         return Ok(quantile(&mann_whitney_pmf(n_pos, n_neg), prob) as f64 / pairs);
     }
@@ -93,7 +93,7 @@ pub fn auc_null_p_value(auc: f64, n_pos: usize, n_neg: usize) -> Result<f64> {
             auc
         )));
     }
-    let pairs = (n_pos * n_neg) as f64;
+    let pairs = n_pos as f64 * n_neg as f64;
     // An AUC computed from scores is a multiple of 1 / (2 pairs); remove the
     // rounding of the division before taking the ceiling.
     let u = (auc * pairs * 2.0).round() / 2.0;

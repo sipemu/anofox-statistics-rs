@@ -1,3 +1,4 @@
+use crate::utils::rng::index;
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -58,7 +59,7 @@ impl StationaryBootstrap {
         let mut result = Vec::with_capacity(length);
 
         // Start with a random index
-        let mut current_idx = self.rng.gen_range(0..n);
+        let mut current_idx = index(&mut self.rng, n);
 
         for _ in 0..length {
             result.push(current_idx);
@@ -66,7 +67,7 @@ impl StationaryBootstrap {
             // With probability q, start a new block (random jump)
             // Otherwise, continue to next index (wrap around)
             if self.rng.gen::<f64>() < q {
-                current_idx = self.rng.gen_range(0..n);
+                current_idx = index(&mut self.rng, n);
             } else {
                 current_idx = (current_idx + 1) % n;
             }
@@ -128,7 +129,7 @@ impl CircularBlockBootstrap {
 
         while result.len() < length {
             // Random starting point for the block
-            let start = self.rng.gen_range(0..n);
+            let start = index(&mut self.rng, n);
 
             // Add elements from the block (with wrap-around)
             for offset in 0..self.block_length {
@@ -192,7 +193,7 @@ impl MovingBlockBootstrap {
         let n_starts = n - k + 1;
         let mut result = Vec::with_capacity(length);
         while result.len() < length {
-            let start = self.rng.gen_range(0..n_starts);
+            let start = index(&mut self.rng, n_starts);
             for offset in 0..k {
                 if result.len() >= length {
                     break;
@@ -281,7 +282,7 @@ impl IndexSampler {
     /// Indices of one resample of length `n` from a series of length `n`.
     pub(crate) fn draw(&mut self, n: usize) -> Vec<usize> {
         match self {
-            IndexSampler::Iid(rng) => (0..n).map(|_| rng.gen_range(0..n)).collect(),
+            IndexSampler::Iid(rng) => (0..n).map(|_| index(rng, n)).collect(),
             IndexSampler::Stationary(b) => b.sample_indices(n, n),
             IndexSampler::Circular(b) => b.sample_indices(n, n),
             IndexSampler::Moving(b) => b.sample_indices(n, n),

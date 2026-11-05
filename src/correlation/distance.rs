@@ -396,7 +396,7 @@ impl SimpleRng {
     }
 
     fn next_usize(&mut self, max: usize) -> usize {
-        (self.next_u64() as usize) % max
+        (self.next_u64() % max as u64) as usize
     }
 }
 
@@ -435,7 +435,7 @@ mod tests {
                     s += a[i][j] * b[i][j];
                 }
             }
-            s / (n * n) as f64
+            s / (n as f64 * n as f64)
         };
         let a = center(&dm(x));
         let b = center(&dm(y));

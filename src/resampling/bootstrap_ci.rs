@@ -4,8 +4,9 @@ use crate::error::{Result, StatError};
 use crate::resampling::{
     BootstrapMethod, CircularBlockBootstrap, MovingBlockBootstrap, StationaryBootstrap,
 };
+use crate::utils::rng::index;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 
 /// Result of a percentile bootstrap confidence interval
 #[derive(Debug, Clone)]
@@ -79,7 +80,7 @@ fn iid_replicates<F: Fn(&[f64]) -> f64>(
     let n = data.len();
     (0..n_bootstrap)
         .map(|_| {
-            let sample: Vec<f64> = (0..n).map(|_| data[rng.gen_range(0..n)]).collect();
+            let sample: Vec<f64> = (0..n).map(|_| data[index(&mut rng, n)]).collect();
             statistic(&sample)
         })
         .collect()
