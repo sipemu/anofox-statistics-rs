@@ -358,7 +358,7 @@ pub fn empirical_mmd_bandwidth(reference: &[f64]) -> Result<f64> {
     }
     ensure_finite("reference", reference)?;
     let m = reference.len();
-    let count = m * m;
+    let count = m as u64 * m as u64;
     // numpy "nearest": index round_half_even(0.5 * (count - 1)).
     let idx = if count % 2 == 1 {
         (count - 1) / 2
@@ -372,12 +372,12 @@ pub fn empirical_mmd_bandwidth(reference: &[f64]) -> Result<f64> {
     };
     // Sorted multiset: the m diagonal zeros, then every pair difference
     // twice.
-    let d = if idx < m {
+    let d = if idx < m as u64 {
         0.0
     } else {
         let mut s = reference.to_vec();
         s.sort_unstable_by(|a, b| a.total_cmp(b));
-        kth_abs_difference(&s, (idx - m) / 2).powi(2)
+        kth_abs_difference(&s, (idx - m as u64) / 2).powi(2)
     };
     Ok(if d == 0.0 {
         0.5f64.sqrt()

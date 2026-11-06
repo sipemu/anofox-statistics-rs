@@ -220,7 +220,7 @@ fn sorted_desc(data: &[f64]) -> Vec<f64> {
 fn hodges_lehmann_one_sample(data: &[f64]) -> f64 {
     let n = data.len();
     let s = sorted_asc(data);
-    median_by(n * (n + 1) / 2, |k| kth_walsh_average(&s, k))
+    median_by(n as u64 * (n as u64 + 1) / 2, |k| kth_walsh_average(&s, k))
 }
 
 /// Compute Hodges-Lehmann estimator for two samples.
@@ -229,7 +229,9 @@ fn hodges_lehmann_one_sample(data: &[f64]) -> f64 {
 /// O((nx + ny) log^2) expected time, O(nx + ny) memory (no nx*ny buffer).
 fn hodges_lehmann_two_sample(x: &[f64], y: &[f64]) -> f64 {
     let yd = sorted_desc(y);
-    median_by(x.len() * y.len(), |k| kth_pairwise_difference(x, &yd, k))
+    median_by(x.len() as u64 * y.len() as u64, |k| {
+        kth_pairwise_difference(x, &yd, k)
+    })
 }
 
 /// Compute confidence interval for Hodges-Lehmann estimator (one sample).
@@ -238,7 +240,7 @@ fn hodges_lehmann_two_sample(x: &[f64], y: &[f64]) -> f64 {
 fn hodges_lehmann_ci(data: &[f64], alpha: f64) -> Result<(f64, f64)> {
     let n = data.len();
     let s = sorted_asc(data);
-    let n_walsh = n * (n + 1) / 2;
+    let n_walsh = n as u64 * (n as u64 + 1) / 2;
 
     // Use normal approximation for CI indices
     let n_f = n as f64;
@@ -251,8 +253,8 @@ fn hodges_lehmann_ci(data: &[f64], alpha: f64) -> Result<(f64, f64)> {
     // For (1-2*alpha) CI
     let z = normal.inverse_cdf(1.0 - alpha);
 
-    let k_lower = ((mu - z * sigma).floor() as usize).min(n_walsh - 1);
-    let k_upper = ((mu + z * sigma).ceil() as usize).min(n_walsh - 1);
+    let k_lower = ((mu - z * sigma).floor() as u64).min(n_walsh - 1);
+    let k_upper = ((mu + z * sigma).ceil() as u64).min(n_walsh - 1);
 
     Ok((
         kth_walsh_average(&s, k_lower),
@@ -268,7 +270,7 @@ fn hodges_lehmann_ci_two_sample(x: &[f64], y: &[f64], alpha: f64) -> Result<(f64
     let ny = y.len();
     let yd = sorted_desc(y);
 
-    let n_diffs = nx * ny;
+    let n_diffs = nx as u64 * ny as u64;
     let nx_f = nx as f64;
     let ny_f = ny as f64;
 
@@ -282,8 +284,8 @@ fn hodges_lehmann_ci_two_sample(x: &[f64], y: &[f64], alpha: f64) -> Result<(f64
     // For (1-2*alpha) CI
     let z = normal.inverse_cdf(1.0 - alpha);
 
-    let k_lower = ((mu - z * sigma).floor() as usize).min(n_diffs - 1);
-    let k_upper = ((mu + z * sigma).ceil() as usize).min(n_diffs - 1);
+    let k_lower = ((mu - z * sigma).floor() as u64).min(n_diffs - 1);
+    let k_upper = ((mu + z * sigma).ceil() as u64).min(n_diffs - 1);
 
     Ok((
         kth_pairwise_difference(x, &yd, k_lower),

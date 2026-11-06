@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-06
+
+### Fixed
+
+- **32-bit overflow in pair-count order statistics.** The selection of order statistics
+  over all pairs (the median-heuristic bandwidth of `mmd_test_1d` /
+  `median_heuristic_bandwidth_1d`, `empirical_mmd_bandwidth`, the Hodges-Lehmann
+  estimates and intervals of `tost_wilcoxon_paired` / `tost_wilcoxon_two_sample`)
+  counted the `~N^2 / 2` pairs in `usize`, which overflows on 32-bit targets (wasm32,
+  i686) beyond ~65 000 values (a panic in debug builds, wrong ranks in release). Pair
+  counts and ranks are now `u64`. No change on 64-bit targets. Covered by
+  `tests/large_sample_32bit.rs` (70 000 values, 4.9e9 pairs), which CI runs on
+  i686-unknown-linux-gnu.
+
 ## [0.9.0] - 2026-11-06
 
 ### Added
