@@ -284,13 +284,11 @@ fn sampling_components(
     let nf = n as f64;
     // F1: observation-level values (1 for TP, 0 for FP / FN) times the
     // correcting factor (TP + FP + FN) / (TP + (FP + FN) / 2).
+    // tp + fp + fn > 0: the reference has both classes.
     let rel = tp + fp + fn_;
-    let (f1_std, f1_fraction) = if rel == 0 {
-        (f64::NAN, 0.0)
-    } else {
-        let factor = rel as f64 / (tp as f64 + 0.5 * (fp + fn_) as f64);
-        (factor * bernoulli_std(tp, rel), rel as f64 / nf)
-    };
+    let factor = rel as f64 / (tp as f64 + 0.5 * (fp + fn_) as f64);
+    let f1_std = factor * bernoulli_std(tp, rel);
+    let f1_fraction = rel as f64 / nf;
     let (roc_auc_std, roc_auc_fraction) = auroc_components(scores, labels);
     Ok(CbpeSamplingComponents {
         accuracy_std: bernoulli_std(tp + tn, n),
