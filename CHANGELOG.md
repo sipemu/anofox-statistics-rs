@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-06
+
+### Added
+
+Model monitoring as NannyML, and a metric pack, upstream of
+DataZooDE/anofox-statistics#365-#369.
+
+- **Probability calibrators.** `classification::IsotonicCalibrator` (PAVA with tied
+  scores merged, linear interpolation, clipped outside the fitted range: scikit-learn's
+  `IsotonicRegression(out_of_bounds = "clip")`) and `classification::PlattCalibrator`
+  (Platt's sigmoid on smoothed targets, Newton to convergence:
+  `_sigmoid_calibration`). Both rebuildable from their fields / `from_parts`.
+- **CBPE (#365).** `monitoring::cbpe`: `fit_reference(scores, labels, &CbpeOptions {
+  calibration, threshold })` / `fit_reference_with_predictions` -> `CbpeModel`
+  (calibrator, threshold, sampling-error components; public fields and `from_parts`),
+  `CbpeModel::estimate(scores)` / `estimate_with_predictions` -> `CbpeEstimate` with
+  the expected confusion matrix, accuracy, precision, recall, F1, specificity and ROC
+  AUC, each a `MetricEstimate { value, sampling_error, lower_confidence,
+  upper_confidence }` (NannyML's sampling errors and `± 3 SE` bands), and
+  `realized_performance` / `CbpeModel::realized` with NannyML's NaN rules. Validated
+  against NannyML 0.13.1 `CBPE` on its synthetic binary dataset and simulated scores.
+  NannyML's randomised "needs calibration" check is not reproduced: the caller picks
+  `CbpeCalibration::{Isotonic (default), Platt, None}`.
+- **PCA reconstruction-error drift (#366).** `Pca::reconstruct`,
+  `Pca::reconstruction_error`, `Pca::n_components_for_variance` (scikit-learn's
+  variance-share rule), and `monitoring::reconstruction`: `fit_reconstruction(reference,
+  &ReconstructionOptions { n_components, scale, impute_nan })` -> `ReconstructionModel`
+  with `row_errors` and `chunk_error` (mean, sd, sampling error, confidence band) and
+  `reconstruction_thresholds`. Population-sd standardisation, variance share 0.65 and
+  mean imputation by default, as NannyML's `DataReconstructionDriftCalculator`
+  (validated on its car-loan dataset) and `prcomp` (reconstruction).
+- **Reference-band thresholds (#367).** `monitoring::threshold_band(values,
+  &ThresholdMethod::{StandardDeviation, Constant, Relative}, &ValueLimits)` ->
+  `ThresholdBand { lower, upper }` with `alert(value)`: NannyML's
+  `StandardDeviationThreshold` / `ConstantThreshold` and `calculate_threshold_values`
+  (limit clamping or `override_using_none`), plus relative limits around the reference
+  mean.
+- **Metric pack (#368).** `metrics::classification_metrics(y_true, y_pred,
+  &ClassificationOptions { average, zero_division })` for any ordered label type:
+  accuracy, precision, recall, F1, specificity, balanced accuracy, MCC, Cohen's kappa
+  and the confusion matrix, with `Average::{Binary(pos), Macro, Micro, Weighted}`;
+  `metrics::confusion_matrix`; `metrics::regression_metrics` (MAE, MSE, RMSE, MAPE,
+  sMAPE, median AE, R², explained variance, max error). scikit-learn definitions,
+  including `zero_division` and `force_finite`; validated against scikit-learn and R
+  yardstick.
+- **Ranking metrics (#369).** `metrics::ranking_metrics(query, relevance, score,
+  &RankingOptions { k, min_relevance, include_no_feedback })`: NDCG@k (scikit-learn's
+  `ndcg_score`, ties averaged; also `metrics::ndcg_at_k` for one query), MAP@k, MRR@k,
+  precision@k, recall@k and hit rate@k (evidently's definitions). Validated against
+  scikit-learn and evidently 0.7.23.
+
 ## [0.9.1] - 2026-11-06
 
 ### Fixed
