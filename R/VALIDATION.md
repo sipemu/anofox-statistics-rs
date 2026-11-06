@@ -234,6 +234,30 @@ Reference script `R/generate_icc_ttest_boot_refs.R` writes
 | `median_heuristic_bandwidth()`, `_1d()`, `mmd_test(GaussianMedianHeuristic)` | `median(dist(rbind(x, y)))`, unbiased MMD² | 1e-12 / 1e-10 | |
 | `embedding_mmd_bandwidth()` | `median(cross distances) / sqrt(2)` | 1e-12 | |
 
+### 5e. Model monitoring and performance metrics
+
+NannyML, scikit-learn and evidently have no R counterpart for CBPE, the
+reconstruction-error drift, the ranking metrics and NannyML's thresholds, so these
+are validated against the Python reference implementations
+(`R/generate_monitoring_refs.py` -> `R/data/monitoring_nannyml_reference.csv`,
+`R/generate_metrics_refs.py` -> `R/data/metrics_sklearn_reference.csv`); the
+calibrators, the PCA reconstruction and the classification / regression metrics are
+also checked against R (`R/generate_monitoring_refs.R` ->
+`R/data/monitoring_r_reference.csv`). Tests: `tests/monitoring_reference.rs`,
+`tests/metrics_reference.rs`.
+
+| Function | Reference | Tolerance | Notes |
+|----------|-----------|-----------|-------|
+| `IsotonicCalibrator` | `isoreg()` + `approx(rule = 2)`; sklearn `IsotonicRegression(out_of_bounds = "clip")` | 1e-12 | sklearn case with tied scores (merged before PAVA) |
+| `PlattCalibrator` | `glm(t ~ f, quasibinomial)` on Platt's smoothed targets; sklearn `_sigmoid_calibration` | 1e-9 (R), 1e-5 (sklearn, L-BFGS-B `gtol = 1e-6`) | `p = 1 / (1 + exp(a f + b))` |
+| `monitoring::fit_reference`, `CbpeModel::estimate*`, `realized_performance` | NannyML `CBPE(problem_type = "classification_binary")`, isotonic | 1e-9 (estimates), 1e-10 (sampling errors, bands), 1e-12 (realized) | synthetic binary dataset (5000 + 5000 rows, chunks of 1000) and simulated continuous scores with drift; ROC AUC sampling error with tied scores 2e-4 (NannyML's unstable sort vs. half-counted ties) |
+| `threshold_band` | NannyML `StandardDeviationThreshold`, `calculate_threshold_values` (clamp / `override_using_none`) | 1e-12 | NaN ignored; CBPE alert thresholds from the realized reference-chunk metrics |
+| `monitoring::fit_reconstruction`, `ReconstructionModel::row_errors`, `chunk_error`, `reconstruction_thresholds` | NannyML `DataReconstructionDriftCalculator` | 1e-9 | car-loan dataset (4 numeric columns), variance share 0.65 and 2 fixed components, NaN imputed by reference means |
+| `Pca::reconstruct`, `reconstruction_error`, `n_components_for_variance` | `prcomp(scale. = TRUE / FALSE)`, `predict()`; sklearn's `searchsorted(side = "right") + 1` | 1e-10 | k = 1..3 and all components |
+| `metrics::classification_metrics` | sklearn (`zero_division` 0 and 1); yardstick `binary`, `macro`, `micro`, `macro_weighted` (incl. `spec`) | 1e-12 | binary, 4 classes with an unpredicted class, a predicted-only label, constant predictions |
+| `metrics::regression_metrics` | sklearn; base R and `yardstick::smape / 100` | 1e-12 | MAPE with a zero target (`max(abs(y), eps)`), constant targets (`force_finite`) |
+| `metrics::ranking_metrics`, `ndcg_at_k` | sklearn `ndcg_score` (ties averaged); evidently 0.7.23 legacy `NDCGKMetric`, `MAPKMetric`, `MRRKMetric`, `PrecisionTopKMetric`, `RecallTopKMetric`, `HitRateKMetric` | 1e-12 | k = 3, 5; graded and `min_rel_score = 2`; with and without no-feedback queries |
+
 ### 6. Modern Distribution Tests
 
 | Function | R Equivalent | Tolerance | Notes |

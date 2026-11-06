@@ -70,6 +70,93 @@ impl Pca {
     }
 }
 
+impl Pca {
+    /// Number of components a variance share selects, as scikit-learn's
+    /// `PCA(n_components = share)` with `0 < share < 1`: the smallest `k`
+    /// whose cumulative explained-variance ratio exceeds `share` (a
+    /// cumulative ratio exactly equal to `share` takes one more component,
+    /// `np.searchsorted(..., side = "right") + 1`), at most
+    /// [`n_components`](Pca::n_components).
+    ///
+    /// Errors unless `0 < share < 1`.
+    pub fn n_components_for_variance(&self, share: f64) -> Result<usize> {
+        if !(share > 0.0 && share < 1.0) {
+            return Err(StatError::InvalidParameter(format!(
+                "variance share must be in (0, 1), got {}",
+                share
+            )));
+        }
+        let mut cum = 0.0;
+        let mut k = 0;
+        for r in &self.explained_variance_ratio {
+            cum += r;
+            if cum <= share {
+                k += 1;
+            } else {
+                break;
+            }
+        }
+        Ok((k + 1).min(self.n_components()).max(1))
+    }
+
+    /// Reconstruction of `data` from its first `n_components` scores, in the
+    /// original units: `center + (scores x rotation') * scale` (scale 1 for an
+    /// unscaled analysis).
+    ///
+    /// Errors as [`transform`](Pca::transform).
+    ///
+    /// R equivalent: `sweep(sweep(predict(p, newdata)[, 1:k] %*% t(p$rotation[, 1:k]),
+    /// 2, p$scale, "*"), 2, p$center, "+")`; scikit-learn:
+    /// `pca.inverse_transform(pca.transform(x))`.
+    pub fn reconstruct(&self, data: &[Vec<f64>], n_components: usize) -> Result<Vec<Vec<f64>>> {
+        let scores = self.transform(data, n_components)?;
+        let d = self.center.len();
+        Ok(scores
+            .iter()
+            .map(|t| {
+                (0..d)
+                    .map(|i| {
+                        let z: f64 = (0..n_components).map(|j| t[j] * self.rotation[i][j]).sum();
+                        let s = self.scale.as_ref().map_or(1.0, |sd| sd[i]);
+                        self.center[i] + z * s
+                    })
+                    .collect()
+            })
+            .collect())
+    }
+
+    /// Reconstruction error of each row of `data`: the euclidean norm of the
+    /// residual of [`reconstruct`](Pca::reconstruct), measured in the space
+    /// the analysis was fitted in (centred, and divided by
+    /// [`scale`](Pca::scale) when scaled), i.e. the norm of the part of the
+    /// standardised row outside the first `n_components` components.
+    ///
+    /// Errors as [`transform`](Pca::transform).
+    ///
+    /// Python equivalent (NannyML's data-reconstruction drift): with `z` the
+    /// scaled rows, `np.linalg.norm(z - pca.inverse_transform(pca.transform(z)),
+    /// axis = 1)`.
+    pub fn reconstruction_error(&self, data: &[Vec<f64>], n_components: usize) -> Result<Vec<f64>> {
+        let scores = self.transform(data, n_components)?;
+        let d = self.center.len();
+        Ok(data
+            .iter()
+            .zip(&scores)
+            .map(|(row, t)| {
+                (0..d)
+                    .map(|i| {
+                        let s = self.scale.as_ref().map_or(1.0, |sd| sd[i]);
+                        let z = (row[i] - self.center[i]) / s;
+                        let zhat: f64 = (0..n_components).map(|j| t[j] * self.rotation[i][j]).sum();
+                        (z - zhat) * (z - zhat)
+                    })
+                    .sum::<f64>()
+                    .sqrt()
+            })
+            .collect())
+    }
+}
+
 /// Principal component analysis of the rows of `data` (observations x
 /// variables), centred but not scaled.
 ///

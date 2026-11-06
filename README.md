@@ -138,7 +138,23 @@ console.log(`t=${result.statistic.toFixed(4)}, p=${result.p_value.toFixed(4)}`);
     MMD, each with a fixed or a bootstrap threshold
 
 - **Multivariate**
-  - Principal component analysis (`prcomp`), e.g. to reduce embeddings
+  - Principal component analysis (`prcomp`, optional scaling), e.g. to reduce
+    embeddings; reconstruction and reconstruction error
+
+- **Model Monitoring** (`monitoring`, as NannyML)
+  - Confidence-based performance estimation (CBPE) of a binary classifier without
+    labels: isotonic or Platt calibration on the reference, expected confusion
+    matrix, accuracy, precision, recall, F1, specificity, ROC AUC, NannyML's sampling
+    errors and confidence bands
+  - Multivariate drift by PCA reconstruction error (NannyML's
+    `DataReconstructionDriftCalculator`)
+  - Alert thresholds from reference values: standard deviation, constant, relative
+
+- **Performance Metrics** (`metrics`, as scikit-learn)
+  - Classification: accuracy, precision, recall, F1, specificity, balanced accuracy,
+    MCC, Cohen's kappa, confusion matrix; binary / macro / micro / weighted averaging
+  - Regression: MAE, MSE, RMSE, MAPE, sMAPE, median AE, R², explained variance, max error
+  - Ranking: NDCG@k (`ndcg_score`), MAP@k, MRR, precision@k, recall@k, hit rate (evidently)
 
 - **Forecast Evaluation**
   - Diebold-Mariano test for comparing predictive accuracy
@@ -161,7 +177,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anofox-statistics = "0.9"
+anofox-statistics = "0.10"
 ```
 
 ## Examples
@@ -681,6 +697,30 @@ let km = kaplan_meier(&time, &event, KmConfType::Log, 0.95)?;
 let lr = log_rank(&time, &event, &["a", "b", "a", "b", "a", "b"])?;
 ```
 
+### Model Monitoring and Performance Metrics
+
+```rust
+use anofox_statistics::metrics::{classification_metrics, Average, ClassificationOptions};
+use anofox_statistics::monitoring::{fit_reference, threshold_band, CbpeOptions,
+                                     ThresholdMethod, ValueLimits};
+
+// CBPE: calibrate on a labelled reference, estimate a chunk without labels.
+let ref_scores = vec![0.1, 0.3, 0.35, 0.6, 0.8, 0.9, 0.2, 0.7];
+let ref_labels = vec![false, false, true, true, true, true, false, false];
+let model = fit_reference(&ref_scores, &ref_labels, &CbpeOptions::default())?;
+let est = model.estimate(&[0.2, 0.65, 0.9, 0.4])?;
+println!("{} ± {}", est.accuracy.value, est.accuracy.sampling_error);
+
+// Alert band from per-chunk reference values (NannyML: mean ± 3 sd).
+let band = threshold_band(&[0.91, 0.93, 0.92], &ThresholdMethod::NANNYML_DEFAULT,
+                          &ValueLimits::UNIT_INTERVAL)?;
+let alert = band.alert(est.accuracy.value);
+
+// Labelled metrics (scikit-learn definitions).
+let m = classification_metrics(&[1, 0, 1, 1], &[1, 0, 0, 1],
+    &ClassificationOptions { average: Average::Binary(1), zero_division: 0.0 })?;
+```
+
 ## Validation
 
 This library is developed using Test-Driven Development (TDD) with R as the oracle (ground truth). All implementations are validated against R's statistical functions:
@@ -738,6 +778,12 @@ This library is developed using Test-Driven Development (TDD) with R as the orac
 | `drift::embedding_*_drift()` | `dist()`, `colMeans()`, kernel sums, `wasserstein1d()` | stats, transport |
 | `multivariate::pca()` | `prcomp()`, `predict()` | stats |
 | `classification::auc_null_quantile()`, `auc_null_p_value()` | `qwilcox()`, `pwilcox()` | stats |
+| `classification::IsotonicCalibrator`, `PlattCalibrator` | `isoreg()` + `approx()`, `glm(quasibinomial)` (and scikit-learn) | stats |
+| `Pca::reconstruct()`, `reconstruction_error()` | `prcomp()`, `predict()` | stats |
+| `metrics::classification_metrics()` | `accuracy()`, `precision()`, `recall()`, `f_meas()`, `spec()`, `mcc()`, `kap()` (and scikit-learn) | yardstick |
+| `metrics::regression_metrics()` | base R, `smape()` (and scikit-learn) | yardstick |
+| `metrics::ranking_metrics()`, `ndcg_at_k()` | scikit-learn `ndcg_score`, evidently recsys metrics | (Python) |
+| `monitoring::cbpe`, `reconstruction`, `thresholds` | NannyML 0.13.1 `CBPE`, `DataReconstructionDriftCalculator`, thresholds | (Python) |
 
 All 303 test cases ensure numerical agreement with R within appropriate tolerances (typically 1e-10, with documented exceptions for algorithm-dependent tests like Shapiro-Wilk).
 
