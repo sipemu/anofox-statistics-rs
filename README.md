@@ -161,7 +161,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anofox-statistics = "0.8"
+anofox-statistics = "0.9"
 ```
 
 ## Examples

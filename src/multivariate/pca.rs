@@ -9,6 +9,10 @@ use crate::utils::math::symmetric_eigen;
 pub struct Pca {
     /// Column means of the data the analysis was fitted on.
     pub center: Vec<f64>,
+    /// Column standard deviations (divisor `n - 1`) the centred data were
+    /// divided by, when fitted with [`PcaOptions::scale`] (R's
+    /// `prcomp(..., scale. = TRUE)$scale`); `None` for an unscaled analysis.
+    pub scale: Option<Vec<f64>>,
     /// Standard deviations of the components (divisor `n - 1`), decreasing.
     pub sdev: Vec<f64>,
     /// Loadings: `rotation[i][j]` is variable `i` of component `j`. Each
@@ -26,7 +30,8 @@ impl Pca {
     }
 
     /// Scores of `data` on the first `n_components` components: the rows,
-    /// centred by the fitted [`center`](Pca::center), times the loadings.
+    /// centred by the fitted [`center`](Pca::center) (and divided by the
+    /// fitted [`scale`](Pca::scale), if any), times the loadings.
     ///
     /// Errors when `n_components` is 0 or exceeds the fitted components, or
     /// when a row has the wrong length or non-finite values.
@@ -53,12 +58,12 @@ impl Pca {
                     )));
                 }
                 ensure_finite(&format!("row {}", r), row)?;
+                let z: Vec<f64> = match &self.scale {
+                    Some(sd) => (0..d).map(|i| (row[i] - self.center[i]) / sd[i]).collect(),
+                    None => (0..d).map(|i| row[i] - self.center[i]).collect(),
+                };
                 Ok((0..n_components)
-                    .map(|j| {
-                        (0..d)
-                            .map(|i| (row[i] - self.center[i]) * self.rotation[i][j])
-                            .sum()
-                    })
+                    .map(|j| (0..d).map(|i| z[i] * self.rotation[i][j]).sum())
                     .collect())
             })
             .collect()
@@ -101,6 +106,40 @@ impl Pca {
 /// assert!((scores[2][0] - 2f64.sqrt()).abs() < 1e-12);
 /// ```
 pub fn pca(data: &[Vec<f64>]) -> Result<Pca> {
+    pca_with_options(data, &PcaOptions::default())
+}
+
+/// Options of [`pca_with_options`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PcaOptions {
+    /// Divide each centred column by its standard deviation (divisor
+    /// `n - 1`) before the analysis, i.e. a PCA of the correlation matrix
+    /// (R's `prcomp(..., scale. = TRUE)`). Default `false`.
+    pub scale: bool,
+}
+
+/// Principal component analysis with options: as [`pca`], and with
+/// `options.scale` the columns are standardised by their standard deviations
+/// (divisor `n - 1`), which are stored in [`Pca::scale`] so that
+/// [`Pca::transform`] applies them to new data.
+///
+/// Errors as [`pca`], and with `scale` on a constant column (as `prcomp`:
+/// "cannot rescale a constant/zero column to unit variance").
+///
+/// R equivalent: `prcomp(data, center = TRUE, scale. = options.scale)`,
+/// scores `predict(p, newdata)`.
+///
+/// # Example
+/// ```
+/// use anofox_statistics::multivariate::{pca_with_options, PcaOptions};
+/// let data = vec![vec![1.0, 10.0], vec![2.0, 30.0], vec![3.0, 20.0], vec![4.0, 50.0]];
+/// let p = pca_with_options(&data, &PcaOptions { scale: true }).unwrap();
+/// // a correlation-matrix PCA: the component variances sum to the number of columns
+/// let total: f64 = p.sdev.iter().map(|s| s * s).sum();
+/// assert!((total - 2.0).abs() < 1e-12);
+/// assert!(p.scale.is_some());
+/// ```
+pub fn pca_with_options(data: &[Vec<f64>], options: &PcaOptions) -> Result<Pca> {
     let n = data.len();
     if n < 2 {
         return Err(StatError::InsufficientData { needed: 2, got: n });
@@ -125,10 +164,29 @@ pub fn pca(data: &[Vec<f64>]) -> Result<Pca> {
     let center: Vec<f64> = (0..d)
         .map(|i| data.iter().map(|row| row[i]).sum::<f64>() / n as f64)
         .collect();
-    let xc: Vec<Vec<f64>> = data
+    let mut xc: Vec<Vec<f64>> = data
         .iter()
         .map(|row| row.iter().zip(&center).map(|(v, c)| v - c).collect())
         .collect();
+    let scale = if options.scale {
+        let sd: Vec<f64> = (0..d)
+            .map(|i| (xc.iter().map(|r| r[i] * r[i]).sum::<f64>() / (n - 1) as f64).sqrt())
+            .collect();
+        if let Some(i) = sd.iter().position(|&s| s.is_nan() || s <= 0.0) {
+            return Err(StatError::InvalidParameter(format!(
+                "cannot rescale the constant column {} to unit variance",
+                i
+            )));
+        }
+        for row in xc.iter_mut() {
+            for (v, s) in row.iter_mut().zip(&sd) {
+                *v /= s;
+            }
+        }
+        Some(sd)
+    } else {
+        None
+    };
     let dot = |a: &[f64], b: &[f64]| a.iter().zip(b).map(|(x, y)| x * y).sum::<f64>();
     let k = (n - 1).min(d);
 
@@ -189,6 +247,7 @@ pub fn pca(data: &[Vec<f64>]) -> Result<Pca> {
     }
     Ok(Pca {
         center,
+        scale,
         sdev,
         rotation,
         explained_variance_ratio: ratio,

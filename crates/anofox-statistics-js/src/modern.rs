@@ -1,5 +1,6 @@
 use anofox_statistics::{
-    energy_distance_test, energy_distance_test_1d, mmd_test, mmd_test_1d, Kernel,
+    energy_distance_test, energy_distance_test_1d, median_heuristic_bandwidth_1d, mmd_test,
+    mmd_test_1d, Kernel,
 };
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -90,6 +91,20 @@ pub enum JsKernel {
     Gaussian,
     Laplacian,
     Linear,
+    /// Gaussian with the median-heuristic bandwidth (bandwidth ignored)
+    GaussianMedianHeuristic,
+}
+
+/// Median-heuristic bandwidth of the Gaussian kernel for 1-D samples (the
+/// bandwidth `mmdTest1d` uses): median absolute pairwise difference of the
+/// pooled sample, floored at 0.01.
+///
+/// @param x - First sample as Float64Array
+/// @param y - Second sample as Float64Array
+/// @returns The bandwidth
+#[wasm_bindgen(js_name = medianHeuristicBandwidth1d)]
+pub fn js_median_heuristic_bandwidth_1d(x: &[f64], y: &[f64]) -> Result<f64, JsError> {
+    median_heuristic_bandwidth_1d(x, y).map_err(|e| JsError::new(&e.to_string()))
 }
 
 #[derive(Serialize)]
@@ -131,7 +146,8 @@ pub fn js_mmd_test_1d(
 ///
 /// @param x - First sample as 2D array
 /// @param y - Second sample as 2D array
-/// @param kernel - Kernel type (Gaussian, Laplacian, or Linear)
+/// @param kernel - Kernel type (Gaussian, Laplacian, Linear, or
+///   GaussianMedianHeuristic: Gaussian with the median-heuristic bandwidth)
 /// @param bandwidth - Kernel bandwidth (required for Gaussian and Laplacian)
 /// @param nPermutations - Number of permutations (default: 999)
 /// @param seed - Random seed (optional)
@@ -168,6 +184,7 @@ pub fn js_mmd_test(
         JsKernel::Gaussian => Kernel::Gaussian { bandwidth: bw },
         JsKernel::Laplacian => Kernel::Laplacian { bandwidth: bw },
         JsKernel::Linear => Kernel::Linear,
+        JsKernel::GaussianMedianHeuristic => Kernel::GaussianMedianHeuristic,
     };
 
     let result = mmd_test(&x_vec, &y_vec, kern, n_permutations.unwrap_or(999), seed)

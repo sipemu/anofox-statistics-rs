@@ -20,6 +20,11 @@ pub enum Kernel {
     },
     /// Laplacian kernel: k(x,y) = exp(-||x-y|| / bandwidth)
     Laplacian { bandwidth: f64 },
+    /// Gaussian kernel whose bandwidth is chosen from the data by
+    /// [`median_heuristic_bandwidth`] (median pairwise euclidean distance of
+    /// the pooled sample, floored at 0.01) when the test runs. With 1-D rows
+    /// this is the kernel of [`mmd_test_1d`].
+    GaussianMedianHeuristic,
 }
 
 impl Default for Kernel {
@@ -77,6 +82,8 @@ fn kernel_value(kernel: Kernel, a: &[f64], b: &[f64]) -> f64 {
             let dist = l1_distance(a, b);
             (-dist / bandwidth).exp()
         }
+        // Resolved to `Gaussian` by `mmd_test` before any kernel evaluation.
+        Kernel::GaussianMedianHeuristic => f64::NAN,
     }
 }
 
@@ -160,6 +167,12 @@ pub fn mmd_test(
 ) -> Result<MMDResult> {
     // Validate inputs
     validate_mmd_inputs(x, y)?;
+    let kernel = match kernel {
+        Kernel::GaussianMedianHeuristic => Kernel::Gaussian {
+            bandwidth: median_heuristic_bandwidth(x, y)?,
+        },
+        k => k,
+    };
     validate_kernel(&kernel)?;
 
     // Convert to slices
@@ -238,7 +251,7 @@ fn validate_kernel(kernel: &Kernel) -> Result<()> {
             ensure_finite_param("scale", scale)?;
             ensure_finite_param("offset", offset)
         }
-        Kernel::Linear => Ok(()),
+        Kernel::Linear | Kernel::GaussianMedianHeuristic => Ok(()),
     }
 }
 
@@ -304,9 +317,7 @@ pub fn mmd_test_1d(
     ensure_finite("x", x)?;
     ensure_finite("y", y)?;
 
-    // Median heuristic for bandwidth selection
-    let combined: Vec<f64> = x.iter().chain(y.iter()).cloned().collect();
-    let bandwidth = median_heuristic_1d(&combined);
+    let bandwidth = median_heuristic_bandwidth_1d(x, y)?;
 
     let x_vec: Vec<Vec<f64>> = x.iter().map(|&v| vec![v]).collect();
     let y_vec: Vec<Vec<f64>> = y.iter().map(|&v| vec![v]).collect();
@@ -318,6 +329,85 @@ pub fn mmd_test_1d(
         n_permutations,
         seed,
     )
+}
+
+/// Median-heuristic bandwidth of the Gaussian kernel for univariate
+/// samples: the median of all `N (N - 1) / 2` absolute pairwise differences
+/// of the pooled sample `x ∪ y` (`N = m + n`), floored at 0.01 (1 when
+/// `N < 2`). This is the bandwidth [`mmd_test_1d`] uses
+/// (`Kernel::Gaussian { bandwidth }`, `k = exp(-d^2 / (2 bandwidth^2))`).
+/// O(N log^2 N) time, O(N) memory.
+///
+/// Errors on non-finite values.
+///
+/// R equivalent: `max(median(dist(c(x, y))), 0.01)`.
+pub fn median_heuristic_bandwidth_1d(x: &[f64], y: &[f64]) -> Result<f64> {
+    ensure_finite("x", x)?;
+    ensure_finite("y", y)?;
+    let combined: Vec<f64> = x.iter().chain(y.iter()).cloned().collect();
+    Ok(median_heuristic_1d(&combined))
+}
+
+/// Median-heuristic bandwidth of the Gaussian kernel for multivariate
+/// samples: the median of all pairwise euclidean distances of the pooled
+/// rows `x ∪ y`, floored at 0.01 (1 with fewer than two rows). This is the
+/// bandwidth of [`Kernel::GaussianMedianHeuristic`]; for 1-D rows it equals
+/// [`median_heuristic_bandwidth_1d`] (and so the kernel of
+/// [`mmd_test_1d`]). O(N^2 d) time and O(N^2) memory for `N = m + n` rows
+/// (O(N) for 1-D rows).
+///
+/// For the bandwidth of evidently's embedding MMD (median distance between
+/// the two samples only, kernel `exp(-d^2 / median^2)`) see
+/// [`embedding_mmd_bandwidth`](crate::drift::embedding_mmd_bandwidth).
+///
+/// Errors on rows of unequal or zero length and non-finite values.
+///
+/// R equivalent: `max(median(dist(rbind(x, y))), 0.01)`.
+pub fn median_heuristic_bandwidth(x: &[Vec<f64>], y: &[Vec<f64>]) -> Result<f64> {
+    let rows: Vec<&Vec<f64>> = x.iter().chain(y.iter()).collect();
+    let Some(first) = rows.first() else {
+        return Ok(1.0);
+    };
+    let d = first.len();
+    if d == 0 {
+        return Err(StatError::InvalidParameter(
+            "Data points must have at least one dimension".to_string(),
+        ));
+    }
+    for (i, r) in rows.iter().enumerate() {
+        if r.len() != d {
+            return Err(StatError::InvalidParameter(
+                "All data points must have the same dimension".to_string(),
+            ));
+        }
+        ensure_finite(&format!("row {}", i), r)?;
+    }
+    if d == 1 {
+        let v: Vec<f64> = rows.iter().map(|r| r[0]).collect();
+        return Ok(median_heuristic_1d(&v));
+    }
+    let n = rows.len();
+    if n < 2 {
+        return Ok(1.0);
+    }
+    let mut dist: Vec<f64> = Vec::with_capacity(n * (n - 1) / 2);
+    for i in 0..n {
+        for j in i + 1..n {
+            dist.push(squared_distance(rows[i], rows[j]).sqrt());
+        }
+    }
+    let k = dist.len();
+    let med = if k % 2 == 1 {
+        *dist.select_nth_unstable_by(k / 2, |a, b| a.total_cmp(b)).1
+    } else {
+        let hi = *dist.select_nth_unstable_by(k / 2, |a, b| a.total_cmp(b)).1;
+        let lo = dist[..k / 2]
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
+        (lo + hi) / 2.0
+    };
+    Ok(med.max(0.01))
 }
 
 /// Compute median heuristic bandwidth for 1D data: the median of the

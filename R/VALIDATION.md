@@ -224,6 +224,16 @@ Reference script `R/generate_icc_ttest_boot_refs.R` writes
 | `auc_null_quantile()` | `qwilcox(p, m, n) / (m n)` | 1e-12 | p in {0, 1e-12, ..., 1 - 1e-12, 1}, sizes up to (50, 40) |
 | `repeated_measures_anova()` sphericity | `afex::aov_ez()`, `stats::mauchly.test()` (`R/generate_rm_sphericity_refs.R`, `tests/rm_sphericity_reference.rs`) | 1e-9 (W, eps), 1e-8 (p) | k = 3, 4; two datasets each; HF eps capped at 1 as R |
 
+### 5d. Scaled PCA and MMD bandwidths
+
+`R/generate_pca_mmd_refs.R` -> `R/data/pca_mmd_reference.csv`, checked by `tests/pca_mmd_reference.rs`.
+
+| Function | R Equivalent | Tolerance | Notes |
+|----------|-------------|-----------|-------|
+| `pca_with_options(scale = true)`, `Pca::transform` | `prcomp(scale. = TRUE)`, `predict()` | 1e-10 (sdev), 1e-8 (loadings, scores) | tall and wide (Gram) designs |
+| `median_heuristic_bandwidth()`, `_1d()`, `mmd_test(GaussianMedianHeuristic)` | `median(dist(rbind(x, y)))`, unbiased MMD² | 1e-12 / 1e-10 | |
+| `embedding_mmd_bandwidth()` | `median(cross distances) / sqrt(2)` | 1e-12 | |
+
 ### 6. Modern Distribution Tests
 
 | Function | R Equivalent | Tolerance | Notes |
