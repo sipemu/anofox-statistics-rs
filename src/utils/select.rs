@@ -259,9 +259,9 @@ mod tests {
     #[test]
     fn test_median_by() {
         let v = [1.0, 2.0, 3.0, 4.0];
-        assert_eq!(median_by(4, |k| v[k]), 2.5);
-        assert_eq!(median_by(3, |k| v[k]), 2.0);
-        assert!(median_by(0, |k| v[k]).is_nan());
+        assert_eq!(median_by(4, |k| v[k as usize]), 2.5);
+        assert_eq!(median_by(3, |k| v[k as usize]), 2.0);
+        assert!(median_by(0, |k| v[k as usize]).is_nan());
     }
 
     /// 5e9 Walsh averages / pairwise differences (40 GB if materialised) at
@@ -271,10 +271,10 @@ mod tests {
     fn test_select_large_n() {
         let mut s = 13u64;
         let xs = sorted(sample(&mut s, 100_000, 0));
-        let n = xs.len();
-        let m = median_by(n * (n + 1) / 2, |k| kth_walsh_average(&xs, k as u64));
+        let n = xs.len() as u64;
+        let m = median_by(n * (n + 1) / 2, |k| kth_walsh_average(&xs, k));
         assert!(m > 0.0 && m < 6.0, "{m}");
-        let d = median_by(n * (n - 1) / 2, |k| kth_abs_difference(&xs, k as u64));
+        let d = median_by(n * (n - 1) / 2, |k| kth_abs_difference(&xs, k));
         assert!(d > 4.0 && d < 9.0, "{d}");
     }
 }
