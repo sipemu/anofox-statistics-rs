@@ -422,7 +422,7 @@ fn mann_whitney_exact_p(n1: usize, n2: usize, u: f64, alternative: &Alternative)
 /// Exact signed-rank p-value from the null pmf of V (R's `psignrank`).
 fn wilcoxon_exact_p(n: usize, v: f64, alternative: &Alternative) -> f64 {
     let pmf = wilcoxon_pmf(n);
-    let max_v = (n * (n + 1) / 2) as f64;
+    let max_v = n as f64 * (n as f64 + 1.0) / 2.0;
     match alternative {
         Alternative::TwoSided => {
             let p_lower = cdf_le(&pmf, v);

@@ -20,33 +20,38 @@
 /// Complexity: expected O(r log(m) log(N)) time for `r` rows of length at
 /// most `m` and `N` entries in total; O(r) memory.
 ///
+/// Ranks and entry counts are `u64`: the number of pairs (`~N^2 / 2`)
+/// overflows `usize` on 32-bit targets (wasm32) beyond ~65 000 values.
+///
 /// # Panics
 /// If `k` is not smaller than the total number of entries.
-pub(crate) fn select_kth_sorted_rows<F>(ranges: &[(usize, usize)], f: F, k: usize) -> f64
+pub(crate) fn select_kth_sorted_rows<F>(ranges: &[(usize, usize)], f: F, k: u64) -> f64
 where
     F: Fn(usize, usize) -> f64,
 {
     let rows = ranges.len();
     let mut lo: Vec<usize> = ranges.iter().map(|r| r.0).collect();
     let mut hi: Vec<usize> = ranges.iter().map(|r| r.1.max(r.0)).collect();
-    let total: usize = lo.iter().zip(&hi).map(|(l, h)| h - l).sum();
+    let width = |l: &usize, h: &usize| (h - l) as u64;
+    let total: u64 = lo.iter().zip(&hi).map(|(l, h)| width(l, h)).sum();
     assert!(k < total, "select_kth_sorted_rows: k = {k} >= {total}");
 
-    let threshold = (4 * rows).max(4096);
+    let threshold = (4 * rows as u64).max(4096);
     // Number of entries known to be smaller than every active entry.
-    let mut below = 0usize;
+    let mut below = 0u64;
     let mut rng_state = 0x9E37_79B9_7F4A_7C15u64;
     let mut lt = vec![0usize; rows];
     let mut le = vec![0usize; rows];
 
     loop {
-        let active: usize = lo.iter().zip(&hi).map(|(l, h)| h - l).sum();
+        let active: u64 = lo.iter().zip(&hi).map(|(l, h)| width(l, h)).sum();
         if active <= threshold {
-            let mut vals: Vec<f64> = Vec::with_capacity(active);
+            let mut vals: Vec<f64> = Vec::with_capacity(active as usize);
             for i in 0..rows {
                 vals.extend((lo[i]..hi[i]).map(|j| f(i, j)));
             }
-            let (_, v, _) = vals.select_nth_unstable_by(k - below, |a, b| a.total_cmp(b));
+            let (_, v, _) =
+                vals.select_nth_unstable_by((k - below) as usize, |a, b| a.total_cmp(b));
             return *v;
         }
 
@@ -54,12 +59,12 @@ where
         rng_state ^= rng_state << 13;
         rng_state ^= rng_state >> 7;
         rng_state ^= rng_state << 17;
-        let mut r = (rng_state % active as u64) as usize;
+        let mut r = rng_state % active;
         let mut pivot = f64::NAN;
         for i in 0..rows {
-            let w = hi[i] - lo[i];
+            let w = (hi[i] - lo[i]) as u64;
             if r < w {
-                pivot = f(i, lo[i] + r);
+                pivot = f(i, lo[i] + r as usize);
                 break;
             }
             r -= w;
@@ -70,8 +75,8 @@ where
         for i in 0..rows {
             lt[i] = lower_bound(lo[i], hi[i], |j| f(i, j) < pivot);
             le[i] = lower_bound(lt[i], hi[i], |j| f(i, j) <= pivot);
-            n_lt += lt[i] - lo[i];
-            n_le += le[i] - lo[i];
+            n_lt += (lt[i] - lo[i]) as u64;
+            n_le += (le[i] - lo[i]) as u64;
         }
 
         if k < n_lt {
@@ -102,7 +107,7 @@ fn lower_bound<P: Fn(usize) -> bool>(mut lo: usize, mut hi: usize, pred: P) -> u
 
 /// `k`-th smallest (0-based) Walsh average `(s_i + s_j) / 2`, `i <= j`, of an
 /// ascending sorted sample `s`. O(n log^2 n) expected time, O(n) memory.
-pub(crate) fn kth_walsh_average(sorted: &[f64], k: usize) -> f64 {
+pub(crate) fn kth_walsh_average(sorted: &[f64], k: u64) -> f64 {
     let n = sorted.len();
     let ranges: Vec<(usize, usize)> = (0..n).map(|i| (i, n)).collect();
     select_kth_sorted_rows(&ranges, |i, j| (sorted[i] + sorted[j]) / 2.0, k)
@@ -111,7 +116,7 @@ pub(crate) fn kth_walsh_average(sorted: &[f64], k: usize) -> f64 {
 /// `k`-th smallest (0-based) pairwise difference `x_i - y_j` over all
 /// `(i, j)`, given `y` sorted descending. O(n log^2 n) expected time, O(nx)
 /// memory.
-pub(crate) fn kth_pairwise_difference(x: &[f64], y_desc: &[f64], k: usize) -> f64 {
+pub(crate) fn kth_pairwise_difference(x: &[f64], y_desc: &[f64], k: u64) -> f64 {
     let ny = y_desc.len();
     let ranges: Vec<(usize, usize)> = (0..x.len()).map(|_| (0, ny)).collect();
     select_kth_sorted_rows(&ranges, |i, j| x[i] - y_desc[j], k)
@@ -120,7 +125,7 @@ pub(crate) fn kth_pairwise_difference(x: &[f64], y_desc: &[f64], k: usize) -> f6
 /// `k`-th smallest (0-based) absolute pairwise difference `|s_i - s_j|`,
 /// `i < j`, of an ascending sorted sample `s`. O(n log^2 n) expected time,
 /// O(n) memory.
-pub(crate) fn kth_abs_difference(sorted: &[f64], k: usize) -> f64 {
+pub(crate) fn kth_abs_difference(sorted: &[f64], k: u64) -> f64 {
     let n = sorted.len();
     let ranges: Vec<(usize, usize)> = (0..n).map(|i| (i + 1, n)).collect();
     select_kth_sorted_rows(&ranges, |i, j| sorted[j] - sorted[i], k)
@@ -128,7 +133,7 @@ pub(crate) fn kth_abs_difference(sorted: &[f64], k: usize) -> f64 {
 
 /// Median of `count` values given their order statistics `kth(k)`, using
 /// `(v[c/2 - 1] + v[c/2]) / 2` for even `count`; NaN when `count == 0`.
-pub(crate) fn median_by<F: Fn(usize) -> f64>(count: usize, kth: F) -> f64 {
+pub(crate) fn median_by<F: Fn(u64) -> f64>(count: u64, kth: F) -> f64 {
     if count == 0 {
         return f64::NAN;
     }
@@ -205,14 +210,22 @@ mod tests {
                     v
                 };
                 for k in ks(walsh.len()) {
-                    assert_eq!(kth_walsh_average(&xs, k), walsh[k], "walsh n={n} k={k}");
+                    assert_eq!(
+                        kth_walsh_average(&xs, k as u64),
+                        walsh[k],
+                        "walsh n={n} k={k}"
+                    );
                 }
                 for k in ks(absd.len()) {
-                    assert_eq!(kth_abs_difference(&xs, k), absd[k], "abs n={n} k={k}");
+                    assert_eq!(
+                        kth_abs_difference(&xs, k as u64),
+                        absd[k],
+                        "abs n={n} k={k}"
+                    );
                 }
                 for k in ks(diffs.len()) {
                     assert_eq!(
-                        kth_pairwise_difference(&x, &yd, k),
+                        kth_pairwise_difference(&x, &yd, k as u64),
                         diffs[k],
                         "diff n={n} k={k}"
                     );
@@ -232,13 +245,13 @@ mod tests {
             let yd: Vec<f64> = sorted(y.clone()).into_iter().rev().collect();
             let (walsh, absd, diffs) = naive_all(&x, &y);
             for k in (0..walsh.len()).step_by(997) {
-                assert_eq!(kth_walsh_average(&xs, k), walsh[k]);
+                assert_eq!(kth_walsh_average(&xs, k as u64), walsh[k]);
             }
             for k in (0..absd.len()).step_by(331) {
-                assert_eq!(kth_abs_difference(&xs, k), absd[k]);
+                assert_eq!(kth_abs_difference(&xs, k as u64), absd[k]);
             }
             for k in (0..diffs.len()).step_by(773) {
-                assert_eq!(kth_pairwise_difference(&x, &yd, k), diffs[k]);
+                assert_eq!(kth_pairwise_difference(&x, &yd, k as u64), diffs[k]);
             }
         }
     }
@@ -259,9 +272,9 @@ mod tests {
         let mut s = 13u64;
         let xs = sorted(sample(&mut s, 100_000, 0));
         let n = xs.len();
-        let m = median_by(n * (n + 1) / 2, |k| kth_walsh_average(&xs, k));
+        let m = median_by(n * (n + 1) / 2, |k| kth_walsh_average(&xs, k as u64));
         assert!(m > 0.0 && m < 6.0, "{m}");
-        let d = median_by(n * (n - 1) / 2, |k| kth_abs_difference(&xs, k));
+        let d = median_by(n * (n - 1) / 2, |k| kth_abs_difference(&xs, k as u64));
         assert!(d > 4.0 && d < 9.0, "{d}");
     }
 }

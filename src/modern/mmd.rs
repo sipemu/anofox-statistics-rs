@@ -423,7 +423,10 @@ fn median_heuristic_1d(data: &[f64]) -> f64 {
     }
     let mut sorted = data.to_vec();
     sorted.sort_by(|a, b| a.total_cmp(b));
-    median_by(n * (n - 1) / 2, |k| kth_abs_difference(&sorted, k)).max(0.01) // Ensure non-zero bandwidth
+    median_by(n as u64 * (n as u64 - 1) / 2, |k| {
+        kth_abs_difference(&sorted, k)
+    })
+    .max(0.01) // Ensure non-zero bandwidth
 }
 
 #[cfg(test)]
