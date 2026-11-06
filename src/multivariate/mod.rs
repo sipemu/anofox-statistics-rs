@@ -4,4 +4,4 @@
 
 mod pca;
 
-pub use pca::{pca, Pca};
+pub use pca::{pca, pca_with_options, Pca, PcaOptions};

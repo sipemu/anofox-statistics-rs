@@ -289,7 +289,7 @@ pub fn embedding_ratio_drift(
 /// Rows evidently uses for the median distance: all rows up to 1000, else
 /// 1000 rows drawn without replacement with a fixed seed.
 fn median_rows(rows: &[Vec<f64>], seed: u64) -> Vec<&Vec<f64>> {
-    const MAX_ROWS: usize = 1000;
+    const MAX_ROWS: usize = super::defaults::EMBEDDING_MEDIAN_MAX_ROWS;
     if rows.len() <= MAX_ROWS {
         return rows.iter().collect();
     }
@@ -329,6 +329,23 @@ fn gaussian(sigma2: f64) -> Kernel {
     Kernel::Gaussian {
         bandwidth: (sigma2 / 2.0).sqrt(),
     }
+}
+
+/// Bandwidth of the Gaussian kernel of [`embedding_mmd_drift`], as the
+/// crate's [`Kernel::Gaussian`] `bandwidth` (`k = exp(-d^2 / (2 bandwidth^2))`):
+/// `median / sqrt(2)`, with `median` the median euclidean distance between
+/// reference and current rows (at most 1000 rows per sample, larger samples
+/// subsampled with a fixed seed; `1 / sqrt(2)` if the median is 0), i.e.
+/// evidently's kernel `exp(-d^2 / median^2)`.
+///
+/// Errors as [`embedding_distance_drift`].
+///
+/// R equivalent: `median(as.matrix(dist(rbind(ref, cur)))[1:m, m + 1:n]) / sqrt(2)`.
+pub fn embedding_mmd_bandwidth(reference: &[Vec<f64>], current: &[Vec<f64>]) -> Result<f64> {
+    validate(reference, current)?;
+    let med = median_distance(&median_rows(reference, 0), &median_rows(current, 0));
+    let sigma2 = if med > 0.0 { med * med } else { 1.0 };
+    Ok((sigma2 / 2.0).sqrt())
 }
 
 /// Embedding drift by the maximum mean discrepancy (evidently's `mmd`

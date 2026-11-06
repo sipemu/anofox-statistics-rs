@@ -139,8 +139,8 @@ impl DriftTest {
             | DriftTest::MannWhitney
             | DriftTest::TTest
             | DriftTest::ChiSquare
-            | DriftTest::Z => 0.05,
-            _ => 0.1,
+            | DriftTest::Z => super::defaults::P_VALUE_THRESHOLD,
+            _ => super::defaults::DISTANCE_THRESHOLD,
         }
     }
 
@@ -224,7 +224,7 @@ impl Default for DriftOptions {
             threshold: None,
             binning: Binning::Auto,
             zero_fill: ZeroFill::Evidently,
-            n_permutations: 1000,
+            n_permutations: super::defaults::N_PERMUTATIONS,
             seed: None,
         }
     }
@@ -244,9 +244,11 @@ pub struct ColumnDrift {
     pub drifted: bool,
 }
 
-/// Size of the reference sample up to which evidently uses the
-/// small-sample tests.
-const SMALL_REFERENCE: usize = 1000;
+use super::defaults::{
+    CATEGORICAL_LARGE, CATEGORICAL_SMALL_BINARY, CATEGORICAL_SMALL_MANY, NUMERIC_FEW_VALUES,
+    NUMERIC_LARGE_FEW_VALUES, NUMERIC_LARGE_MANY_VALUES, NUMERIC_MANY_VALUES, NUMERIC_SMALL_BINARY,
+    NUMERIC_SMALL_FEW_VALUES, NUMERIC_SMALL_MANY_VALUES, SMALL_REFERENCE_ROWS as SMALL_REFERENCE,
+};
 
 /// evidently's default test for a numeric column.
 ///
@@ -268,11 +270,11 @@ pub fn default_drift_test_numeric(reference: &[f64], current: &[f64]) -> DriftTe
     let pooled: Vec<f64> = reference.iter().chain(current).copied().collect();
     let u = super::binning::n_distinct(&pooled);
     match (reference.len() <= SMALL_REFERENCE, u) {
-        (true, u) if u > 5 => DriftTest::Ks,
-        (true, u) if u > 2 => DriftTest::ChiSquare,
-        (true, _) => DriftTest::Z,
-        (false, u) if u > 5 => DriftTest::Wasserstein,
-        (false, _) => DriftTest::JensenShannon,
+        (true, u) if u > NUMERIC_MANY_VALUES => NUMERIC_SMALL_MANY_VALUES,
+        (true, u) if u > NUMERIC_FEW_VALUES => NUMERIC_SMALL_FEW_VALUES,
+        (true, _) => NUMERIC_SMALL_BINARY,
+        (false, u) if u > NUMERIC_MANY_VALUES => NUMERIC_LARGE_MANY_VALUES,
+        (false, _) => NUMERIC_LARGE_FEW_VALUES,
     }
 }
 
@@ -282,13 +284,13 @@ pub fn default_drift_test_numeric(reference: &[f64], current: &[f64]) -> DriftTe
 /// larger one.
 pub fn default_drift_test_categorical<T: Ord>(reference: &[T], current: &[T]) -> DriftTest {
     if reference.len() > SMALL_REFERENCE {
-        return DriftTest::JensenShannon;
+        return CATEGORICAL_LARGE;
     }
     let (r, _) = super::category_counts(reference, current);
     if r.len() > 2 {
-        DriftTest::ChiSquare
+        CATEGORICAL_SMALL_MANY
     } else {
-        DriftTest::Z
+        CATEGORICAL_SMALL_BINARY
     }
 }
 

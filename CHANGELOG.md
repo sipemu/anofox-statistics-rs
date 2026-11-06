@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-06
+
+### Added
+
+- **Scaled PCA.** `multivariate::pca_with_options(data, &PcaOptions { scale: true })`
+  standardises the columns by their standard deviations (divisor `n - 1`), as R's
+  `prcomp(scale. = TRUE)`; the sds are stored in the new field `Pca::scale:
+  Option<Vec<f64>>` and `Pca::transform` applies them (`predict.prcomp`). `pca(data)`
+  is unchanged (`scale: None`). A constant column with `scale` is an error, as in R.
+  Validated against `prcomp(scale. = TRUE)` / `predict` (tall and wide designs).
+- **Public MMD median-heuristic bandwidths.** `modern::median_heuristic_bandwidth(x, y)`
+  (median pairwise euclidean distance of the pooled rows, floored at 0.01; for 1-D rows
+  the bandwidth of `mmd_test_1d`), `modern::median_heuristic_bandwidth_1d(x, y)` (the
+  bandwidth `mmd_test_1d` uses) and `drift::embedding_mmd_bandwidth(reference, current)`
+  (the kernel bandwidth of `embedding_mmd_drift`, evidently's convention). New
+  `Kernel::GaussianMedianHeuristic` lets `mmd_test` pick the bandwidth from the data;
+  the existing kernels and defaults (`Kernel::default()` is still
+  `Gaussian { bandwidth: 1.0 }`) are unchanged. Validated against R.
+- **evidently defaults as constants.** `drift::defaults` (`P_VALUE_THRESHOLD`,
+  `DISTANCE_THRESHOLD`, `SMALL_REFERENCE_ROWS`, the default tests per column type and
+  regime, `N_PERMUTATIONS`, `DATASET_DRIFT_SHARE`, `EMBEDDING_DISTANCE_THRESHOLD` = 0.2,
+  `EMBEDDING_MMD_THRESHOLD` = 0.015, `EMBEDDING_DISTANCE_QUANTILE` = 0.95,
+  `EMBEDDING_MMD_QUANTILE` = 0.05, `EMBEDDING_BOOTSTRAP_RESAMPLES` = 100, the ratio
+  method's component test / thresholds, ...), and `EmbeddingThreshold::EVIDENTLY_DISTANCE`,
+  `EVIDENTLY_MMD`, `evidently_distance_bootstrap(seed)`, `evidently_mmd_bootstrap(seed)`.
+  The drift functions use these constants (no behaviour change).
+- JS: `JsKernel.GaussianMedianHeuristic` for `mmdTest`, `medianHeuristicBandwidth1d`.
+
+### Changed
+
+- `Pca` has a new public field `scale` and `Kernel` a new variant (breaking for struct
+  literals / exhaustive matches).
+
 ## [0.8.3] - 2026-11-06
 
 ### Fixed
