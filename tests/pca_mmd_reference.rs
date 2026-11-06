@@ -205,6 +205,22 @@ fn evidently_defaults_are_exposed() {
     )
     .unwrap();
     assert_eq!(a.threshold, 0.2);
+    assert_eq!(
+        EmbeddingThreshold::evidently_distance_bootstrap(None),
+        EmbeddingThreshold::Bootstrap {
+            n_bootstrap: 100,
+            quantile: 0.95,
+            seed: None
+        }
+    );
+    let a = embedding_distance_drift(
+        &r,
+        &c,
+        EmbeddingDistance::Euclidean,
+        EmbeddingThreshold::evidently_distance_bootstrap(Some(2)),
+    )
+    .unwrap();
+    assert!(a.threshold.is_finite());
     let b =
         embedding_mmd_drift(&r, &c, EmbeddingThreshold::evidently_mmd_bootstrap(Some(1))).unwrap();
     assert!(b.threshold.is_finite());

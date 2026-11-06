@@ -589,4 +589,27 @@ mod tests {
 
         assert!(mmd_test_1d(&x, &y, 100, None).is_err());
     }
+
+    #[test]
+    fn test_median_heuristic_bandwidth_edge_cases() {
+        let e: Vec<Vec<f64>> = vec![];
+        assert_eq!(median_heuristic_bandwidth(&e, &e).unwrap(), 1.0);
+        let one = vec![vec![1.0, 2.0]];
+        assert_eq!(median_heuristic_bandwidth(&one, &e).unwrap(), 1.0);
+        assert!(median_heuristic_bandwidth(&[vec![]], &e).is_err());
+        assert!(median_heuristic_bandwidth(&one, &[vec![1.0]]).is_err());
+        assert!(median_heuristic_bandwidth(&one, &[vec![1.0, f64::NAN]]).is_err());
+        assert!(median_heuristic_bandwidth_1d(&[1.0], &[f64::INFINITY]).is_err());
+        // Three rows: three distances (odd count), median = middle one.
+        let x = vec![vec![0.0, 0.0], vec![3.0, 4.0]];
+        let y = vec![vec![0.0, 1.0]];
+        let bw = median_heuristic_bandwidth(&x, &y).unwrap();
+        // distances 5, 1, sqrt(18)
+        assert!((bw - 18f64.sqrt()).abs() < 1e-12);
+        // Identical rows: floored at 0.01.
+        let z = vec![vec![1.0, 1.0]; 3];
+        assert_eq!(median_heuristic_bandwidth(&z, &z).unwrap(), 0.01);
+        // The unresolved kernel is never evaluated directly.
+        assert!(kernel_value(Kernel::GaussianMedianHeuristic, &[0.0], &[1.0]).is_nan());
+    }
 }
