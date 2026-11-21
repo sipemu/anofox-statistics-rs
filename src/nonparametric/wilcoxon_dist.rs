@@ -117,11 +117,21 @@ pub(crate) fn cdf_le(pmf: &[f64], q: f64) -> f64 {
 
 /// `P(S >= q)` for a pmf on `0..len`.
 pub(crate) fn cdf_ge(pmf: &[f64], q: f64) -> f64 {
-    let qi = q.ceil();
+    let qi = (q - 1e-7).ceil();
     if qi <= 0.0 {
         return 1.0;
     }
-    1.0 - cdf_le(pmf, qi - 1.0)
+    let qi = qi as usize;
+    if qi >= pmf.len() {
+        return 0.0;
+    }
+    // Sum the shorter tail for accuracy: `1 - P(S <= q - 1)` would form a
+    // small upper tail as `1 - (1 - tail)` and lose it to rounding (#64).
+    if 2 * qi >= pmf.len() {
+        pmf[qi..].iter().sum::<f64>()
+    } else {
+        1.0 - pmf[..qi].iter().sum::<f64>()
+    }
 }
 
 /// Quantile as R's `qwilcox` / `qsignrank`: the smallest `q` with
@@ -216,5 +226,20 @@ mod tests {
         }
         let big = wilcoxon_pmf(200);
         assert!((big.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn cdf_ge_upper_tail_matches_reflected_lower_tail() {
+        // V is symmetric, so P(V >= v) = P(V <= max_v - v), and the
+        // reflected side sums the small tail directly (#64).
+        for n in 1..=100 {
+            let pmf = wilcoxon_pmf(n);
+            let max_v = pmf.len() - 1;
+            for v in 0..=max_v {
+                let ge = cdf_ge(&pmf, v as f64);
+                let le = cdf_le(&pmf, (max_v - v) as f64);
+                assert!((ge - le).abs() <= 1e-12 * le, "n = {n}, v = {v}");
+            }
+        }
     }
 }
