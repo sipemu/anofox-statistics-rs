@@ -380,3 +380,70 @@ fn issue_20_exact_tests_large_n_match_r() {
         r.p_value
     );
 }
+
+/// #64: exact one-sided `Greater` p-values sum the small upper tail directly
+/// instead of forming it as `1 - (1 - tail)`. R 4.6.1:
+/// wilcox.test(1:60, alternative = "greater", exact = TRUE)$p.value, etc.
+#[test]
+fn issue_64_exact_greater_small_upper_tail_matches_r() {
+    let rel = |a: f64, e: f64| ((a - e) / e).abs() <= 1e-10;
+    let zeros = vec![0.0; 70];
+
+    let x: Vec<f64> = (1..=60).map(f64::from).collect();
+    let r = wilcoxon_signed_rank(
+        &x,
+        &zeros[..60],
+        Alternative::Greater,
+        false,
+        true,
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(rel(r.p_value, 8.6736173798840509e-19), "{:e}", r.p_value);
+    let two = wilcoxon_signed_rank(
+        &x,
+        &zeros[..60],
+        Alternative::TwoSided,
+        false,
+        true,
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(rel(two.p_value, 2.0 * r.p_value), "{:e}", two.p_value);
+
+    let x: Vec<f64> = [-3.0, -1.0, 2.0]
+        .into_iter()
+        .chain((4..=70).map(f64::from))
+        .collect();
+    let r =
+        wilcoxon_signed_rank(&x, &zeros, Alternative::Greater, false, true, None, None).unwrap();
+    assert!(rel(r.p_value, 5.9292306307801287e-21), "{:e}", r.p_value);
+
+    let x: Vec<f64> = (1..=55)
+        .chain((56..=60).map(|i| -i))
+        .map(f64::from)
+        .collect();
+    let r = wilcoxon_signed_rank(
+        &x,
+        &zeros[..60],
+        Alternative::Greater,
+        false,
+        true,
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(rel(r.p_value, 5.8666433510983036e-07), "{:e}", r.p_value);
+
+    // The shared `cdf_ge` also serves the Mann-Whitney `Greater` path.
+    let x: Vec<f64> = (61..=120).map(f64::from).collect();
+    let y: Vec<f64> = (1..=60).map(f64::from).collect();
+    let r = mann_whitney_u(&x, &y, Alternative::Greater, false, true, None, None).unwrap();
+    assert!(rel(r.p_value, 1.0350369440934841e-35), "{:e}", r.p_value);
+    let x: Vec<f64> = (1..=5).chain(61..=115).map(f64::from).collect();
+    let y: Vec<f64> = (6..=60).chain(116..=120).map(f64::from).collect();
+    let r = mann_whitney_u(&x, &y, Alternative::Greater, false, true, None, None).unwrap();
+    assert!(rel(r.p_value, 4.6180444606596356e-12), "{:e}", r.p_value);
+}

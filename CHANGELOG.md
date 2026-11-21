@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-21
+
+### Fixed
+
+- **Exact one-sided `Greater` p-values lost small upper tails (#64).** The exact upper
+  tail `P(S >= q)` was formed as `1 - (1 - tail)` and rounded away: exactly `0.0` from
+  about n = 60 in `wilcoxon_signed_rank(.., Alternative::Greater, .., exact = true, ..)`
+  while the two-sided p-value was correct. The shorter tail is now summed directly
+  (as R's `psignrank` / `pwilcox`), which also fixes the exact `Greater` (and
+  above-the-mean two-sided) Mann-Whitney p-values and the exact AUC null p-value.
+  Validated against R 4.6.1 `wilcox.test(..., exact = TRUE)`.
+
 ## [0.10.0] - 2026-11-06
 
 ### Added
